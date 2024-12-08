@@ -2,6 +2,11 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import YAML from 'yaml';
 import { ServerContext } from './server';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Read and parse the config file
 const configPath = join(__dirname, 'config.yml');

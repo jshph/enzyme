@@ -1,6 +1,6 @@
 import express, { Express } from 'express';
 import { Server } from 'http';
-import { extractPatterns, MatchType, QueryPattern } from './extract/index';
+import { extractPatterns, QueryPattern } from './extract/index';
 import { parseQueryString } from './extract/queryParser';
 import { getFileIndexer, ElectronFileIndexer } from './indexer/electron';
 import * as winston from 'winston';

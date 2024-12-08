@@ -1,48 +1,60 @@
-import { resolve } from 'path'
+import { resolve, join } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from 'tailwindcss'
 import autoprefixer from 'autoprefixer'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
+import { fileURLToPath } from 'url'
+import path from 'path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin(), nodePolyfills()],
-    // build: {
-    //   rollupOptions: {
-    //     output: {
-    //       format: 'es'
-    //     }
-    //   }
-    // }
+    build: {
+      rollupOptions: {
+        output: {
+          format: 'es'
+        },
+        external: ['electron']
+      }
+    }
   },
   preload: {
     plugins: [externalizeDepsPlugin(), nodePolyfills()],
     build: {
       rollupOptions: {
-        input: {
-          preload: resolve(__dirname, 'src/preload/index.ts')
-        }
+        output: {
+          format: 'es'
+        },
+        external: ['electron']
       }
     }
   },
   renderer: {
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src')
+        '@renderer': resolve(join(__dirname, 'src/renderer/src'))
       }
+    },
+    plugins: [react(), nodePolyfills()],
+    css: {
+      postcss: {
+        plugins: [tailwindcss(), autoprefixer()],
+      },
     },
     build: {
       rollupOptions: {
         input: {
-          main: resolve(__dirname, 'src/renderer/index.html')
-        }
-      }
-    },
-    plugins: [react()],
-    css: {
-      postcss: {
-        plugins: [tailwindcss(), autoprefixer()]
+          dashboard: resolve(__dirname, 'src/renderer/dashboard/dashboard.html'),
+          menubar: resolve(__dirname, 'src/renderer/menubar/menubar.html')
+        },
+        output: {
+          format: 'es'
+        },
+        external: ['electron']
       }
     }
   }

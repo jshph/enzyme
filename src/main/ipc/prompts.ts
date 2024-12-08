@@ -26,7 +26,7 @@ export function setupPromptRoutes() {
     }
   });
 
-  ipcMain.handle('search-vault-items', async (event, query: string) => {
+  ipcMain.handle('search-vault-items', async (_, query: string) => {
     const allTags = indexer.getTags();
     const allLinks = indexer.getLinks();
 
@@ -63,7 +63,7 @@ export function setupPromptRoutes() {
     }
   });
 
-  ipcMain.handle('create-prompt', async (event, { prompt, name }) => {
+  ipcMain.handle('create-prompt', async (_, { prompt, name }) => {
     try {
       const auth = store.get('auth');
       const token = await getCurrentSession();
@@ -84,7 +84,7 @@ export function setupPromptRoutes() {
     }
   });
 
-  ipcMain.handle('update-prompt', async (event, { id, prompt, name }) => {
+  ipcMain.handle('update-prompt', async (_, { id, prompt, name }) => {
     try {
       const token = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
@@ -104,7 +104,7 @@ export function setupPromptRoutes() {
     }
   });
 
-  ipcMain.handle('delete-prompt', async (event, id) => {
+  ipcMain.handle('delete-prompt', async (_, id) => {
     try {
       const token = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');

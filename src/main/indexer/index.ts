@@ -23,13 +23,6 @@ interface IndexEntry {
   files: FileMetadata[];
 }
 
-interface SerializedCache {
-  tagIndex: { [key: string]: IndexEntry };
-  linkIndex: { [key: string]: IndexEntry };
-  folderIndex: { [key: string]: IndexEntry };
-  lastUpdated: number;
-}
-
 interface TrendingItem {
   name: string;
   count: number;
@@ -50,12 +43,8 @@ export class FileIndexer {
   private watcher: chokidar.FSWatcher | null = null;
   private vaultPath: string | null = null;
   private spacesPath: string = "enzyme-spaces";
-  private cacheFile: string | null = null;
-  private lastSave: number = 0;
-  private readonly SAVE_INTERVAL = 5 * 60 * 1000; // 5 minutes
   private isIndexing: boolean = false;
   private indexQueue: Array<() => Promise<void>> = [];
-  private doCache: boolean = true;
   private totalFiles: number = 0;
   private processedFiles: number = 0;
   private excludedTags: string[] = [];
@@ -126,12 +115,10 @@ export class FileIndexer {
     this.logger.debug(`Initializing file indexer...`);
     this.clearIndex();
     
-    this.doCache = doCache;
     this.vaultPath = vaultPath;
     if (spacesPath) {
       this.spacesPath = spacesPath;
     }
-    this.cacheFile = vaultPath ? window.path.join(vaultPath, '.indexer-cache.json') : null;
     this.excludedTags = excludedTags.map(tag => tag.toLowerCase());
     this.excludedPatterns = excludedPatterns.map(pattern => pattern.toLowerCase());
     this.includedPatterns = includedPatterns.map(pattern => pattern.toLowerCase());
@@ -156,9 +143,6 @@ export class FileIndexer {
 
   async stop(): Promise<void> {
     if (this.watcher) {
-      if (this.doCache) {
-        await this.saveCache(); // Save cache before stopping
-      }
       await this.watcher.close();
       this.watcher = null;
     }
@@ -524,7 +508,6 @@ export class FileIndexer {
 
             // Update total processed files after batch is complete
             this.processedFiles += this.batchProcessedFiles;
-            await this.maybeSaveCache();
         } finally {
             this.isIndexing = false;
             this.emitIndexingStatus();
@@ -535,70 +518,6 @@ export class FileIndexer {
 
   private async handleFileRemoval(filePath: string): Promise<void> {
     this.removeFromIndex(filePath);
-    await this.maybeSaveCache();
-  }
-
-  private async loadCache(): Promise<void> {
-    try {
-      if (!this.cacheFile) return;
-
-      const exists = await fs.access(this.cacheFile)
-        .then(() => true)
-        .catch(() => false);
-
-      if (!exists) return;
-
-      const cacheData = await fs.readFile(this.cacheFile, 'utf-8');
-      const cache: SerializedCache = JSON.parse(cacheData);
-
-      // Convert plain objects back to Maps
-      this.tagIndex = new Map(Object.entries(cache.tagIndex));
-      this.linkIndex = new Map(Object.entries(cache.linkIndex));
-      this.folderIndex = new Map(Object.entries(cache.folderIndex));
-      this.lastSave = cache.lastUpdated;
-
-      this.logger.info('Cache loaded successfully');
-    } catch (error) {
-      this.logger.error(`Error loading cache: ${error}`);
-      this.logger.info('Starting fresh indexer...');
-      // If cache is corrupted, start fresh
-      this.tagIndex = new Map();
-      this.linkIndex = new Map();
-      this.folderIndex = new Map();
-    }
-  }
-
-  private async maybeSaveCache(): Promise<void> {
-    if (!this.doCache) return;
-
-    const now = Date.now();
-    if (now - this.lastSave > this.SAVE_INTERVAL) {
-      await this.saveCache();
-    }
-  }
-
-  private async saveCache(): Promise<void> {
-    try {
-      if (!this.cacheFile) return;
-
-      const cache: SerializedCache = {
-        tagIndex: Object.fromEntries(this.tagIndex),
-        linkIndex: Object.fromEntries(this.linkIndex),
-        folderIndex: Object.fromEntries(this.folderIndex),
-        lastUpdated: Date.now()
-      };
-
-      await fs.writeFile(
-        this.cacheFile,
-        JSON.stringify(cache, null, 2),
-        'utf-8'
-      );
-
-      this.lastSave = Date.now();
-      this.logger.info('Cache saved successfully');
-    } catch (error) {
-      this.logger.error(`Error saving cache: ${error}`);
-    }
   }
 
   private async processQueue(): Promise<void> {

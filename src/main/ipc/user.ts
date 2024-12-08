@@ -100,11 +100,11 @@ export async function clearSession() {
 }
 
 export function setupUserIPCRoutes() {
-  ipcMain.handle('get-settings', async (event) => {
+  ipcMain.handle('get-settings', async (_) => {
     return await getSettings();
   });
 
-  ipcMain.handle('update-settings', async (event, newSettings) => {
+  ipcMain.handle('update-settings', async (_, newSettings) => {
     try {
       const token = await getCurrentSession();
       const auth = store.get('auth');
@@ -135,7 +135,7 @@ export function setupUserIPCRoutes() {
   });
 
 
-  ipcMain.handle('update-local-settings', async (event, newLocalSettings: LocalSettings) => {
+  ipcMain.handle('update-local-settings', async (_, newLocalSettings: LocalSettings) => {
     try {
       store.set('localSettings', newLocalSettings);
       return { success: true };

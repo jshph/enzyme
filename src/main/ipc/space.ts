@@ -36,7 +36,7 @@ export function setupSpaceRoutes() {
     return { success: true };
   });
 
-  ipcMain.handle('create-space', async (event, spaceData) => {
+  ipcMain.handle('create-space', async (_, spaceData) => {
     try {
       const auth = store.get('auth');
       const token = await getCurrentSession();
@@ -50,7 +50,7 @@ export function setupSpaceRoutes() {
         },
         body: JSON.stringify({ ...spaceData, email: auth.email })
       });
-      const result = await responseon();
+      const result = await response.json();
       
       if (result.success) {
         // Update local mappings
@@ -72,7 +72,7 @@ export function setupSpaceRoutes() {
     }
   });
 
-  ipcMain.handle('submit-to-space', async (event, { spaceName, submission }) => {
+  ipcMain.handle('submit-to-space', async (_, { spaceName, submission }) => {
     try {
       const token = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
@@ -99,7 +99,7 @@ export function setupSpaceRoutes() {
     }
   });
 
-  ipcMain.handle('fetch-spaces', async (event) => {
+  ipcMain.handle('fetch-spaces', async (_) => {
     try {
       const auth = store.get('auth');
       const token = await getCurrentSession();
@@ -157,7 +157,7 @@ export function setupSpaceRoutes() {
     }
   });
 
-  ipcMain.handle('fetch-space-submissions', async (event, spaceId) => {
+  ipcMain.handle('fetch-space-submissions', async (_, spaceId) => {
     try {
       const token = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
@@ -197,7 +197,7 @@ export function setupSpaceRoutes() {
     }
   });
 
-  ipcMain.handle('search-vault-tags', async (event, query?: string) => {
+  ipcMain.handle('search-vault-tags', async (_, query?: string) => {
     try {
       const allTags = fileIndexer.getTags();
       
@@ -220,7 +220,7 @@ export function setupSpaceRoutes() {
     }
   });
 
-  ipcMain.handle('delete-space', async (event, spaceId) => {
+  ipcMain.handle('delete-space', async (_, spaceId) => {
     try {
       const token = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
@@ -246,7 +246,7 @@ export function setupSpaceRoutes() {
     }
   });
 
-  ipcMain.handle('edit-space', async (event, { spaceId, updates }) => {
+  ipcMain.handle('edit-space', async (_, { spaceId, updates }) => {
     try {
       const token = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
@@ -281,7 +281,7 @@ export function setupSpaceRoutes() {
     }
   });
 
-  ipcMain.handle('refresh-space', async (event, spaceId) => {
+  ipcMain.handle('refresh-space', async (_, spaceId) => {
     try {
       const token = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');

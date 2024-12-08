@@ -1,7 +1,18 @@
 import React, { useState } from 'react'
 import SettingsManager from './components/SettingsManager'
 import Sidebar from './components/Sidebar'
-import { ipcRenderer } from 'electron'
+declare global {
+  interface Window {
+    electron: {
+      ipcRenderer: {
+        send: (channel: string, ...args: any[]) => void
+        on: (channel: string, func: (...args: any[]) => void) => void
+        invoke: (channel: string, ...args: any[]) => Promise<any>
+      }
+    }
+  }
+}
+
 import Main from './components/main'
 
 const App: React.FC = () => {
@@ -34,9 +45,9 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     try {
       // Clear spaces first
-      await ipcRenderer.invoke('clear-spaces');
+      await window.electron.ipcRenderer.invoke('clear-spaces');
       
-      const { success, error } = await ipcRenderer.invoke('auth:logout');
+      const { success, error } = await window.electron.ipcRenderer.invoke('auth:logout');
       if (success) {
         setIsAuthenticated(false);
         setEmail('');

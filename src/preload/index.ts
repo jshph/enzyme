@@ -44,35 +44,27 @@ const api = {
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
-if (process.contextIsolated) {
+// if (process.contextIsolated) {
+//   console.log('contextIsolated')
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('electron', {
+      ...electronAPI,
+      ipcRenderer: {
+        send: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
+        on: (channel: string, func: (...args: any[]) => void) => {
+          ipcRenderer.on(channel, (_, ...args) => func(...args))
+        },
+        invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args)
+      }
+    })
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
     console.error(error)
   }
-} else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
-}
-
-import fs from 'fs';
-import path from 'path';
-
-contextBridge.exposeInMainWorld('nodefs', {
-  readFile: (path: string) => fs.promises.readFile(path, "utf-8"),
-  writeFile: (path: string, data: string) => fs.promises.writeFile(path, data),
-  readdir: (path: string) => fs.promises.readdir(path),
-  mkdir: (path: string, options?: fs.MakeDirectoryOptions) => fs.promises.mkdir(path, options),
-  stat: (path: string) => fs.promises.stat(path),
-  exists: (path: string) => fs.existsSync(path)
-})
-
-contextBridge.exposeInMainWorld('nodepath', {
-  join: (...paths: string[]) => path.join(...paths),
-  resolve: (...paths: string[]) => path.resolve(...paths),
-  dirname: (pathName: string) => path.dirname(pathName),
-  basename: (pathName: string) => path.basename(pathName)
-})
+// } else {
+//   console.log('not contextIsolated')
+//   // @ts-ignore (define in dts)
+//   window.electron = electronAPI
+//   // @ts-ignore (define in dts)
+//   window.api = api
+// }

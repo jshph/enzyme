@@ -66,7 +66,7 @@ export function setupVaultIPCRoutes() {
     );
   });
   
-  ipcMain.handle('trending-data-update', (event) => {
+  ipcMain.handle('trending-data-update', (_) => {
     return indexer.getTrendingItems();
   });
   

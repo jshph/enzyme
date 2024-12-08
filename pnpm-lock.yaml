@@ -8,12 +8,6 @@ dependencies:
   '@anthropic-ai/sdk':
     specifier: ^0.32.1
     version: 0.32.1
-  '@electron-toolkit/preload':
-    specifier: ^3.0.1
-    version: 3.0.1(electron@31.7.6)
-  '@electron-toolkit/utils':
-    specifier: ^3.0.0
-    version: 3.0.0(electron@31.7.6)
   '@types/alpinejs':
     specifier: ^3.13.11
     version: 3.13.11
@@ -76,10 +70,10 @@ dependencies:
     version: 4.1.0
   menubar:
     specifier: ^9.5.1
-    version: 9.5.1(electron@31.7.6)
+    version: 9.5.1(electron@32.2.7)
   react-router-dom:
-    specifier: ^6.22.0
-    version: 6.22.0(react-dom@18.3.1)(react@18.3.1)
+    specifier: ^6.28.0
+    version: 6.28.0(react-dom@18.3.1)(react@18.3.1)
   rss-parser:
     specifier: ^3.13.0
     version: 3.13.0
@@ -112,9 +106,15 @@ devDependencies:
   '@electron-toolkit/eslint-config-ts':
     specifier: ^2.0.0
     version: 2.0.0(eslint@8.57.1)(typescript@5.7.2)
+  '@electron-toolkit/preload':
+    specifier: ^3.0.1
+    version: 3.0.1(electron@32.2.7)
   '@electron-toolkit/tsconfig':
     specifier: ^1.0.1
     version: 1.0.1(@types/node@20.17.9)
+  '@electron-toolkit/utils':
+    specifier: ^3.0.0
+    version: 3.0.0(electron@32.2.7)
   '@types/node':
     specifier: ^20.17.9
     version: 20.17.9
@@ -131,8 +131,8 @@ devDependencies:
     specifier: ^10.4.20
     version: 10.4.20(postcss@8.4.49)
   electron:
-    specifier: ^31.7.6
-    version: 31.7.6
+    specifier: ^32.2.7
+    version: 32.2.7
   electron-builder:
     specifier: ^24.13.3
     version: 24.13.3(electron-builder-squirrel-windows@24.13.3)
@@ -585,13 +585,13 @@ packages:
       - supports-color
     dev: true
 
-  /@electron-toolkit/preload@3.0.1(electron@31.7.6):
+  /@electron-toolkit/preload@3.0.1(electron@32.2.7):
     resolution: {integrity: sha512-EzoQmpK8jqqU8YnM5jRe0GJjGVJPke2KtANqz8QtN2JPT96ViOvProBdK5C6riCm0j1T8jjAGVQCZLQy9OVoIA==}
     peerDependencies:
       electron: '>=13.0.0'
     dependencies:
-      electron: 31.7.6
-    dev: false
+      electron: 32.2.7
+    dev: true
 
   /@electron-toolkit/tsconfig@1.0.1(@types/node@20.17.9):
     resolution: {integrity: sha512-M0Mol3odspvtCuheyujLNAW7bXq7KFNYVMRtpjFa4ZfES4MuklXBC7Nli/omvc+PRKlrklgAGx3l4VakjNo8jg==}
@@ -601,13 +601,13 @@ packages:
       '@types/node': 20.17.9
     dev: true
 
-  /@electron-toolkit/utils@3.0.0(electron@31.7.6):
+  /@electron-toolkit/utils@3.0.0(electron@32.2.7):
     resolution: {integrity: sha512-GaXHDhiT7KCvMJjXdp/QqpYinq69T/Pdl49Z1XLf8mKGf63dnsODMWyrmIjEQ0z/vG7dO8qF3fvmI6Eb2lUNZA==}
     peerDependencies:
       electron: '>=13.0.0'
     dependencies:
-      electron: 31.7.6
-    dev: false
+      electron: 32.2.7
+    dev: true
 
   /@electron/asar@3.2.17:
     resolution: {integrity: sha512-OcWImUI686w8LkghQj9R2ynZ2ME693Ek6L1SiaAgqGKzBaTIZw3fHDqN82Rcl+EU1Gm9EgkJ5KLIY/q5DCRbbA==}
@@ -1244,8 +1244,8 @@ packages:
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
     dev: true
 
-  /@remix-run/router@1.15.0:
-    resolution: {integrity: sha512-HOil5aFtme37dVQTB6M34G95kPM3MMuqSmIRVCC52eKV+Y/tGSqw9P3rWhlAx6A+mz+MoX+XxsGsNJbaI5qCgQ==}
+  /@remix-run/router@1.21.0:
+    resolution: {integrity: sha512-xfSkCAchbdG5PnbrKqFWwia4Bi61nH+wm8wLEqfHDyp7Y3dZzgqS2itV8i4gAq9pC2HsTpwyBC6Ds8VHZ96JlA==}
     engines: {node: '>=14.0.0'}
     dev: false
 
@@ -1844,8 +1844,8 @@ packages:
       eslint-visitor-keys: 3.4.3
     dev: true
 
-  /@ungap/structured-clone@1.2.0:
-    resolution: {integrity: sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==}
+  /@ungap/structured-clone@1.2.1:
+    resolution: {integrity: sha512-fEzPV3hSkSMltkw152tJKNARhOupqbH96MZWyRjNaYZOMIzbrTeQDG+MTc6Mr2pgzFQzFxAfmhGDNP5QK++2ZA==}
     dev: true
 
   /@vitejs/plugin-react@4.3.4(vite@5.4.11):
@@ -3370,8 +3370,8 @@ packages:
       - supports-color
     dev: true
 
-  /electron@31.7.6:
-    resolution: {integrity: sha512-fc2kMaEc/zxGTW6oCxbuE7BQNOlDucSo+351AiovBAcp7G0iQkVu3k2kHIQolSsD38+tPdBj/N02DVpZTzi7rg==}
+  /electron@32.2.7:
+    resolution: {integrity: sha512-y8jbQRG3xogF70XPlk5c+dWe5iRfUBo28o2NMpKd/CcW7ENIaWtBlGima8/8nmRdAaYTy1+yIt6KB0Lon9H8cA==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
     requiresBuild: true
@@ -3689,7 +3689,7 @@ packages:
       '@humanwhocodes/config-array': 0.13.0
       '@humanwhocodes/module-importer': 1.0.1
       '@nodelib/fs.walk': 1.2.8
-      '@ungap/structured-clone': 1.2.0
+      '@ungap/structured-clone': 1.2.1
       ajv: 6.12.6
       chalk: 4.1.2
       cross-spawn: 7.0.6
@@ -5518,12 +5518,12 @@ packages:
     engines: {node: '>= 0.6'}
     dev: false
 
-  /menubar@9.5.1(electron@31.7.6):
+  /menubar@9.5.1(electron@32.2.7):
     resolution: {integrity: sha512-swfgKal+DTgJINay36X+LGBSqyFKS4d9FyJ2w0s/4MtO7/UGplEZqluLTnq4xgLNxNjMWhXycOELP+rRYpTagA==}
     peerDependencies:
       electron: '>=9.0.0 <33.0.0'
     dependencies:
-      electron: 31.7.6
+      electron: 32.2.7
       electron-positioner: 4.1.0
     dev: false
 
@@ -6248,6 +6248,13 @@ packages:
       side-channel: 1.0.6
     dev: false
 
+  /qs@6.13.1:
+    resolution: {integrity: sha512-EJPeIn0CYrGu+hli1xilKAPXODtJ12T0sP63Ijx2/khC2JtuaN3JyNIpvmnkmaEtha9ocbG4A4cMcr+TvqvwQg==}
+    engines: {node: '>=0.6'}
+    dependencies:
+      side-channel: 1.0.6
+    dev: false
+
   /querystring-es3@0.2.1:
     resolution: {integrity: sha512-773xhDQnZBMFobEiztv8LIl70ch5MSF/jUQVlhwFyBILqq96anmoctVIYz+ZRp0qbCKATTn6ev02M3r7Ga5vqA==}
     engines: {node: '>=0.4.x'}
@@ -6311,26 +6318,26 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
-  /react-router-dom@6.22.0(react-dom@18.3.1)(react@18.3.1):
-    resolution: {integrity: sha512-z2w+M4tH5wlcLmH3BMMOMdrtrJ9T3oJJNsAlBJbwk+8Syxd5WFJ7J5dxMEW0/GEXD1BBis4uXRrNIz3mORr0ag==}
+  /react-router-dom@6.28.0(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-kQ7Unsl5YdyOltsPGl31zOjLrDv+m2VcIEcIHqYYD3Lp0UppLjrzcfJqDJwXxFw3TH/yvapbnUvPlAj7Kx5nbg==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       react: '>=16.8'
       react-dom: '>=16.8'
     dependencies:
-      '@remix-run/router': 1.15.0
+      '@remix-run/router': 1.21.0
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      react-router: 6.22.0(react@18.3.1)
+      react-router: 6.28.0(react@18.3.1)
     dev: false
 
-  /react-router@6.22.0(react@18.3.1):
-    resolution: {integrity: sha512-q2yemJeg6gw/YixRlRnVx6IRJWZD6fonnfZhN1JIOhV2iJCPeRNSH3V1ISwHf+JWcESzLC3BOLD1T07tmO5dmg==}
+  /react-router@6.28.0(react@18.3.1):
+    resolution: {integrity: sha512-HrYdIFqdrnhDw0PqG/AKjAqEqM7AvxCz0DQ4h2W8k6nqmc5uRBYDag0SBxx9iYz5G8gnuNVLzUe13wl9eAsXXg==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       react: '>=16.8'
     dependencies:
-      '@remix-run/router': 1.15.0
+      '@remix-run/router': 1.21.0
       react: 18.3.1
     dev: false
 
@@ -7426,7 +7433,7 @@ packages:
     engines: {node: '>= 0.4'}
     dependencies:
       punycode: 1.4.1
-      qs: 6.13.0
+      qs: 6.13.1
     dev: false
 
   /utf8-byte-length@1.0.5:

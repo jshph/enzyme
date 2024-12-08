@@ -116,17 +116,18 @@ function setupMenubar() {
     }
   }
 
+  const menubarUrl = import.meta.env.VITE_ELECTRON_RENDERER_URL + '/menubar.html'
   const mb: Menubar = menubar({
-    index: `${app.getAppPath()}/src/renderer/menubar`,
+    index: menubarUrl,
     icon: getMenubarIcon(),
     browserWindow: {
       width: 400,
       height: 800,
       webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
+        nodeIntegration: false,
+        contextIsolation: true,
         sandbox: false,
-        preload: `${app.getAppPath()}/src/preload/index.ts`
+        preload: `/Users/joshuapham/Hacks/enzyme/out/preload/index.mjs`
       },
       vibrancy: 'tooltip',
     }
@@ -191,9 +192,10 @@ function createWindow(): void {
     minWidth: 1280,
     minHeight: 1024,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      // preload: `${app.getAppPath()}/src/preload/index.ts`
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      preload: `/Users/joshuapham/Hacks/enzyme/out/preload/index.mjs`
     },
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 15, y: 15 },
@@ -220,11 +222,11 @@ function createWindow(): void {
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
-  if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL)
-  } else {
-    mainWindow.loadFile(path.join(app.getAppPath(), 'src/renderer/index.html'))
-  }
+  // if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
+  mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
+  // } else {
+  //   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+  // }
 }
 
 

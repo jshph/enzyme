@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
+  "type": "module",
   "author": "example.com",
   "homepage": "https://electron-vite.org",
   "scripts": {
@@ -22,8 +23,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
-    "@electron-toolkit/preload": "^3.0.1",
-    "@electron-toolkit/utils": "^3.0.0",
     "@types/alpinejs": "^3.13.11",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
@@ -45,6 +44,7 @@
     "jest": "^29.7.0",
     "js-yaml": "^4.1.0",
     "menubar": "^9.5.1",
+    "react-router-dom": "^6.28.0",
     "rss-parser": "^3.13.0",
     "tiny-lru": "^11.2.11",
     "ts-jest": "^29.2.5",
@@ -52,19 +52,20 @@
     "ts-node-dev": "^2.0.0",
     "vite-plugin-node-polyfills": "^0.22.0",
     "winston": "^3.17.0",
-    "yaml": "^2.6.1",
-    "react-router-dom": "^6.22.0"
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^2.0.0",
     "@electron-toolkit/eslint-config-ts": "^2.0.0",
     "@electron-toolkit/tsconfig": "^1.0.1",
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
     "@types/node": "^20.17.9",
     "@types/react": "^18.3.14",
     "@types/react-dom": "^18.3.2",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
-    "electron": "^31.7.6",
+    "electron": "^32.2.7",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
     "eslint": "^8.57.1",
