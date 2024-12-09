@@ -611,7 +611,7 @@ button:disabled {
     align-items: center;
     gap: 12px; /* Increased gap for better spacing */
     position: relative;
-    width: 100%;s
+    width: 100%;
 }
 
 .vault-info img {

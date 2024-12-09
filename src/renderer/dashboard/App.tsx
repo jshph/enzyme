@@ -3,7 +3,6 @@ import { useSettingsContext } from './contexts/SettingsContext'
 import Sidebar from './components/Sidebar'
 import Main from './components/main'
 import { VaultProvider, useVault } from './components/VaultProvider'
-import { useSpaceManager } from './hooks/useSpaceManager'
 import { useAuth } from './contexts/AuthContext'
 
 // Create an inner component to use hooks
@@ -13,7 +12,6 @@ const AppContent: React.FC = () => {
   const [error, setError] = useState(false)
   const { refreshSettings, settings } = useSettingsContext()
   const { initializeVault } = useVault()
-  const { fetchSpaces } = useSpaceManager()
   const auth = useAuth()
 
   const init = useCallback(async () => {
@@ -59,13 +57,6 @@ const AppContent: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
-
-  // Watch for view changes
-  useEffect(() => {
-    if (currentView === 'spaces' && auth.isAuthenticated) {
-      fetchSpaces()
-    }
-  }, [currentView, auth.isAuthenticated])
 
   const quitApp = async () => {
     await window.electron.ipcRenderer.send('quit-app')

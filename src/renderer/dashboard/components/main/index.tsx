@@ -15,7 +15,7 @@ const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView }) => {
     <div className="flex-1 ml-64 min-h-screen overflow-y-auto">
       <div className="p-8">
         {currentView === 'settings' && <Settings />}
-        {currentView === 'spaces' && <Spaces />}
+        {currentView === 'spaces' && <Spaces currentView={currentView} />}
         {currentView === 'prompts' && <Prompts />}
         {currentView === 'login' && <Login init={init} setCurrentView={setCurrentView}/>}
       </div>

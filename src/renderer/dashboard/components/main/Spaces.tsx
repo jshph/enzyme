@@ -1,15 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Space, NewSpace } from '../../types';
 import { useSettingsContext } from '../../contexts/SettingsContext';
-import { useSpaceManager } from '../../hooks/useSpaceManager';
 import { useAuth } from '../../contexts/AuthContext';
 
-interface SpacesProps {}
+interface SpacesProps {
+  currentView: string;
+}
 
-const Spaces: React.FC<SpacesProps> = () => {
+const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
   const { settings } = useSettingsContext();
   const { isAuthenticated } = useAuth();
-  const { spaces, message, error, fetchSpaces, saveSpace } = useSpaceManager();
+  // const { spaces, message, error, fetchSpaces, saveSpace } = useSpaceManager();
   const [newSpace, setNewSpace] = useState<NewSpace>({
     id: null,
     name: '',
@@ -24,6 +25,62 @@ const Spaces: React.FC<SpacesProps> = () => {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const enzymeBaseUrl = 'https://enzyme.garden';
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState(false);
+  
+  useEffect(() => {
+    if (currentView === 'spaces') {
+      fetchSpaces();
+    }
+  }, [currentView]);
+
+  const fetchSpaces = useCallback(async () => {
+    try {
+      const response = await window.electron.ipcRenderer.invoke('fetch-spaces');
+      if (response.success) {
+        setSpaces(response.spaces);
+      }
+    } catch (error) {
+      console.error('Error fetching spaces:', error);
+      setMessage('Failed to fetch spaces');
+      setError(true);
+    }
+  }, []);
+
+  const saveSpace = useCallback(async (spaceData: NewSpace, isEditing: boolean) => {
+    try {
+      const response = await window.electron.ipcRenderer.invoke(
+        isEditing ? 'edit-space' : 'create-space',
+        isEditing ? {
+          spaceId: spaceData.id,
+          updates: {
+            name: spaceData.name,
+            destinationFolder: spaceData.destinationFolder,
+            enabledTags: [...spaceData.enabledTags]
+          }
+        } : {
+          ...spaceData,
+          enabledTags: [...spaceData.enabledTags]
+        }
+      );
+
+      if (response.success) {
+        await fetchSpaces();
+        setMessage(`Space ${isEditing ? 'updated' : 'created'} successfully!`);
+        setError(false);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error saving space:', error);
+      setMessage(`Failed to ${isEditing ? 'update' : 'create'} space`);
+      setError(true);
+      return false;
+    }
+  }, [fetchSpaces]);
+
+
 
   const generateFolderName = (name: string): string => {
     if (!name) return '';
@@ -310,7 +367,7 @@ const Spaces: React.FC<SpacesProps> = () => {
             Cancel
           </button>
           <button
-            onClick={saveSpace}
+            onClick={() => saveSpace(newSpace, editingSpace)}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             Save

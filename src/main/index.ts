@@ -58,6 +58,10 @@ function initializeMain() {
   ipcMain.on('quit-app', () => {
     app.quit();
   });
+  
+  ipcMain.on('open-dashboard', () => {
+    createWindow();
+  });
 
   setupMenubar();
   setupDashboard();

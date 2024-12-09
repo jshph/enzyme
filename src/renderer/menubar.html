@@ -1,18 +1,325 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Dashboard</title>
-    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
-    <!-- <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
-    /> -->
-  </head>
+<head>
+    <title>Enzyme</title>
+    <link href="../styles/menubar.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="settingsData">
+      <div class="modal" :style="showModal ? 'display: block;' : 'display: none;'">
+        <div class="modal-content">
+          <span class="close-button" @click="showModal = false">&times;</span>
+          <p>Please sign in to analyze again</p>
+          <button id="open-dashboard" @click="openDashboard">Open Dashboard</button>
+        </div>
+      </div>
 
-  <body>
-    <div id="root"></div>
-    <!-- For development with Vite -->
-    <script type="module" src="./menubar/main.tsx"></script>
-  </body>
-</html>
+      <div class="fixed-header">
+        <div class="settings-section">
+            <div class="vault-info">
+              <a class="settings-menu" @click="openDashboard">
+                <img src="./resources/settings.png" alt="Settings">
+              </a>
+              <p class="mb-2">
+                <img x-show="settings.vaultPath" src="./resources/vault.png" alt="Vault">
+                <span x-show="settings.vaultPath" class="text-green-600" x-text="settings.vaultPath"></span>
+                <span x-show="!settings.vaultPath" class="text-red-600">⚠️</span>
+                <button x-show="!settings.vaultPath" @click="openDashboard" class="ml-2 bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700">
+                    Connect Vault
+                </button>
+              </p>
+            </div>
+
+        </div>
+        
+        <div class="analyze-controls">
+            <div class="form-group">
+                <label for="promptTemplate">Template</label>
+                <select id="promptTemplate" x-model="selectedTemplate" class="prompt-select">
+                    <template x-for="template in promptTemplates" :key="template.id">
+                        <option 
+                            :value="template.id" 
+                            x-text="template.label"
+                            :title="template.description"
+                        ></option>
+                    </template>
+                </select>
+            </div>
+            <button 
+                @click="analyzeVault"
+                :disabled="isAnalyzing"
+                class="analyze-btn"
+            >
+                <span x-show="!isAnalyzing">Digest</span>
+                <span x-show="isAnalyzing">...</span>
+            </button>
+            <button 
+                class="view-toggle" 
+                @click="toggleView()"
+                x-text="showTrending ? '↑' : '↓'" 
+            ></button>
+        </div>
+    </div>
+    <div class="view-container">
+
+        <div 
+            class="trending-view" 
+            x-show="showTrending"
+        >
+          <div class="loading-spinner" x-show="trendingData.tags.length === 0 && trendingData.links.length === 0">
+              <div class="spinner"></div>
+              <p>Vault has no data yet...</p>
+          </div>
+          <div class="trending-section" x-show="trendingData && (trendingData.tags.length || trendingData.links.length)">
+              <div class="trending-tags" x-show="trendingData?.tags?.length">
+                  <h3>Trending Tags</h3>
+                  <div class="trending-items">
+                      <template x-for="tag in trendingData.tags" :key="tag.name">
+                          <span class="trending-item">
+                              <span x-text="'#' + tag.name"></span>
+                              <span class="count" x-text="tag.count"></span>
+                          </span>
+                      </template>
+                  </div>
+              </div>
+              <div class="trending-links" x-show="trendingData?.links?.length">
+                  <h3>Trending Links</h3>
+                  <div class="trending-items">
+                      <template x-for="link in trendingData.links" :key="link.name">
+                          <span class="trending-item">
+                              <span x-text="'[[' + link.name + ']]'"></span>
+                              <span class="count" x-text="link.count"></span>
+                          </span>
+                      </template>
+                  </div>
+              </div>
+          </div>
+        </div>
+
+        <div 
+            class="digest-view" 
+            :class="{ 'active': !showTrending }"
+            x-show="!showTrending"
+        >
+            <!-- Add loading spinner -->
+            <div class="loading-spinner" x-show="isAnalyzing">
+                <div class="spinner"></div>
+                <p>Generating insights...</p>
+            </div>
+
+            <!-- Only show carousel when we have digests and not analyzing -->
+            <div class="carousel-container" x-show="analysisDigests && analysisDigests.length > 0 && !isAnalyzing">
+                <div class="carousel-track" :style="`transform: translateX(-${currentSlide * slideWidth}px)`">
+                    <template x-for="(digest, index) in analysisDigests" :key="index">
+                        <div class="carousel-slide">
+                            <div class="digest-item">
+                                <p x-text="digest.text"></p>
+                                <span @click="copyDigest(digest.text)" class="copy-icon" title="Copy digest">
+                                    📋
+                                </span>
+                                <div class="files-list">
+                                    <template x-for="file in digest.files" :key="file">
+                                        <a :href="`obsidian://open?vault=obsidian&file=${encodeURIComponent(file)}`" target="_blank">
+                                            <p x-text="file.split('/').pop()"></p>
+                                        </a>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add status footer -->
+    <div class="status-footer" x-show="indexingStatus.visible">
+        <div class="status-indicator" :class="indexingStatus.isComplete ? 'complete' : 'indexing'"></div>
+        <span x-text="indexingStatus.message"></span>
+    </div>
+
+    <div class="carousel-nav" :class="{ 'hidden': showTrending || !analysisDigests || analysisDigests.length === 0 }">
+        <button class="carousel-arrow prev" @click="prevSlide" x-show="currentSlide > 0">←</button>
+        <button class="carousel-arrow next" @click="nextSlide" x-show="currentSlide < analysisDigests.length - 1">→</button>
+        <template x-for="(_, index) in analysisDigests" :key="index">
+            <div 
+              class="carousel-dot" 
+              :class="{ 'active': currentSlide === index }"
+              @click="goToSlide(index)"
+          ></div>
+        </template>
+    </div>
+    <script>
+        
+        // const { Store } = require('./electron-store.js');
+        // const store = new Store();
+        
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('settingsData', () => ({
+                  indexingStatus: {
+                  visible: false,
+                  isComplete: false,
+                  message: ''
+              },
+              trendingData: {
+                tags: [],
+                links: []
+              },
+              analysisDigests: null,
+              isAnalyzing: false,
+              selectedTemplate: '',
+              selectedTemplateId: null,
+              selectedUserPrompt: null,
+              showTrending: true,
+              currentSlide: 0,
+              slideWidth: 300 + 10 + 10, // 300px for slide, 10px for left and right padding
+              showModal: false,
+              settings: {},
+              analysisDigests: [],
+              promptTemplates: [],
+              async init() {
+                  this.settings = await window.electron.ipcRenderer.invoke('get-settings');
+
+                  await this.updatePromptTemplates();
+
+                  // Update the indexing status handler
+                  window.electron.ipcRenderer.on('indexing-status', (_, status) => {
+                      this.indexingStatus.visible = true;
+                      this.indexingStatus.isComplete = status.isComplete;
+                      this.indexingStatus.message = status.message;
+                      
+                      // Hide the status after 3 seconds if complete
+                      if (status.isComplete) {
+                          setTimeout(() => {
+                              this.indexingStatus.visible = false;
+                          }, 3000);
+                      }
+                  });
+
+                  // Handle trending data updates
+                  window.electron.ipcRenderer.invoke('trending-data-update').then((trendingData) => {
+                      this.trendingData = trendingData;
+                  });
+
+                  // Add visibility change listener
+                  window.addEventListener('visibilitychange', async () => {
+                      if (document.visibilityState === 'visible') {
+                          window.electron.ipcRenderer.invoke('trending-data-update').then((trendingData) => {
+                              this.trendingData = trendingData;
+                          });
+                          // reset settings
+                          this.settings = await window.electron.ipcRenderer.invoke('get-settings');
+                          await this.updatePromptTemplates();
+                      }
+                  });
+              },
+              async updatePromptTemplates() {
+                  try {
+                      // Load built-in templates
+                      const templates = await window.electron.ipcRenderer.invoke('get-prompt-templates');
+                      this.promptTemplates = templates.map(t => ({
+                          ...t,
+                          type: 'template'
+                      }));
+
+                      // Check if we have a session
+                      const session = await window.electron.ipcRenderer.invoke('auth:verify-session');
+                      if (session.isAuthenticated) {
+                        // Load user prompts
+                        const userPrompts = await window.electron.ipcRenderer.invoke('get-prompts');
+                        userPrompts.prompts.forEach(prompt => {
+                            this.promptTemplates.push({ 
+                                id: prompt.id, 
+                                label: `User: ${prompt.name}`,
+                                type: 'user',
+                                prompt: prompt.prompt
+                            });
+                        });
+                      }
+
+                      if (this.promptTemplates.length > 0) {
+                          this.selectedTemplate = this.promptTemplates[0].id;
+                      }
+                  } catch (error) {
+                      console.error('Failed to load prompt templates:', error);
+                  }
+              },
+              openDashboard() {
+                  window.electron.ipcRenderer.send('open-dashboard');
+              },
+              async analyzeVault() {
+                  this.isAnalyzing = true;
+                  this.analysisDigests = null;
+                  this.showTrending = false;
+                  
+                  try {
+                      // Find the selected template/prompt
+                      const selected = this.promptTemplates.find(t => t.id === this.selectedTemplate);
+                      
+                      let templateId = null;
+                      let userPrompt = null;
+                      
+                      if (selected.type === 'template') {
+                          templateId = selected.id;
+                      } else {
+                          userPrompt = selected.prompt;
+                      }
+
+                      const response = await window.electron.ipcRenderer.invoke('analyze-vault', templateId, userPrompt);
+                      
+                      if (response?.error === 'limit_reached') {
+                          this.showTrending = true;
+                          return;
+                      }
+
+                      if (!response || response.length === 0) {
+                          this.showTrending = true;
+                          return;
+                      }
+
+                      this.analysisDigests = response;
+                      this.currentSlide = 0;
+                  } catch (error) {
+                      console.error('Failed to analyze vault:', error);
+                      this.showTrending = true;
+                  } finally {
+                      this.isAnalyzing = false;
+                  }
+              },
+              copyDigest(digest) {
+                  navigator.clipboard.writeText(digest);
+                  // Could add a toast notification here
+              },
+              toggleView() {
+                  this.showTrending = !this.showTrending;
+              },
+              prevSlide() {
+                  if (this.currentSlide > 0) {
+                      this.currentSlide--;
+                  }
+              },
+              nextSlide() {
+                  if (this.currentSlide < this.analysisDigests.length - 1) {
+                      this.currentSlide++;
+                  }
+              },
+              goToSlide(index) {
+                  this.currentSlide = index;
+                  
+                  const track = document.querySelector('.carousel-track');
+                  const slides = track.querySelectorAll('.carousel-slide');
+                  const targetSlide = slides[index];
+                  
+                  if (targetSlide) {
+                      track.style.transform = `translateX(-${index * this.slideWidth}px)`;
+                  }
+                  
+                  document.querySelectorAll('.carousel-dot').forEach((dot, i) => {
+                      dot.classList.toggle('active', i === index);
+                  });
+              }
+          }));
+        });
+    </script>
+</body>
+</html> 
