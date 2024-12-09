@@ -86,10 +86,10 @@ function initializeMain() {
     }
   }
 
-  // Hide the dock icon initially if on macOS
-  if (process.platform === 'darwin') {
-    app.dock.hide();
-  }
+  // // Hide the dock icon initially if on macOS
+  // if (process.platform === 'darwin') {
+  //   app.dock.hide();
+  // }
 }
 
 

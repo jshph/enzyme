@@ -1,15 +1,17 @@
 import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SidebarProps {
   currentView: string;
   setCurrentView: (view: string) => void;
-  isAuthenticated: boolean;
-  handleLogout: () => void;
-  quitApp: () => void;
-  email: string;
+  quitApp: () => Promise<void>;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isAuthenticated, handleLogout, quitApp, email }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp }) => {
+  const { isAuthenticated, email, handleLogout } = useAuth();
+
+  console.log('isAuthenticated', isAuthenticated)
+
   return (
     <div className="w-64 bg-white shadow-lg fixed h-screen overflow-y-auto">
       <nav className="mt-12">

@@ -2,14 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Main Process",
+      "name": "Debug Enzyme",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceRoot}/enzyme",
-      "runtimeExecutable": "${workspaceRoot}/enzyme/node_modules/.bin/electron-vite",
-      "windows": {
-        "runtimeExecutable": "${workspaceRoot}/enzyme/node_modules/.bin/electron-vite.cmd"
-      },
+      "cwd": "${workspaceRoot}",
+      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/electron-vite",
       "runtimeArgs": ["--sourcemap"],
       "env": {
         "REMOTE_DEBUGGING_PORT": "9222"
@@ -20,7 +17,7 @@
       "port": 9222,
       "request": "attach",
       "type": "chrome",
-      "webRoot": "${workspaceFolder}/enzyme/src/renderer",
+      "webRoot": "${workspaceFolder}/src/renderer",
       "timeout": 60000,
       "presentation": {
         "hidden": true

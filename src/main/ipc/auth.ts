@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import { TokenManager } from "../auth";
-import { getServerUrl, store } from "./index";
+import { getServerUrl, logger, store } from "./index";
 import { clearSession, getCurrentSession } from "./user";
 
 export function setupAuthIPCRoutes() {
@@ -17,7 +17,7 @@ export function setupAuthIPCRoutes() {
   const SERVER_URL = getServerUrl();
 
 
-  ipcMain.handle('verify-otp', async (event, email: string, token: string) => {
+  ipcMain.handle('auth:verify-otp', async (_, email: string, token: string) => {
     try {
       const response = await fetch(`${SERVER_URL}/auth/verify-otp`, {
         method: 'POST',
@@ -36,7 +36,7 @@ export function setupAuthIPCRoutes() {
         });
       }
       
-      return data;
+      return { success: true, message: data.message };
     } catch (error) {
       console.error('Error verifying OTP:', error);
       return { 
@@ -46,7 +46,7 @@ export function setupAuthIPCRoutes() {
     }
   });
 
-  ipcMain.handle('auth:send-verification-code', async (event, email) => {
+  ipcMain.handle('auth:send-verification-code', async (_, email) => {
     try {
       const response = await fetch(`${SERVER_URL}/auth/send-verification-code`, {
         method: 'POST',
@@ -55,17 +55,17 @@ export function setupAuthIPCRoutes() {
       });
 
       if (!response.ok) {
-        return await response.text();
+        return { success: false, error: await response.text() };
       }
       const data = await response.json();
-      return data.message;
+      return { success: true, message: data.message };
     } catch (error) {
       logger.error(`Error sending verification code: ${error}`);
-      return `Error sending verification code`;
+      throw new Error('Error sending verification code. Please try again in a few moments.');
     }
   });
 
-  ipcMain.handle('auth:verify-session', async (event) => {
+  ipcMain.handle('auth:verify-session', async (_) => {
     try {
       const token = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/auth/verify-session`, {
@@ -87,7 +87,7 @@ export function setupAuthIPCRoutes() {
         });
       }
       
-      return data;
+      return { isAuthenticated: true, user: data.user };
     } catch (error) {
       console.error('Error verifying session:', error);
       return { 

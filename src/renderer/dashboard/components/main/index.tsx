@@ -4,14 +4,20 @@ import Spaces from './Spaces'
 import Prompts from './Prompts'
 import Login from './Login'
 
-const Main: React.FC<{ currentView: string, isAuthenticated: boolean }> = ({ currentView, isAuthenticated }) => {
+interface MainProps {
+  currentView: string;
+  init: () => Promise<void>;
+  setCurrentView: (view: string) => void;
+}
+
+const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView }) => {
   return (
     <div className="flex-1 ml-64 min-h-screen overflow-y-auto">
       <div className="p-8">
         {currentView === 'settings' && <Settings />}
-        {currentView === 'spaces' && isAuthenticated && <Spaces />}
-        {currentView === 'prompts' && isAuthenticated && <Prompts />}
-        {currentView === 'login' && <Login />}
+        {currentView === 'spaces' && <Spaces />}
+        {currentView === 'prompts' && <Prompts />}
+        {currentView === 'login' && <Login init={init} setCurrentView={setCurrentView}/>}
       </div>
     </div>
   )

@@ -32,7 +32,6 @@ const api = {
   createSpace: (spaceData: SpaceInfo) => ipcRenderer.invoke('create-space', spaceData),
   submitToSpace: (spaceName: string, submission: any) => ipcRenderer.invoke('submit-to-space', { spaceName, submission }),
   clearSpaces: () => ipcRenderer.invoke('clear-spaces'),
-  searchVaultTags: (query?: string) => ipcRenderer.invoke('search-vault-tags', query),
   fetchSpaceSubmissions: (spaceId: string) => ipcRenderer.invoke('fetch-space-submissions', spaceId),
 
   // Prompts
