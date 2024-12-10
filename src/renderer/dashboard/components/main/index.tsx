@@ -3,7 +3,7 @@ import Settings from './Settings'
 import Spaces from './Spaces'
 import Prompts from './Prompts'
 import Login from './Login'
-
+import Playground from './Playground'
 interface MainProps {
   currentView: string;
   init: () => Promise<void>;
@@ -17,6 +17,7 @@ const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView }) => {
         {currentView === 'settings' && <Settings />}
         {currentView === 'spaces' && <Spaces currentView={currentView} />}
         {currentView === 'prompts' && <Prompts />}
+        {currentView === 'playground' && <Playground />}
         {currentView === 'login' && <Login init={init} setCurrentView={setCurrentView}/>}
       </div>
     </div>

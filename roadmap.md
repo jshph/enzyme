@@ -111,8 +111,18 @@ DONE:
 
 NEXT before launch:
 
+- laern how to insert blockquotes programamticaly, without generating the ai all. Output format should be doc links followed by synthesis.
+- implement the "digest" menu item in the editor - to extract mentions from the editor and retrieve docs from Enzyme, to synthesize them and output blockquotes with the docs as references.
+- could also implement a plugin which is a view on the docs, link it to the editor
 
-- rewrite menubar in react
+
+Brainstorming:
+
+- a view on your thoughts anywhere you go --
+  - which digests to the most relevant ones - metaprompting until you have a way to extract the question that surfaces the most relevant insights. A constantly evolving view, which you know by the question that was asked. And then a way to extend the question by posting it to your friends -- the most interesting question, you're creating a mirror for your friends. which you can share with a few of your thoughts.
+  - allays the common critique that in an age of ai, we'll just be swimming in content that doesn't really matter to us. Contrary - we can shape the mirrors that most represent all that we've captured.
+
+
 
 - prompt space should be as functional as original dashboard.html
 - flow of vault digestion -> (optional) prompt -> create space (either from prompt or minimally) -> share space -> digest

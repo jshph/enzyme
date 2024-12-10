@@ -36,7 +36,8 @@ export default defineConfig({
   renderer: {
     resolve: {
       alias: {
-        '@renderer': resolve(join(__dirname, 'src/renderer/src'))
+        '@': path.resolve(__dirname, './src/renderer/dashboard'),
+        '@renderer': path.resolve(__dirname, './src/renderer')
       }
     },
     plugins: [react(), nodePolyfills()],

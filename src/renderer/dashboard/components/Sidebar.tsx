@@ -35,6 +35,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp 
             </a>
           )}
 
+          <a onClick={() => setCurrentView('playground')} 
+              className={`flex items-center px-4 py-3 cursor-pointer hover:bg-gray-50 ${currentView === 'playground' ? 'bg-blue-50 text-blue-600' : ''}`}>
+              <span className="ml-2">Playground</span>
+          </a>
+
           {!isAuthenticated && (
             <a onClick={() => setCurrentView('login')} 
                 className={`flex items-center px-4 py-3 cursor-pointer hover:bg-gray-50 ${currentView === 'login' ? 'bg-blue-50 text-blue-600' : ''}`}>

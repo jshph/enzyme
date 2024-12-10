@@ -26,12 +26,6 @@ const AppContent: React.FC = () => {
         setMessage('Failed to initialize vault')
         setError(true)
       }
-
-      // If authenticated, set view and fetch spaces
-      if (auth.isAuthenticated) {
-        setCurrentView('settings')
-        await fetchSpaces()
-      }
     } catch (err) {
       console.error('Error during initialization:', err)
       setMessage('Failed to initialize application')
