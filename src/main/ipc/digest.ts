@@ -80,25 +80,16 @@ export function setupDigestIPCRoutes() {
     docs: z.array(z.string()).describe("The verbatim filepaths of the top 5 most relevant documents to the user's query"),
   });
 
-  const DiveExplorationSchema = z.object({
-    type: z.string().describe("The type of the segment, should be 'dive'"),
-    exploration: z.string().describe("A 50 word exploration of the relevant documents for this segment, the tone of a therapist / good friend. The goal is to help the user explore novel insights from subtle connections between the documents. Rather than generalize, be specific, pointing to experiences from notes to ground your point of view."),
-  });
-
-  const GapExplorationSchema = z.object({
-    type: z.string().describe("The type of the segment, should be 'gap'"),
-    exploration: z.string().describe("A 50 word exploration of the gaps in insight of these documents that the user may be missing, pointing to a specific, grounded, subtle connection between the documents to illuminate a missing insight."),
-  });
-
   const SegmentSchema = z.object({
     theme: z.string().describe("A 5 word theme of this segment"),
-    synthesis: z.union([DiveExplorationSchema, GapExplorationSchema]),
-    docs: z.array(z.string()).describe("The verbatim filepaths of the top most relevant documents to the exploration").length(4)
+    type: z.string().describe("The type of the segment, should be 'dive' or 'gap'"),
+    analysis: z.string().describe("A 50 word exploration of the relevant documents for this segment, the tone of a therapist / good friend. The goal is either to help the user explore novel insights from subtle connections between the documents, or to illuminate a missing insight. Make sure to be specific, and to ground your point of view on experiences in the notes."),
+    docs: z.array(z.string()).describe("The verbatim filepaths of the top 4 most relevant documents to the synthesis").length(4)
   })
 
   const SuggestedOutputSchema = z.object({
-    question: z.string().describe("An insightful, reflective question to the user that would surface the relevant documents from the notes, distinguished from the other documents"),
-    segments: z.array(SegmentSchema).describe("Segments of the output, which illuminate pathways through the notes").min(2).max(4)
+    question: z.string().describe("An insightful, reflective question to the user that would surface the relevant documents from the notes"),
+    segments: z.array(SegmentSchema).min(2).max(4)
   });
   
 
@@ -124,7 +115,7 @@ export function setupDigestIPCRoutes() {
         content: `
           You are a masterful news article curator. Every piece of gold that falls through the cracks comes from a brilliant writer who is on the brink of quitting their job. DON'T let extremely insightful writers quit, especially if their ideas are promising yet half baked.
 
-          Your task is to craft a question, then interleave alternating segments of synthesis and the documents most relevant to the synthesis.
+          Your task is to craft a question, and to create a series of flowing segments which illuminate pathways through the notes. Always include supporting sources and a synthesis.
           The context is: ${JSON.stringify(context)}
         `
       },
@@ -133,17 +124,25 @@ export function setupDigestIPCRoutes() {
         content: query
       }  
     ]
+    const maxRetries = 3;
+    let attempt = 0;
 
-    try {
-      response = await generateObject({
-        model: openai("gpt-4o-mini"),
-        messages: messages as CoreMessage[],
-        schema: SuggestedOutputSchema
-      });
-      return response.object;
-    } catch (error) {
-      console.error(error);
-      return null;
+    while (attempt < maxRetries) {
+      try {
+        response = await generateObject({
+          model: openai("gpt-4o-mini"),
+          temperature: 0.7,
+          messages: messages as CoreMessage[],
+          schema: SuggestedOutputSchema
+        });
+        return response.object;
+      } catch (error) {
+        console.error(`Attempt ${attempt + 1} failed:`, error);
+        attempt++;
+        if (attempt === maxRetries) {
+          return null;
+        }
+      }
     }
   });
 

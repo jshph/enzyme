@@ -15,11 +15,10 @@ interface OutputSection {
 }
 
 export interface BaseSegment {
-  type: 'docs';
   theme: string;
   synthesis: {
     type: 'dive' | 'gap';
-    exploration: string;
+    analysis: string;
   };
   docs: {
     file: string;
@@ -75,8 +74,8 @@ export const SuggestedOutput = React.forwardRef<
             type: 'synthesis',
             title: segment.synthesis.type === 'dive' ? 'Deep Dive' : 'Gap Analysis',
             content: (
-              <div className="bg-secondary/5 border border-dashed border-secondary/30 p-4 rounded-lg">
-                <p>{segment.synthesis.exploration}</p>
+              <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100">
+                <p>{segment.synthesis.analysis}</p>
               </div>
             )
           });
@@ -90,7 +89,7 @@ export const SuggestedOutput = React.forwardRef<
                 {segment.docs.map((doc, idx) => (
                   <div 
                     key={idx} 
-                    className="bg-secondary/5 border border-dashed border-secondary/30 hover:bg-accent/5 transition-colors cursor-pointer"
+                    className="bg-secondary/5 border border-dashed rounded-md cursor-pointer border-secondary/20 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100"
                     onClick={() => openInObsidian(doc.file)}
                   >
                     <div className="p-4 space-y-2">

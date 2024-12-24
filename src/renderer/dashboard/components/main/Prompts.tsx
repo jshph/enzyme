@@ -65,7 +65,7 @@ const Prompts: React.FC<{ currentView: string, setPromptCount: (count: number) =
 
       {/* Prompt List */}
       <div className="space-y-4">
-        <h3 className="text-lg font-medium text-primary/90">Prompts</h3>
+        <h3 className="text-lg font-medium text-primary/90">Scheduled</h3>
         
         <div className="grid grid-cols-1 gap-4">
           {userPrompts.map((prompt) => (

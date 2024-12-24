@@ -63,8 +63,8 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       segments: result.segments.map(segment => ({
         theme: segment.theme,
         synthesis: {
-          type: segment.synthesis.type,
-          exploration: segment.synthesis.exploration
+          type: segment.type,
+          analysis: segment.analysis
         },
         docs: segment.docs.map(doc => {
           const contextItem = context.find(result => result.file === doc);
@@ -91,43 +91,78 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   return (
     <>
-      {/*  Showing the top tags and entities to help create a prompt */}
-      {trendingData && (
+      <div className="space-y-6">
+        {/* Header section */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold text-primary/90">Create a Recipe</h2>
+          <p className="text-sm text-primary/70">
+            Transform your notes into structured insights. Start by adding a few ingredients below - 
+            they'll help surface relevant content from your knowledge base.
+          </p>
+        </div>
+
+        {/* Recipe builder section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-primary/90">Trending</h3>
-          <div className="flex flex-wrap gap-2 text-xs">
-            {trendingData.tags.map((tag, index) => (
-              <div key={index} className="bg-brand/30 p-2 rounded-full shadow-md cursor-pointer hover:bg-brand/70 mr-2" title="Add to prompt" onClick={() => addEntityToEditor(`#${tag.name}`)}>{`#${tag.name}`}</div>
-            ))}
-            {trendingData.links.map((link, index) => (
-              <div key={index} className="bg-brand/30 p-2 rounded-full shadow-md cursor-pointer hover:bg-brand/70 mr-2" title="Add to prompt" onClick={() => addEntityToEditor(`[[${link.name}]]`)}>{`[[${link.name}]]`}</div>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-primary/90">Ingredients</h3>
+            <span className="text-xs text-primary/50">Add tags and links to explore connections</span>
+          </div>
+          
+          <DndProvider backend={HTML5Backend}>
+            <Plate editor={editor}>
+              <EditorContainer variant="demo" className="h-24"> {/* Reduced height */}
+                <Editor />
+              </EditorContainer>
+            </Plate>
+          </DndProvider>
+        </div>
+
+        {/* Suggested ingredients section */}
+        {trendingData && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-primary/70">Popular ingredients from your notes</h4>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {trendingData.tags.map((tag, index) => (
+                <div 
+                  key={index} 
+                  className="bg-brand/30 px-3 py-1.5 rounded-full shadow-sm cursor-pointer hover:bg-brand/70 transition-colors" 
+                  title="Add to recipe" 
+                  onClick={() => addEntityToEditor(`#${tag.name}`)}
+                >{`#${tag.name}`}</div>
+              ))}
+              {trendingData.links.map((link, index) => (
+                <div 
+                  key={index} 
+                  className="bg-brand/30 px-3 py-1.5 rounded-full shadow-sm cursor-pointer hover:bg-brand/70 transition-colors" 
+                  title="Add to recipe" 
+                  onClick={() => addEntityToEditor(`[[${link.name}]]`)}
+                >{`[[${link.name}]]`}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button 
+          className="w-full bg-brand/30 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-brand/70 transition-colors font-medium"
+          onClick={submitPrompt}
+        >
+          Generate Recipe
+        </button>
+
+        {/* Output section */}
+        <div className="mt-8 space-y-4">
+          <h3 className="text-lg font-medium text-primary/90">Recipe Variations</h3>
+          <p className="text-sm text-primary/70">
+            Select the most relevant format for exploring your notes
+          </p>
+          <div className="gap-4">
+            {suggestedOutputs && suggestedOutputs.map((output, index) => (
+              <SuggestedOutput
+                key={index}
+                body={output}
+              />
             ))}
           </div>
-        </div>
-      )}
-      
-      {/* Playground to create a prompt */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-primary/90">Builder</h3>
-        <DndProvider backend={HTML5Backend}>
-          <Plate editor={editor}>
-            <EditorContainer variant="demo">
-            <Editor />
-            </EditorContainer>
-          </Plate>
-        </DndProvider>
-        <button className="bg-brand/30 p-2 rounded-full shadow-md cursor-pointer hover:bg-brand/70" onClick={submitPrompt}>Submit Prompt</button>
-      </div>
-
-      <div className="mt-4 space-y-4">
-        <h3 className="text-lg font-medium text-primary/90">Suggested Outputs</h3>
-        <div className="gap-4">
-          {suggestedOutputs && suggestedOutputs.map((output, index) => (
-            <SuggestedOutput
-              key={index}
-              body={output}
-            />
-          ))}
         </div>
       </div>
     </>

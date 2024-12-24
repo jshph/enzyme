@@ -14,13 +14,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp,
   return (
     <div className="w-64 bg-surface shadow-lg fixed h-screen overflow-y-auto">
       <nav className="mt-12">
-          <a onClick={() => setCurrentView('settings')} 
-              className={`flex items-center px-4 py-3 cursor-pointer hover:bg-input ${
-                currentView === 'settings' ? 'bg-brand/10 text-brand' : 'text-primary'
-              }`}
-          >
-              <span className="ml-2">Settings</span>
-          </a>
 
           {isAuthenticated && hiddenFeaturesEnabled && (
             <a onClick={() => setCurrentView('spaces')} 
@@ -36,9 +29,17 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp,
                 className={`flex items-center px-4 py-3 cursor-pointer hover:bg-input ${
                   currentView === 'prompts' ? 'bg-brand/10 text-brand' : 'text-primary'
                 }`}>
-                <span className="ml-2">Prompts</span>
+                <span className="ml-2">Recipe Home</span>
             </a>
           )}
+          
+          <a onClick={() => setCurrentView('settings')} 
+              className={`flex items-center px-4 py-3 cursor-pointer hover:bg-input ${
+                currentView === 'settings' ? 'bg-brand/10 text-brand' : 'text-primary'
+              }`}
+          >
+              <span className="ml-2">Settings</span>
+          </a>
 
           {isAuthenticated && hiddenFeaturesEnabled && (
             <a onClick={() => setCurrentView('playground')} 
