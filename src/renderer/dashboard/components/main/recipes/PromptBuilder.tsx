@@ -1,63 +1,66 @@
-import { useCreateEditor } from "../components/editor/use-create-editor";
-import { Editor } from "./plate-ui/editor";
 import { useCallback, useState } from "react";
-import { EditorContainer } from "./plate-ui/editor";
-import { HTML5Backend } from "react-dnd-html5-backend";
-import { SuggestedOutput, SuggestedOutputBody } from "./plate-ui/suggested-output";
-import { Plate } from "@udecode/plate-common/react";
-import { DndProvider } from "react-dnd";
+import { SuggestedOutput, SuggestedOutputBody } from "../../plate-ui/suggested-output";
 import { useEffect } from "react";
-import { MatchResult } from "./editor/use-chat";
+import { MatchResult } from "../../editor/use-chat";
+import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext";
 
+interface SelectedEntity {
+  type: 'tag' | 'link';
+  name: string;
+}
 
 const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
-  const editor = useCreateEditor();
+  // const editor = useCreateEditor();
+  const { hasVaultInitialized } = useSettingsContext();
   
   // TODO figure out how to get the entire contents of the editor and not just the selection
 
   const [trendingData, setTrendingData] = useState<any>(null);
+  const [selectedEntities, setSelectedEntities] = useState<SelectedEntity[]>([]);
 
   const fetchTrendingData = async () => {
     const result = await window.electron.ipcRenderer.invoke('trending-data-update');
-    setTrendingData(result);
+    // Format the tags and links with the # and [[ ]]
+    const formattedTags = result.tags.map(tag => ({ type: 'tag', name: `#${tag.name}` }));
+    const formattedLinks = result.links.map(link => ({ type: 'link', name: `[[${link.name}]]` }));
+    setTrendingData({ tags: formattedTags, links: formattedLinks });
   };
 
   useEffect(() => {
-    fetchTrendingData();
-  }, [currentView]);
+    if (hasVaultInitialized && currentView === 'recipes') {
+      fetchTrendingData();
+    }
+  }, [currentView, hasVaultInitialized]);
 
   const [suggestedOutputs, setSuggestedOutputs] = useState<SuggestedOutputBody[]>();
 
+  const toggleEntity = (type: 'tag' | 'link', name: string) => {
+    setSelectedEntities(prev => {
+      const exists = prev.some(entity => entity.type === type && entity.name === name);
+      if (exists) {
+        return prev.filter(entity => !(entity.type === type && entity.name === name));
+      } else {
+        return [...prev, { type, name }];
+      }
+    });
+  };
+
   const submitPrompt = useCallback(async () => {
-    // Get the entire editor contents
-    const fragment = editor.children;
+    if (selectedEntities.length === 0) return;
 
-    const unwrapMentions = (nodes) => {
-      let text = '';
-      nodes.forEach(node => {
-        if (node.type === 'mention' && node.value) {
-          text += `${node.value}`;
-        } else if (node.text) {
-          text += node.text;
-        } else if (node.children) {
-          text += unwrapMentions(node.children);
-        }
-        text += ' ';
-      });
-      return text;
-    }
+    // Convert selected entities to query string
+    const query = selectedEntities.map(entity => entity.name).join(' ');
 
-    const unwrappedText = unwrapMentions(fragment);
-    // fetch the context using the entities in the editor, returned as json
-    const context: MatchResult[] = await window.electron.ipcRenderer.invoke('get-context', unwrappedText);
+    // fetch the context using the entities
+    const context: MatchResult[] = await window.electron.ipcRenderer.invoke('get-context', query);
 
-    // Context will contain urls in addition to the contents themselves.
+    // Get suggested output
     const result = await window.electron.ipcRenderer.invoke('suggested-output', { 
       context, 
-      query: unwrappedText 
+      query 
     });
 
-    // Construct the body with the new segment structure
+    // Construct the body
     const body: SuggestedOutputBody = {
       question: result.question,
       segments: result.segments.map(segment => ({
@@ -78,16 +81,7 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     };
 
     setSuggestedOutputs([body]);
-  }, [editor]);
-
-  const addEntityToEditor = (entity: string) => {
-    editor.insertNodes([{
-      type: 'mention',
-      value: entity,
-      children: [{ text: '' }]
-    }]);
-  }
-
+  }, [selectedEntities]);
 
   return (
     <>
@@ -108,13 +102,13 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             <span className="text-xs text-primary/50">Add tags and links to explore connections</span>
           </div>
           
-          <DndProvider backend={HTML5Backend}>
+          {/* <DndProvider backend={HTML5Backend}>
             <Plate editor={editor}>
-              <EditorContainer variant="demo" className="h-24"> {/* Reduced height */}
+              <EditorContainer variant="demo" className="h-24">
                 <Editor />
               </EditorContainer>
             </Plate>
-          </DndProvider>
+          </DndProvider> */}
         </div>
 
         {/* Suggested ingredients section */}
@@ -125,25 +119,32 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
               {trendingData.tags.map((tag, index) => (
                 <div 
                   key={index} 
-                  className="bg-brand/30 px-3 py-1.5 rounded-full shadow-sm cursor-pointer hover:bg-brand/70 transition-colors" 
-                  title="Add to recipe" 
-                  onClick={() => addEntityToEditor(`#${tag.name}`)}
-                >{`#${tag.name}`}</div>
+                  className={`px-3 py-1.5 rounded-full shadow-sm cursor-pointer transition-colors ${
+                    selectedEntities.some(e => e.type === 'tag' && e.name === tag.name)
+                      ? 'bg-brand/70'
+                      : 'bg-brand/30 hover:bg-brand/50'
+                  }`}
+                  onClick={() => toggleEntity('tag', tag.name)}
+                >{tag.name}</div>
               ))}
               {trendingData.links.map((link, index) => (
                 <div 
                   key={index} 
-                  className="bg-brand/30 px-3 py-1.5 rounded-full shadow-sm cursor-pointer hover:bg-brand/70 transition-colors" 
-                  title="Add to recipe" 
-                  onClick={() => addEntityToEditor(`[[${link.name}]]`)}
-                >{`[[${link.name}]]`}</div>
+                  className={`px-3 py-1.5 rounded-full shadow-sm cursor-pointer transition-colors ${
+                    selectedEntities.some(e => e.type === 'link' && e.name === link.name)
+                      ? 'bg-brand/70'
+                      : 'bg-brand/30 hover:bg-brand/50'
+                  }`}
+                  onClick={() => toggleEntity('link', link.name)}
+                >{link.name}</div>
               ))}
             </div>
           </div>
         )}
 
-        <button 
-          className="w-full bg-brand/30 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-brand/70 transition-colors font-medium"
+        <button
+          disabled={!hasVaultInitialized || selectedEntities.length === 0}
+          className="w-full bg-brand/30 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-brand/70 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={submitPrompt}
         >
           Generate Recipe

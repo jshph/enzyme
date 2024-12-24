@@ -6,12 +6,11 @@ import { useAuth } from './contexts/AuthContext'
 
 // Create an inner component to use hooks
 const AppContent: React.FC = () => {
-  const [currentView, setCurrentView] = useState('login')
+  const [currentView, setCurrentView] = useState('settings')
   const [message, setMessage] = useState('')
   const [error, setError] = useState(false)
   const { refreshSettings, initializeVault } = useSettingsContext()
   const { isAuthenticated } = useAuth()
-  const [promptCount, setPromptCount] = useState(0);
 
   const init = async () => {
     try {
@@ -67,13 +66,11 @@ const AppContent: React.FC = () => {
           currentView={currentView}
           setCurrentView={setCurrentView}
           quitApp={quitApp}
-          promptCount={promptCount}
         />
         <Main 
           currentView={currentView} 
           init={init}
           setCurrentView={setCurrentView}
-          setPromptCount={setPromptCount}
         />
       </div>
     </div>

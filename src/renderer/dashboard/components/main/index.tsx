@@ -1,7 +1,7 @@
 import React from 'react'
 import Settings from './Settings'
 import Spaces from './Spaces'
-import Prompts from './Prompts'
+import Recipes from './Recipes'
 import Login from './Login'
 import Playground from './Playground'
 import { useAuth } from '@renderer/dashboard/contexts/AuthContext'
@@ -10,22 +10,20 @@ interface MainProps {
   currentView: string;
   init: () => Promise<void>;
   setCurrentView: (view: string) => void;
-  setPromptCount: (count: number) => void;
 }
 
-const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView, setPromptCount }) => {
-  const { hiddenFeaturesEnabled } = useAuth();
+const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView }) => {
 
-  const hiddenFeatures = hiddenFeaturesEnabled ? (
-    <>
-      <div style={{ display: currentView === 'spaces' ? 'block' : 'none' }}>
-        <Spaces currentView={currentView} />
-      </div>
-      <div style={{ display: currentView === 'playground' ? 'block' : 'none' }}>
-        <Playground />
-      </div>
-    </>
-  ) : null;
+  // const hiddenFeatures = hiddenFeaturesEnabled ? (
+  //   <>
+  //     <div style={{ display: currentView === 'spaces' ? 'block' : 'none' }}>
+  //       <Spaces currentView={currentView} />
+  //     </div>
+  //     <div style={{ display: currentView === 'playground' ? 'block' : 'none' }}>
+  //       <Playground />
+  //     </div>
+  //   </>
+  // ) : null;
 
   return (
     <div className="flex-1 ml-64 min-h-screen overflow-y-auto bg-surface/70">
@@ -34,11 +32,11 @@ const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView, setPromp
           <Settings />
         </div>
 
-        <div style={{ display: currentView === 'prompts' ? 'block' : 'none' }}>
-          <Prompts currentView={currentView} setPromptCount={setPromptCount} />
+        <div style={{ display: currentView === 'recipes' ? 'block' : 'none' }}>
+          <Recipes currentView={currentView} />
         </div>
         
-        {hiddenFeatures}
+        {/* {hiddenFeatures} */}
         <div style={{ display: currentView === 'login' ? 'block' : 'none' }}>
           <Login init={init} setCurrentView={setCurrentView}/>
         </div>

@@ -57,8 +57,9 @@ implementation notes:
 - also want this to be performant -- can some of the processing happen in the background without awaits
   - optimize for startup -- we need the settings to initialize faster than the rest of the UI renders; the prompt builder may not have its tags ready yet, but that's okay, we should have more of the UI have "loading" indicators for when indexing is happening.
 - there's definitely a bug that reflects the index doesn't have enough docs because the output gets hallucinated. Need to fix that -- before submitting prompt the index should be run. Noticing this happens when i navigate tabs to Prompt, possibly interrupting a process
+- also fix the bug where opening the app shows login view if you've already logged in
 
-
+<!-- 
 # Sketching out the Prompt Builder / Recipe Home
 
 Copy should reflect:
@@ -73,7 +74,10 @@ Goals for the copy + flow on that page:
 - Tone of the title + branding needs to be professional. But also, mostly getting out of the way. The objective is to explore notes. This UI is just a workflow.
 - Show only what the user needs in order to get started with this workflow / know what it does for them
 
-(in the base case, just present multiple options of suggested outputs in different tabs and styles, and allow the user to choose between one of them without editing them)
+(in the base case, just present multiple options of suggested outputs in different tabs and styles, and allow the user to choose between one of them without editing them) -->
+
+
+
 
 	- this requires a custom component in plate which will render docs given a URL
 - [ ] "create prompt" button

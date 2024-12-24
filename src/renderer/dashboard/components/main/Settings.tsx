@@ -14,7 +14,6 @@ const Settings: React.FC = () => {
 
   const { isAuthenticated } = useAuth();
 
-  const [settingsTab, setSettingsTab] = useState('vault');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [error, setError] = useState(false);
@@ -94,29 +93,10 @@ const Settings: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-primary/90">Enzyme Settings</h2>
-
-      {/* Settings Navigation */}
-      <div className="border-b border-input/30">
-        <nav className="-mb-px flex space-x-8">
-          <button 
-            onClick={() => setSettingsTab('vault')}
-            className={`py-4 px-1 text-sm font-medium ${
-              settingsTab === 'vault' 
-                ? 'border-b-2 border-brand/70 text-brand/90' 
-                : 'text-secondary/70 hover:text-secondary/90'
-            }`}
-          >
-            Vault Configuration
-          </button>
-        </nav>
-      </div>
-
       {/* Vault Configuration Tab */}
-      {settingsTab === 'vault' && (
-        <div className="space-y-6">
-          <div className="bg-brand/5 p-4 rounded-lg">
-            <p className="text-brand/80">
+      <div className="space-y-6">
+        <div className="bg-brand/5 p-4 rounded-lg">
+          <p className="text-brand/80 text-sm">
               Set up your markdown vault settings here. This vault is where Enzyme will analyze your knowledge. 
               You can choose an existing directory for your vault, or if you don't have one yet, a new vault will be created for you. (
               <a className="text-blue-300 hover:text-blue-400" href="https://obsidian.md" target="_blank" rel="noopener noreferrer">
@@ -132,12 +112,12 @@ const Settings: React.FC = () => {
                 <input 
                   type="text" 
                   value={settings.vaultPath || ''} 
-                  className="flex-1 rounded-l-md input-base bg-input/50 p-4" 
+                  className="flex-1 rounded-l-md input-base bg-input/50 p-4 text-sm" 
                   readOnly 
                 />
                 <button 
                   onClick={browseVaultDirectory} 
-                  className="bg-brand/80 text-primary/90 px-4 py-2 rounded-r-md hover:bg-brand/90"
+                  className="bg-brand/80 text-primary/90 px-4 py-2 rounded-r-md hover:bg-brand/90 text-sm"
                 >
                   Browse
                 </button>
@@ -178,7 +158,7 @@ const Settings: React.FC = () => {
                 type="number" 
                 value={settings.port || 3779}
                 onChange={(e) => updateSetting('port', Number(e.target.value))}
-                className="mt-1 block w-full p-2 rounded-md input-base bg-input/50" 
+                className="mt-1 block w-full p-2 rounded-md input-base bg-input/50 text-sm" 
               />
               <p className="mt-2 text-sm text-secondary/70">
               The port number Enzyme will use. Only change this if you have port conflicts.
@@ -197,7 +177,7 @@ const Settings: React.FC = () => {
               <textarea 
                 value={processArrayField(settings.includedPatterns || [])}
                 onChange={(e) => updateSetting('includedPatterns', e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/20"
+                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/20 text-sm"
                 disabled={!isAuthenticated}
               />
               <p className="text-secondary/70 text-sm">Example: *.md to include all markdown files</p>
@@ -208,7 +188,7 @@ const Settings: React.FC = () => {
               <textarea 
                 value={processArrayField(settings.excludedPatterns || [])}
                 onChange={(e) => updateSetting('excludedPatterns', e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/20"
+                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/20 text-sm"
                 disabled={!isAuthenticated}
               />
               <p className="text-secondary/70 text-sm">Example: private/*, templates/* to exclude private and template folders</p>
@@ -219,7 +199,7 @@ const Settings: React.FC = () => {
               <textarea 
                 value={processArrayField(settings.excludedTags || [])}
                 onChange={(e) => updateSetting('excludedTags', e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/50"
+                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/50 text-sm"
                 disabled={!isAuthenticated}
               />
               <p className="text-secondary/70 text-sm">Tags to ignore when analyzing your vault (comma-separated)</p>
@@ -253,8 +233,7 @@ const Settings: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from 'react';
 
 export const useAuthManager = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hiddenFeaturesEnabled, setHiddenFeaturesEnabled] = useState(false);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -12,10 +11,8 @@ export const useAuthManager = () => {
   const verifySession = async () => {
     const response = await window.electron.ipcRenderer.invoke('auth:verify-session');
     if (response.isAuthenticated) {
-      const hiddenFeaturesEnabled = await window.electron.ipcRenderer.invoke('auth:hidden-features-enabled');
       setIsAuthenticated(true);
       setEmail(response.user.email);
-      setHiddenFeaturesEnabled(hiddenFeaturesEnabled);
     }
   };
   // Set initial auth state
@@ -114,7 +111,6 @@ export const useAuthManager = () => {
     handleLogout,
     clearMessage,
     isSessionValid,
-    hiddenFeaturesEnabled,
     verifySession
   };
 }; 

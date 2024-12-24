@@ -13,7 +13,6 @@ interface AuthContextType {
   handleLogout: () => Promise<void>;
   clearMessage: () => void;
   isSessionValid: () => Promise<boolean>;
-  hiddenFeaturesEnabled: boolean;
   verifySession: () => Promise<void>;
 }
 
