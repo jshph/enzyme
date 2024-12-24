@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export interface Settings {
   vaultPath?: string;
@@ -10,10 +10,21 @@ export interface Settings {
 }
 
 export const useSettingsManager = (initialSettings: Settings = {}) => {
-  const settingsRef = useRef<Settings>({});
+  const [settings, setSettings] = useState<Settings>(initialSettings);
   const [originalSettings, setOriginalSettings] = useState<Settings>(initialSettings);
+  const [hasVaultInitialized, setHasVaultInitialized] = useState<boolean>(false);
 
   const arrayFields = ['includedPatterns', 'excludedPatterns', 'excludedTags'];
+
+  const saveLocalSettings = async (settings: Settings) => {
+    if (settings.vaultPath) {
+      await window.electron.ipcRenderer.invoke('update-local-settings', {
+        vaultPath: settings.vaultPath
+      });
+    } else {
+      console.log('No vault path provided');
+    }
+  }
 
   const processArrayField = useCallback((value: string[] | string): string => {
     if (Array.isArray(value)) {
@@ -27,45 +38,59 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
   }, []);
 
   const updateSetting = useCallback((key: string, value: any) => {
-    settingsRef.current = {
-      ...settingsRef.current,
+    setSettings(currentSettings => ({
+      ...currentSettings,
       [key]: value
-    };
+    }));
   }, []);
 
   const hasChanges = useCallback(() => {
-    return JSON.stringify(settingsRef.current) !== JSON.stringify(originalSettings);
-  }, [settingsRef, originalSettings]);
+    return JSON.stringify(settings) !== JSON.stringify(originalSettings);
+  }, [settings, originalSettings]);
 
   const resetSettings = useCallback(() => {
-    settingsRef.current = originalSettings;
+    setSettings(originalSettings);
   }, [originalSettings]);
 
-  const refreshSettings = async () => {
+  const refreshSettings = async (): Promise<Settings> => {
     const savedSettings = await window.electron.ipcRenderer.invoke('get-settings');
-    settingsRef.current = savedSettings;
+
+    await saveLocalSettings(savedSettings);
+
+    setSettings(savedSettings);
     setOriginalSettings(savedSettings);
+    return savedSettings;
   };
+
+  const initializeVault = async (): Promise<boolean> => {
+    try {
+      const savedSettings = await window.electron.ipcRenderer.invoke('get-settings');
+      setHasVaultInitialized(false);
+      const result = await window.electron.ipcRenderer.invoke('initialize-index', savedSettings);
+      setHasVaultInitialized(result.success);
+      return result.success;
+    } catch (error) {
+      console.error('Error initializing vault:', error);
+      throw error;
+    }
+  }
 
   const saveSettings = useCallback(async () => {
     try {
-      const preparedSettings = { ...settingsRef.current };
+      const preparedSettings = { ...settings };
       arrayFields.forEach(field => {
         if (typeof preparedSettings[field] === 'string') {
           preparedSettings[field] = prepareArrayField(preparedSettings[field] as string);
         }
       });
 
-      const localSettings = {
-        vaultPath: preparedSettings.vaultPath || ''
-      };
-      await window.electron.ipcRenderer.invoke('update-local-settings', localSettings);
+      await saveLocalSettings(preparedSettings);
 
       const { vaultPath, ...serverSettings } = preparedSettings;
       const result = await window.electron.ipcRenderer.invoke('update-settings', serverSettings);
 
       if (result.success) {
-        setOriginalSettings(settingsRef.current);
+        setOriginalSettings(settings);
       } else {
         throw new Error('Failed to save settings');
       }
@@ -73,7 +98,7 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
       console.error('Error saving settings:', error);
       throw error;
     }
-  }, [settingsRef, arrayFields, prepareArrayField]);
+  }, [settings, arrayFields, prepareArrayField]);
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
@@ -90,7 +115,7 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
   }, []);
 
   return {
-    settings: settingsRef.current,
+    settings,
     originalSettings,
     updateSetting,
     hasChanges,
@@ -98,6 +123,8 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
     resetSettings,
     processArrayField,
     prepareArrayField,
-    refreshSettings
+    refreshSettings,
+    initializeVault,
+    hasVaultInitialized
   };
 }; 

@@ -149,7 +149,7 @@ async function applyPatternModifiers(
   
   if (pattern.modifier) {
     if (pattern.modifier.startsWith('<') || pattern.modifier.startsWith('>')) {
-      const limit = parseInt(pattern.modifier.slice(1)) || defaultPatternLimit;
+      const limit = parseInt(pattern.modifier.slice(1)) || 30;
       filteredFiles = filteredFiles
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, limit);
@@ -176,11 +176,19 @@ async function applyPatternModifiers(
   return filteredFiles;
 }
 
+async function extractContentForFileMatch(
+  match: Match,
+  file: string  
+): Promise<string[]> {
+  const fileContents = await fs.readFile(file, 'utf-8');
+  const { data: frontmatter } = matter.default(fileContents);
+  return extractContentForMatch(fileContents, match, frontmatter);
+}
+
 function extractContentForMatch(
   contents: string,
   match: Match,
-  frontmatter: any,
-  file: string
+  frontmatter: any
 ): string[] {
   const extractedContents: string[] = [];
 

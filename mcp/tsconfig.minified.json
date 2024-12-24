@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "module": "NodeNext",
+    "target": "ESNext",
+    "esModuleInterop": true,
+    "strict": true,
+    "types": ["node"],
+    "baseUrl": "./",
+    "outDir": "./dist-minified",
+    "rootDir": "./src",
+    "sourceMap": false,
+    "declaration": false,
+    "removeComments": true,
+    "importHelpers": true,
+    "noEmitHelpers": true,
+    "inlineSources": false,
+    "preserveConstEnums": false,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "stripInternal": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "alwaysStrict": true,
+    "importsNotUsedAsValues": "remove",
+    "newLine": "lf",
+    "noEmitOnError": true,
+    "preserveValueImports": false
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/__tests__/**"
+  ]
+} 

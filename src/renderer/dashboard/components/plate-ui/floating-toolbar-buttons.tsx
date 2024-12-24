@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 
 import {
   BoldPlugin,
@@ -9,7 +9,8 @@ import {
   StrikethroughPlugin,
   UnderlinePlugin,
 } from '@udecode/plate-basic-marks/react';
-import { useEditorReadOnly } from '@udecode/plate-common/react';
+import { useEditorReadOnly, useSelectionFragment } from '@udecode/plate-common/react';
+import { useEditorSelection } from '@udecode/plate-core/react';
 import {
   BoldIcon,
   Code2Icon,
@@ -20,15 +21,38 @@ import {
 } from 'lucide-react';
 
 import { AIToolbarButton } from './ai-toolbar-button';
-import { CommentToolbarButton } from './comment-toolbar-button';
 import { LinkToolbarButton } from './link-toolbar-button';
 import { MarkToolbarButton } from './mark-toolbar-button';
-import { MoreDropdownMenu } from './more-dropdown-menu';
 import { ToolbarGroup } from './toolbar';
 import { TurnIntoDropdownMenu } from './turn-into-dropdown-menu';
-
+import { ToolbarButton } from './toolbar';
 export function FloatingToolbarButtons() {
   const readOnly = useEditorReadOnly();
+  const selection = useEditorSelection();
+  const fragment = useSelectionFragment();
+  
+  // const extractMentionsFromEditor = useCallback((): string[] => {
+
+  //   const _extract = (nodes: any[]): string[] => {
+  //     const result: string[] = [];
+      
+  //     for (const node of nodes) {
+  //       if (node.type === 'mention' && node.value) {
+  //         const value = node.value;
+  //         result.push(value);
+  //       } else if (node.type === 'text' && node.value) {
+  //         result.push(node.value);
+  //       } else if (node.children) {
+  //         result.push(..._extract(node.children));
+  //       }
+  //     }
+      
+  //     return result;
+  //   }
+
+  //   return _extract(fragment);
+  // }, [fragment]);
+  
 
   return (
     <>
@@ -41,6 +65,45 @@ export function FloatingToolbarButtons() {
             </AIToolbarButton>
           </ToolbarGroup>
 
+          <ToolbarGroup>
+            <ToolbarButton onClick={() => {
+              // TODO create a prompt not with the mentions, but with the whole editor content
+              const unwrapMentions = (nodes) => {
+                let text = '';
+                nodes.forEach(node => {
+                  if (node.type === 'mention' && node.value) {
+                    text += `<span>${node.value}</span>`;
+                  } else if (node.text) {
+                    text += node.text;
+                  } else if (node.children) {
+                    text += unwrapMentions(node.children);
+                  }
+                });
+                return text;
+              };
+
+              const unwrappedText = unwrapMentions(fragment);
+              console.log('Unwrapped Text:', unwrappedText);
+
+              // Create prompt using ipc
+              window.electron.ipcRenderer.invoke('create-prompt', {
+                prompt: unwrappedText,
+                created_at: new Date().toISOString(),
+                reminder_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              });
+            }} tooltip="Create Prompt">
+              Create Prompt
+            </ToolbarButton>
+          </ToolbarGroup>
+          {/* <ToolbarGroup>
+            <ToolbarButton onClick={() => {
+              // Create a digest using the tags and links present
+              const mentions = extractMentionsFromEditor();
+              console.log('Mentions:', mentions);
+            }} tooltip="Help me create a prompt">
+              Generate a prompt with these tags and links
+            </ToolbarButton>
+          </ToolbarGroup> */}
           <ToolbarGroup>
             <TurnIntoDropdownMenu />
 
@@ -77,12 +140,6 @@ export function FloatingToolbarButtons() {
           </ToolbarGroup>
         </>
       )}
-
-      <ToolbarGroup>
-        <CommentToolbarButton />
-
-        {!readOnly && <MoreDropdownMenu />}
-      </ToolbarGroup>
     </>
   );
 }

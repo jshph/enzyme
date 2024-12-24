@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useSettingsContext } from './contexts/SettingsContext'
 import Sidebar from './components/Sidebar'
 import Main from './components/main'
-import { VaultProvider, useVault } from './components/VaultProvider'
 import { useAuth } from './contexts/AuthContext'
 
 // Create an inner component to use hooks
@@ -10,32 +9,37 @@ const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState('login')
   const [message, setMessage] = useState('')
   const [error, setError] = useState(false)
-  const { refreshSettings, settings } = useSettingsContext()
-  const { initializeVault } = useVault()
-  const auth = useAuth()
+  const { refreshSettings, initializeVault } = useSettingsContext()
+  const { isAuthenticated } = useAuth()
+  const [promptCount, setPromptCount] = useState(0);
 
-  const init = useCallback(async () => {
+  const init = async () => {
     try {
       // Refresh settings
       await refreshSettings()
-      console.log(settings)
-      
-      // Initialize vault if needed
-      const vaultInitialized = await initializeVault(settings)
-      if (!vaultInitialized) {
-        setMessage('Failed to initialize vault')
-        setError(true)
-      }
+
     } catch (err) {
       console.error('Error during initialization:', err)
       setMessage('Failed to initialize application')
       setError(true)
     }
-  }, [auth.isAuthenticated])
+  }
+
+  const initVault = async () => {
+    try {
+      await initializeVault()
+    } catch (err) {
+      console.error('Error during vault initialization:', err)
+      setMessage('Failed to initialize vault')
+      setError(true)
+    }
+  }
 
   // Initialize on mount
   useEffect(() => {
     init()
+
+    initVault()
 
     // Set up visibility change handler
     const handleVisibilityChange = () => {
@@ -50,7 +54,7 @@ const AppContent: React.FC = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [isAuthenticated])
 
   const quitApp = async () => {
     await window.electron.ipcRenderer.send('quit-app')
@@ -63,11 +67,13 @@ const AppContent: React.FC = () => {
           currentView={currentView}
           setCurrentView={setCurrentView}
           quitApp={quitApp}
+          promptCount={promptCount}
         />
         <Main 
           currentView={currentView} 
           init={init}
           setCurrentView={setCurrentView}
+          setPromptCount={setPromptCount}
         />
       </div>
     </div>
@@ -77,9 +83,7 @@ const AppContent: React.FC = () => {
 // Main App component with providers
 const App: React.FC = () => {
   return (
-    <VaultProvider>
-      <AppContent />
-    </VaultProvider>
+    <AppContent />
   )
 }
 

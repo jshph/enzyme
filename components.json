@@ -6,8 +6,8 @@
   "tailwind": {
     "baseColor": "slate",
     "config": "tailwind.config.ts",
-    "css": "src/app/globals.css",
-    "cssVariables": true,
+    "css": "src/renderer/styles/dashboard.css",
+    "cssVariables": false,
     "prefix": ""
   },
   "aliases": {

@@ -1,33 +1,23 @@
-import { Toaster } from 'sonner';
-import { PlateEditor } from '@/components/editor/plate-editor';
-import { SettingsProvider } from '@/components/editor/settings';
+import { useCreateEditor } from '../../components/editor/use-create-editor';
+import { Editor, EditorContainer } from '../../components/plate-ui/editor';
+import { Plate } from '@udecode/plate-common/react';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
+
+
 
 export default function Playground() {
-
-  const documents = [
-    {
-      id: '1',
-      url: 'https://platejs.org/docs/plugin-components',
-      content: 'This is a test content'
-    },
-    {
-      id: '2',
-      url: 'https://platejs.org/docs/plugin-components',
-      content: 'This is a test content'
-    },
-    {
-      id: '3',
-      url: 'https://platejs.org/docs/plugin-components',
-      content: 'This is a test content'
-    },
-  ];
+  const editor = useCreateEditor();
 
   return (
-    <div className="h-screen w-full" data-registry="plate">
-      <SettingsProvider>
-        <PlateEditor />
-      </SettingsProvider>
-      <Toaster />
+    <div className="space-y-6">
+      <DndProvider backend={HTML5Backend}>
+        <Plate editor={editor}>
+          <EditorContainer variant="demo">
+            <Editor />
+          </EditorContainer>
+        </Plate>
+      </DndProvider>
     </div>
   );
 }

@@ -39,17 +39,17 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
       <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            <h2 className="mt-6 text-center text-3xl font-bold text-primary/90">
               Welcome to Enzyme
             </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
+            <p className="mt-2 text-center text-sm text-secondary/70">
               Sign in with your email to get started
             </p>
           </div>
 
           {!showOtpForm ? (
             <form className="mt-8 space-y-6" onSubmit={onSubmitEmail}>
-              <div className="rounded-md shadow-sm">
+              <div className="rounded-md">
                 <div>
                   <label htmlFor="email-address" className="sr-only">Email address</label>
                   <input 
@@ -59,7 +59,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required 
-                    className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                    className="appearance-none rounded-md relative block w-full px-3 py-2 input-base bg-input/50 placeholder-secondary/50 text-primary/90 focus:outline-none focus:ring-2 focus:ring-brand/60 focus:border-brand/60" 
                     placeholder="Email address"
                   />
                 </div>
@@ -67,7 +67,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
 
               <button 
                 type="submit" 
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-primary/90 bg-brand/80 hover:bg-brand/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand/60 disabled:opacity-50"
                 disabled={loading}
               >
                 <span>{loading ? 'Sending...' : 'Get verification code'}</span>
@@ -75,7 +75,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
             </form>
           ) : (
             <form className="mt-8 space-y-6" onSubmit={onSubmitOtp}>
-              <div className="rounded-md shadow-sm">
+              <div className="rounded-md">
                 <div>
                   <label htmlFor="otp-code" className="sr-only">Verification Code</label>
                   <input 
@@ -85,7 +85,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value)}
                     required 
-                    className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                    className="appearance-none rounded-md relative block w-full px-3 py-2 input-base bg-input/50 placeholder-secondary/50 text-primary/90 focus:outline-none focus:ring-2 focus:ring-brand/60 focus:border-brand/60" 
                     placeholder="Enter verification code"
                   />
                 </div>
@@ -93,7 +93,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
 
               <button 
                 type="submit" 
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-primary/90 bg-brand/80 hover:bg-brand/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand/60 disabled:opacity-50"
                 disabled={loading}
               >
                 <span>{loading ? 'Verifying...' : 'Verify Code'}</span>
@@ -102,7 +102,9 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
           )}
 
           {message && (
-            <div className={`mt-4 p-4 rounded-md ${error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+            <div className={`mt-4 p-4 rounded-md ${
+              error ? 'bg-red/5 text-red/80' : 'bg-brand/5 text-brand/80'
+            }`}>
               <p>{message}</p>
             </div>
           )}

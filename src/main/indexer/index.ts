@@ -4,6 +4,7 @@ import * as matter from 'gray-matter';
 import * as chokidar from 'chokidar';
 import { getFileCreationDate } from '../utils.js';
 import * as winston from 'winston';
+import { ServerContext } from '../server';
 
 export interface FileMetadata {
   path: string;
@@ -33,6 +34,17 @@ interface TrendingItems {
   links: TrendingItem[];
 }
 
+interface QueryResult {
+  tags: string[];
+  links: string[];
+}
+
+interface CachedSearchTerm {
+  term: string;
+  results: QueryResult;
+  timestamp: number;
+}
+
 export class FileIndexer {
   private tagIndex: Map<string, IndexEntry> = new Map();
   private tagSet: Set<string> = new Set();
@@ -59,6 +71,11 @@ export class FileIndexer {
   private logger: winston.Logger;
   private logPath: string = '.';
   private initializeTimeout: NodeJS.Timeout | null = null;
+  private searchCache: Map<string, CachedSearchTerm> = new Map();
+  private readonly CACHE_TTL = 5000; // Cache results for 5 seconds
+  private readonly MIN_SEARCH_LENGTH = 2; // Only search for terms 2+ chars
+  private serverContext: ServerContext = new ServerContext();
+
 
   constructor() {
     // Initialize logger
@@ -80,7 +97,7 @@ export class FileIndexer {
     });
   }
 
-  async initialize(vaultPath: string, includedPatterns: string[], excludedPatterns: string[], excludedTags: string[], doCache: boolean = false, spacesPath: string | null = null): Promise<void> {
+  async initialize(vaultPath: string, includedPatterns: string[], excludedPatterns: string[], excludedTags: string[], doCache: boolean = false, spacesPath: string | null = null, port: number = 3779, defaultPatternLimit: number = 10): Promise<void> {
     // Clear any existing timeout
     if (this.initializeTimeout) {
       clearTimeout(this.initializeTimeout);
@@ -135,6 +152,9 @@ export class FileIndexer {
         clearTimeout(this.initializeTimeout);
         this.initializeTimeout = null;
       }
+      
+      await this.serverContext.startServer(this, port);
+
     } catch (error) {
       this.clearIndex();
       this.notify('Indexing Error', error instanceof Error ? error.message : 'Unknown error');
@@ -703,6 +723,106 @@ export class FileIndexer {
 
   public getLinks(): Set<string> {
     return this.linkSet;
+  }
+
+
+  private fuzzyMatch(pattern: string, str: string, fileCount: number): number | null {
+    if (pattern.length > str.length) return null;
+    
+    pattern = pattern.toLowerCase();
+    str = str.toLowerCase();
+    
+    let score = 0;
+    let patternIdx = 0;
+    let prevMatchIdx = -1;
+    
+    for (let strIdx = 0; strIdx < str.length && patternIdx < pattern.length; strIdx++) {
+      if (pattern[patternIdx] === str[strIdx]) {
+        // Consecutive matches score higher
+        score += prevMatchIdx === strIdx - 1 ? 2 : 1;
+        // Matches at start or after separators score higher
+        if (strIdx === 0 || str[strIdx - 1] === ' ' || str[strIdx - 1] === '-' || str[strIdx - 1] === '_') {
+          score += 3;
+        }
+        prevMatchIdx = strIdx;
+        patternIdx++;
+      }
+    }
+    
+    // Only return score if we matched the full pattern
+    if (patternIdx === pattern.length) {
+      // Add file count to the score, but normalize it to prevent overwhelming the match quality
+      // Log scale helps prevent very popular items from completely dominating
+      const fileCountBonus = Math.log10(fileCount + 1) * 2;
+      return score + fileCountBonus;
+    }
+    
+    return null;
+  }
+
+  public queryForTagsAndLinks(searchTerm: string): QueryResult {
+    // Return empty results for empty or short searches
+    if (!searchTerm || searchTerm.length < this.MIN_SEARCH_LENGTH) {
+      return { tags: [], links: [] };
+    }
+
+    // Check cache first
+    const cached = this.searchCache.get(searchTerm);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.results;
+    }
+
+    const maxResults = 10;
+    const results: QueryResult = { tags: [], links: [] };
+    
+    // Helper function to collect and sort matches
+    const collectMatches = (items: Set<string>, getFileCount: (item: string) => number): string[] => {
+      const matches: Array<{ item: string; score: number }> = [];
+      
+      for (const item of items) {
+        const fileCount = getFileCount(item);
+        const score = this.fuzzyMatch(searchTerm, item, fileCount);
+        if (score !== null) {
+          matches.push({ item, score });
+          if (matches.length > maxResults * 2) { // Collect a few extra for better sorting
+            matches.sort((a, b) => b.score - a.score);
+            matches.length = maxResults * 2;
+          }
+        }
+      }
+      
+      return matches
+        .sort((a, b) => b.score - a.score)
+        .slice(0, maxResults)
+        .map(m => m.item);
+    };
+
+    // Get file counts for tags and links
+    const getTagFileCount = (tag: string) => this.tagIndex.get(tag)?.files.length ?? 0;
+    const getLinkFileCount = (link: string) => this.linkIndex.get(link)?.files.length ?? 0;
+
+    // Collect matches for tags and links with their respective file counts
+    results.tags = collectMatches(this.tagSet, getTagFileCount);
+    results.links = collectMatches(this.linkSet, getLinkFileCount);
+
+    // Cache the results
+    this.searchCache.set(searchTerm, {
+      term: searchTerm,
+      results,
+      timestamp: Date.now()
+    });
+
+    // Clean up old cache entries periodically
+    if (this.searchCache.size > 100) { // Prevent cache from growing too large
+      const now = Date.now();
+      for (const [key, value] of this.searchCache.entries()) {
+        if (now - value.timestamp > this.CACHE_TTL) {
+          this.searchCache.delete(key);
+        }
+      }
+    }
+
+    return results;
   }
 }
 

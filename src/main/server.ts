@@ -1,11 +1,12 @@
 import express, { Express } from 'express';
 import { Server } from 'http';
-import { extractPatterns, QueryPattern } from './extract/index';
+import { extractPatterns, MatchResult, QueryPattern } from './extract/index';
 import { parseQueryString } from './extract/queryParser';
 import { getFileIndexer, ElectronFileIndexer } from './indexer/electron';
 import * as winston from 'winston';
 import path from 'path';
 import { app as electronApp, Notification } from 'electron';
+import cors from 'cors';
 
 interface ServerConfig {
   vaultPath: string;
@@ -35,13 +36,11 @@ let server: Server | null = null;
 const app: Express = express();
 
 export class ServerContext {
-  indexer: ElectronFileIndexer;
+  indexer: ElectronFileIndexer | null = null;
   private logger: winston.Logger;
-
+  private config: ServerConfig | null = null;
   constructor() {
     const logPath = path.join(electronApp.getPath('userData'), 'logs');
-
-    this.indexer = getFileIndexer();
     this.logger = winston.createLogger({
       level: 'debug',
       format: winston.format.combine(
@@ -55,47 +54,61 @@ export class ServerContext {
     });
   }
 
+  public async getContext(query: string, format: 'json' | 'md' = 'md'): Promise<string[] | MatchResult[]> {
+    const queryPatterns: QueryPattern[] = parseQueryString(query);
+    const results = await extractPatterns(queryPatterns, this.config?.defaultPatternLimit);
+    
+    const combinedResults = [
+      ...results
+    ];
+
+    const formattedResults: string[] | MatchResult[] = combinedResults.map(result => {
+      const folder = result.file.split(path.sep).slice(0, -1).join(path.sep);
+      if (format === 'md') {
+        return TEMPLATE_RESULT.replace('{file}', result.file)
+          .replace('{folder}', folder)
+          .replace('{tags}', result.tags.join(', '))
+          .replace('{lastModified}', result.lastModified.toString())
+          .replace('{createdAt}', result.createdAt.toString())
+          .replace('{contents}', result.extractedContents.join('\n'));
+      } else {
+        return result;
+      }
+    });
+
+    return formattedResults;
+
+  }
+
+  public async getDocContent(path: string): Promise<string> {
+    const content = await this.indexer?.getDocContent(path);
+    return content;
+  }
 
 
-  async startServer(config: ServerConfig) {
-  
-    this.logger.debug(`Starting server with config: ${JSON.stringify(config)}`);
+  async startServer(indexer: ElectronFileIndexer, port: number) {
+    if (server) {
+      await this.stopServer();
+    }
+    
+    this.indexer = indexer;
 
-    await this.indexer.initialize(
-      config.vaultPath,
-      config.includedPatterns,
-      config.excludedPatterns,
-      config.excludedTags,
-      config.doCache
-    );
+    app.use(cors());
+    app.use(express.json());
   
     app.get('/context', (async (req: express.Request, res: express.Response) => {
-      const { query } = req.query;
+      const query = req.query.query as string;
   
       if (!query || typeof query !== 'string') {
         res.status(400).json({ error: `Query parameter is required and must be a string but was: ${JSON.stringify(req.query)}` });
+        return;
       }
 
       const decodedQuery = decodeURIComponent(query as string);
   
       try {
-        const queryPatterns: QueryPattern[] = parseQueryString(decodedQuery);
-        const results = await extractPatterns(queryPatterns, config.defaultPatternLimit);
-        
-        const combinedResults = [
-          ...results
-        ];
+        const formattedResults = await this.getContext(decodedQuery);
 
-        const formattedResults = combinedResults.map(result => {
-          const folder = result.file.split(path.sep).slice(0, -1).join(path.sep);
-          return TEMPLATE_RESULT.replace('{file}', result.file)
-            .replace('{folder}', folder)
-            .replace('{tags}', result.tags.join(', '))
-            .replace('{lastModified}', result.lastModified.toString())
-            .replace('{createdAt}', result.createdAt.toString())
-            .replace('{contents}', result.extractedContents.join('\n'))
-        });
-        
         res.json({
           content: formattedResults.map((result: string) => ({
             type: "text",
@@ -108,12 +121,11 @@ export class ServerContext {
       }
     }) as express.RequestHandler);
   
-    server = app.listen(config.port, () => {
-      this.logger.info(`Context server listening at http://localhost:${config.port}`);
-      this.logger.info(`Indexer initialized with directory ${config.vaultPath}`);
+    server = app.listen(port, () => {
+      this.logger.info(`Context server listening at http://localhost:${port}`);
       new Notification({
         title: 'Enzyme MCP Server',
-        body: `Model Context Protocol server available at http://localhost:${config.port}`
+        body: `Model Context Protocol server available at http://localhost:${port}`
       }).show();
     });
   
@@ -122,9 +134,14 @@ export class ServerContext {
   
   async stopServer(): Promise<void> {
     if (server) {
-      await this.indexer.stop();
+      await this.indexer?.stop();
       await new Promise<void>((resolve) => server!.close(() => resolve()));
       server = null;
     }
   } 
+}
+
+export const useContextServer = () => {
+  const contextServer = new ServerContext();
+  return contextServer;
 }

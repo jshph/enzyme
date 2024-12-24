@@ -67,7 +67,7 @@ export function setupAuthIPCRoutes() {
 
   ipcMain.handle('auth:verify-session', async (_) => {
     try {
-      const token = await getCurrentSession();
+      const { token } = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/auth/verify-session`, {
         method: 'POST',
         headers: { 
@@ -77,7 +77,9 @@ export function setupAuthIPCRoutes() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok || data.error) {
+        return { isAuthenticated: false, error: data.error };
+      }
       
       // Update stored auth if we get a new token
       if (data.access_token) {
@@ -97,9 +99,31 @@ export function setupAuthIPCRoutes() {
     }
   });
 
+  ipcMain.handle('auth:hidden-features-enabled', async (_) => {
+    try {
+      const { token, email } = await getCurrentSession();
+      const response = await fetch(`${SERVER_URL}/auth/hidden-features-enabled`, {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      return data.hidden_features_enabled;
+    } catch (error) {
+      console.error('Error checking hidden features enabled:', error);
+      return false;
+    }
+  });
+
   ipcMain.handle('auth:logout', async () => {
     try {
-      const token = await getCurrentSession();
+      const { token } = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/auth/logout`, {
         method: 'POST',
         headers: { 

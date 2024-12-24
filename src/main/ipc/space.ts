@@ -38,9 +38,8 @@ export function setupSpaceRoutes() {
 
   ipcMain.handle('create-space', async (_, spaceData) => {
     try {
-      const auth = store.get('auth');
-      const token = await getCurrentSession();
-      if (!auth?.email || !token) throw new Error('Not authenticated');
+      const { email, token } = await getCurrentSession();
+      if (!email || !token) throw new Error('Not authenticated');
 
       const response = await fetch(`${SERVER_URL}/space/create`, {
         method: 'POST',
@@ -74,7 +73,7 @@ export function setupSpaceRoutes() {
 
   ipcMain.handle('submit-to-space', async (_, { spaceName, submission }) => {
     try {
-      const token = await getCurrentSession();
+      const { token } = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
 
       const mappings = getSpaces();
@@ -101,9 +100,8 @@ export function setupSpaceRoutes() {
 
   ipcMain.handle('fetch-spaces', async (_) => {
     try {
-      const auth = store.get('auth');
-      const token = await getCurrentSession();
-      if (!auth?.email || !token) {
+      const { email, token } = await getCurrentSession();
+      if (!email || !token) {
         throw new Error('Not authenticated');
       }
 

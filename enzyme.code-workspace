@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "enzyme",
+			"path": "."
+		},
+		{
+			"name": "enzyme-standalone-server",
+			"path": "../enzyme-standalone-server"
+		},
+		{
+			"name": "enzyme-site",
+			"path": "../enzyme-site"
+		}
+	],
+  "settings": {}
+}

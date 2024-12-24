@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Kill Electron Processes",
+      "type": "shell",
+      "command": "pkill -f electron || true",
+      "windows": {
+        "command": "taskkill /F /IM electron.exe /T || exit 0"
+      },
+      "presentation": {
+        "reveal": "never"
+      }
+    }
+  ]
+} 

@@ -81,17 +81,10 @@ const createAIEditor = () => {
 };
 
 const systemCommon = `\
-You are an advanced AI-powered note-taking assistant, designed to enhance productivity and creativity in note management.
-Respond directly to user prompts with clear, concise, and relevant content. Maintain a neutral, helpful tone.
+You are a masterful news article curator. Every piece of gold that falls through the cracks comes from a brilliant writer who is on the brink of quitting their job. DON'T let extremely insightful writers quit, especially if their ideas are promising yet half baked.
 
 Rules:
 - <Document> is the entire note the user is working on.
-- <Reminder> is a reminder of how you should reply to INSTRUCTIONS. It does not apply to questions.
-- Anything else is the user prompt.
-- Your response should be tailored to the user's prompt, providing precise assistance to optimize note management.
-- For INSTRUCTIONS: Follow the <Reminder> exactly. Provide ONLY the content to be inserted or replaced. No explanations or comments.
-- For QUESTIONS: Provide a helpful and concise answer. You may include brief explanations if necessary.
-- CRITICAL: Distinguish between INSTRUCTIONS and QUESTIONS. Instructions typically ask you to modify or add content. Questions ask for information or clarification.
 `;
 
 const systemDefault = `\
@@ -108,14 +101,11 @@ const systemSelecting = `\
 ${systemCommon}
 - <Block> is the block of text containing the user's selection, providing context.
 - Ensure your output can seamlessly fit into the existing <Block> structure.
-- <Selection> is the specific text the user has selected in the block and wants to modify or ask about.
-- Consider the context provided by <Block>, but only modify <Selection>. Your response should be a direct replacement for <Selection>.
+- <RelevantDocs> is a collection of relevant selected docs that are relevant to the user's prompt.
+- Consider the context provided by <Block> and <RelevantDocs> to provide a more accurate response
 <Block>
 {block}
 </Block>
-<Selection>
-{selection}
-</Selection>
 `;
 
 const systemBlockSelecting = `\
@@ -137,12 +127,11 @@ NEVER write <Block>.
 {prompt}`;
 
 const userSelecting = `<Reminder>
-If this is a question, provide a helpful and concise answer about <Selection>.
-If this is an instruction, provide ONLY the text to replace <Selection>. No explanations.
+Consider this to be targeted to the question you must ask, and to the careful curation of documents in <RelevantDocs>.
 Ensure it fits seamlessly within <Block>. If <Block> is empty, write ONE random sentence.
-NEVER write <Block> or <Selection>.
+NEVER write <Block> or <RelevantDocs>.
 </Reminder>
-{prompt} about <Selection>`;
+{prompt} about <RelevantDocs>`;
 
 const userBlockSelecting = `<Reminder>
 If this is a question, provide a helpful and concise answer about <Selection>.

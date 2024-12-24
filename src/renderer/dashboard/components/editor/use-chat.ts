@@ -1,9 +1,16 @@
 'use client';
 
-import { faker } from '@faker-js/faker';
 import { useChat as useBaseChat } from 'ai/react';
-
 import { useSettings } from '@/components/editor/settings';
+
+export interface MatchResult {
+  file: string;
+  tags: string[];
+  extractedContents: string[];
+  lastModified: number;
+  createdAt: Date;
+}
+
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -12,7 +19,21 @@ interface ChatMessage {
 
 interface ChatHistory {
   messages: ChatMessage[];
+  system: string;
 }
+
+const TEMPLATE_RESULT = `## File: {file}
+* Folder: {folder}
+* Tags: {tags}
+* Last modified: {lastModified}
+* Created: {createdAt}
+
+
+### Contents
+\`\`\`
+{contents}
+\`\`\`
+`;
 
 export const useChat = () => {
   const { keys, model } = useSettings();
@@ -26,62 +47,92 @@ export const useChat = () => {
       model: model.value,
     },
     fetch: async (input, init) => {
-      const res = await fetch(input, init);
 
-      if (!res.ok) {
-        // Mock the API response. Remove it when you implement the route /api/ai/command
-        await new Promise((resolve) => setTimeout(resolve, 400));
+      let reqBody = JSON.parse(init?.body as string);
+      let systemPrompt = reqBody.system;
 
-        const stream = fakeStreamText();
+      let allDocs: MatchResult[] = [];
 
-        return new Response(stream, {
-          headers: {
-            Connection: 'keep-alive',
-            'Content-Type': 'text/plain',
-          },
-        });
-      }
+      // Format the user messages that are json
+      reqBody.messages = reqBody.messages.map(message => {
+        if (message.role === 'user') {
+          // Extract from inside <RelevantDocs>
+          let docs = message.content.match(/<RelevantDocs>\n(.*?)\n<\/RelevantDocs>/s)?.[1];
 
-      return res;
-    },
-  });
-};
+          let content = message.content;
+          if (docs) {
+            docs = JSON.parse(docs);
+            allDocs.push(...docs);
 
-// Used for testing. Remove it after implementing useChat api.
-const fakeStreamText = ({
-  chunkCount = 10,
-  streamProtocol = 'data',
-}: {
-  chunkCount?: number;
-  streamProtocol?: 'data' | 'text';
-} = {}) => {
-  const chunks = Array.from({ length: chunkCount }, () => ({
-    delay: faker.number.int({ max: 150, min: 50 }),
-    texts: faker.lorem.words({ max: 3, min: 1 }) + ' ',
-  }));
-  const encoder = new TextEncoder();
+            const formattedContext = docs.map(doc =>
+              TEMPLATE_RESULT
+                .replace('{file}', doc.file)
+                .replace('{folder}', doc.file.split("/").slice(0, -1).join("/"))
+                .replace('{tags}', doc.tags.join(', '))
+                .replace('{lastModified}', doc.lastModified.toString())
+                .replace('{createdAt}', doc.createdAt.toString())
+                .replace('{contents}', doc.extractedContents.join('\n'))
+            );
 
-  return new ReadableStream({
-    async start(controller) {
-      for (const chunk of chunks) {
-        await new Promise((resolve) => setTimeout(resolve, chunk.delay));
+            content = content.replace(/<RelevantDocs>\n(.*?)\n<\/RelevantDocs>/s, `<RelevantDocs>\n${formattedContext}\n</RelevantDocs>`);
+          } else {
+            content = message.content;
+          }
 
-        if (streamProtocol === 'text') {
-          controller.enqueue(encoder.encode(chunk.texts));
-        } else {
-          controller.enqueue(
-            encoder.encode(`0:${JSON.stringify(chunk.texts)}\n`)
-          );
+          return {
+            ...message,
+            content: content
+          }
         }
+        return message;
+      });
+
+      let messages = [{ role: 'system', content: systemPrompt }, ...reqBody.messages];
+      let response;
+      try {
+        response = await window.electron.ipcRenderer.invoke('relevant-docs', messages);
+      } catch (error) {
+        console.error(error);
       }
 
-      if (streamProtocol === 'data') {
-        controller.enqueue(
-          `d:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":${chunks.length}}}\n`
-        );
-      }
+      // Look up the docs from response
+      const selectedDocs = response.docs.map(doc => {
+        const match = allDocs.find(m => m.file === doc);
+        return match;
+      });
 
-      controller.close();
-    },
+      let formattedResponseMd = response.question + '\n';
+      selectedDocs.forEach(doc => {
+        if (doc) {
+          formattedResponseMd += `\n\n> ${doc.extractedContents.map(content => content.replace(/\n/g, ' ')).join('\n> ')}\n\n[link](${doc.file})`;
+        }
+      });
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const text = formattedResponseMd;
+          // Wrap response in the expected format for the AI chat component
+          controller.enqueue(encoder.encode('0:' + JSON.stringify(text) + '\n'));
+          
+          // Add completion message
+          controller.enqueue(
+            encoder.encode(
+              `d:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":${text.length}}}\n`
+            )
+          );
+          
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          Connection: 'keep-alive',
+          'Cache-Control': 'no-cache',
+        },
+      });
+    }
   });
 };

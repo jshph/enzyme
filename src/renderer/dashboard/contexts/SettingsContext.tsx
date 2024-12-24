@@ -11,6 +11,8 @@ interface SettingsContextType {
   saveSettings: () => Promise<void>;
   processArrayField: (value: string[] | string) => string;
   prepareArrayField: (value: string) => string[]; 
+  initializeVault: () => Promise<boolean>;
+  hasVaultInitialized: boolean;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

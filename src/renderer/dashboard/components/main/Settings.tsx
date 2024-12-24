@@ -7,16 +7,18 @@ const Settings: React.FC = () => {
     updateSetting, 
     hasChanges, 
     saveSettings,
-    processArrayField
+    processArrayField,
+    initializeVault,
+    hasVaultInitialized
   } = useSettingsContext();
 
   const { isAuthenticated } = useAuth();
 
   const [settingsTab, setSettingsTab] = useState('vault');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [hasVaultInitialized, setHasVaultInitialized] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState(false);
+  const { verifySession } = useAuth();
 
   const browseVaultDirectory = async () => {
     try {
@@ -25,17 +27,13 @@ const Settings: React.FC = () => {
         updateSetting('vaultPath', result);
         
         try {
-          setHasVaultInitialized(false);
           setMessage('Initializing vault...');
           setError(false);
+
+          // Initialize vault
+          await initializeVault();
+          await verifySession();
           
-          const initResult = await window.electron.ipcRenderer.invoke('initialize-index', settings);
-          
-          if (!initResult.success) {
-            throw new Error(initResult.details || initResult.error || 'Unknown error');
-          }
-          
-          setHasVaultInitialized(true);
           setMessage('Vault initialized successfully');
           setError(false);
           
@@ -46,7 +44,6 @@ const Settings: React.FC = () => {
           }, 3000);
           
         } catch (err: any) {
-          setHasVaultInitialized(true);
           setMessage(err.message);
           if (err.message?.includes('access')) {
             setMessage('Permission denied. Please grant access to the selected folder in System Preferences > Security & Privacy > Files and Folders.');
@@ -62,7 +59,6 @@ const Settings: React.FC = () => {
         }
       }
     } catch (err) {
-      setHasVaultInitialized(true);
       setMessage('Failed to select directory. Please try again.');
       setError(true);
       console.error('Error selecting directory:', err);
@@ -98,15 +94,17 @@ const Settings: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-gray-800">Enzyme Settings</h2>
+      <h2 className="text-3xl font-bold text-primary/90">Enzyme Settings</h2>
 
       {/* Settings Navigation */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-input/30">
         <nav className="-mb-px flex space-x-8">
           <button 
             onClick={() => setSettingsTab('vault')}
             className={`py-4 px-1 text-sm font-medium ${
-              settingsTab === 'vault' ? 'border-b-2 border-blue-500 text-blue-600' : ''
+              settingsTab === 'vault' 
+                ? 'border-b-2 border-brand/70 text-brand/90' 
+                : 'text-secondary/70 hover:text-secondary/90'
             }`}
           >
             Vault Configuration
@@ -117,8 +115,8 @@ const Settings: React.FC = () => {
       {/* Vault Configuration Tab */}
       {settingsTab === 'vault' && (
         <div className="space-y-6">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <p className="text-blue-800">
+          <div className="bg-brand/5 p-4 rounded-lg">
+            <p className="text-brand/80">
               Set up your markdown vault settings here. This vault is where Enzyme will analyze your knowledge. 
               You can choose an existing directory for your vault, or if you don't have one yet, a new vault will be created for you. (
               <a className="text-blue-300 hover:text-blue-400" href="https://obsidian.md" target="_blank" rel="noopener noreferrer">
@@ -127,25 +125,26 @@ const Settings: React.FC = () => {
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
+          <div className="card space-y-4 bg-surface/50 p-8 rounded-sm">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Markdown Vault Location</label>
-              <div className="mt-1 flex">
+              <label className="block text-sm font-medium text-primary/80">Markdown Vault Location</label>
+              <div className="mt-4 flex">
                 <input 
                   type="text" 
                   value={settings.vaultPath || ''} 
-                  className="flex-1 rounded-l-md border border-gray-300 px-3 py-2" 
+                  className="flex-1 rounded-l-md input-base bg-input/50 p-4" 
                   readOnly 
                 />
                 <button 
                   onClick={browseVaultDirectory} 
-                  className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700"
+                  className="bg-brand/80 text-primary/90 px-4 py-2 rounded-r-md hover:bg-brand/90"
                 >
                   Browse
                 </button>
               </div>
+              <p className="mt-2 text-sm text-secondary/70">Select the root folder for your markdown vault</p>
               {!hasVaultInitialized && settings.vaultPath && (
-                <div className="mt-2 flex items-center text-sm text-gray-600">
+                <div className="mt-4 flex items-center text-sm text-gray-600">
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -153,21 +152,20 @@ const Settings: React.FC = () => {
                   Initializing vault...
                 </div>
               )}
-              <p className="mt-2 text-sm text-gray-500">Select the root folder for your markdown vault</p>
             </div>
 
-            <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div className="mt-4 bg-brand/5 border-l-4 border-brand/10 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-5 w-5 text-brand/60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
-                    The vault path is stored locally on this machine. If you use Enzyme on multiple computers, you'll need to set the vault path on each one.
+                  <p className="text-sm text-secondary/80">
+                  The vault path is stored locally on this machine. If you use Enzyme on multiple computers, you'll need to set the vault path on each one.
                   </p>
-                  <p className="mt-2 text-sm text-yellow-700">
+                  <p className="mt-2 text-sm text-secondary/40">
                     Note: You may need to grant permission in System Preferences &gt; Security & Privacy &gt; Files and Folders for Enzyme to access your vault folder.
                   </p>
                 </div>
@@ -175,58 +173,64 @@ const Settings: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Server Port</label>
+              <label className="block text-sm font-medium text-primary/80">Server Port</label>
               <input 
                 type="number" 
                 value={settings.port || 3779}
                 onChange={(e) => updateSetting('port', Number(e.target.value))}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2" 
+                className="mt-1 block w-full p-2 rounded-md input-base bg-input/50" 
               />
-              <p className="mt-2 text-sm text-gray-500">
-                The port number Enzyme will use. Only change this if you have port conflicts.
-                Server URL: <span>{`http://localhost:${settings.port || 3779}`}</span>
+              <p className="mt-2 text-sm text-secondary/70">
+              The port number Enzyme will use. Only change this if you have port conflicts.
+              Server URL: <span>{`http://localhost:${settings.port || 3779}`}</span>
               </p>
             </div>
 
-            <div className={`space-y-6 border-t pt-6 mt-6 ${isAuthenticated ? '' : 'opacity-50'}`}>
-              <h3 className="text-lg font-medium text-gray-900">Advanced Settings <span>{isAuthenticated ? '' : '(login to configure)'}</span></h3>
+            <div className={`space-y-6 border-t border-input/30 pt-6 mt-6 ${isAuthenticated ? '' : 'opacity-50'}`}>
+              <h3 className="text-lg font-medium text-primary/90">
+                Advanced Settings 
+                <span className="text-secondary/70">{isAuthenticated ? '' : ' (login to configure)'}</span>
+              </h3>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700">Files to Include</label>
+              <label className="block text-sm font-medium text-primary/80">Files to Include</label>
               <textarea 
                 value={processArrayField(settings.includedPatterns || [])}
                 onChange={(e) => updateSetting('includedPatterns', e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/20"
+                disabled={!isAuthenticated}
               />
-              <p className="text-gray-500 text-sm">Example: *.md to include all markdown files</p>
+              <p className="text-secondary/70 text-sm">Example: *.md to include all markdown files</p>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700">Files to Exclude</label>
+              <label className="block text-sm font-medium text-primary/80">Files to Exclude</label>
               <textarea 
                 value={processArrayField(settings.excludedPatterns || [])}
                 onChange={(e) => updateSetting('excludedPatterns', e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/20"
+                disabled={!isAuthenticated}
               />
-              <p className="text-gray-500 text-sm">Example: private/*, templates/* to exclude private and template folders</p>
+              <p className="text-secondary/70 text-sm">Example: private/*, templates/* to exclude private and template folders</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Tags to Exclude</label>
+              <label className="block text-sm font-medium text-primary/80">Tags to Exclude</label>
               <textarea 
                 value={processArrayField(settings.excludedTags || [])}
                 onChange={(e) => updateSetting('excludedTags', e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/50"
+                disabled={!isAuthenticated}
               />
-              <p className="text-gray-500 text-sm">Tags to ignore when analyzing your vault (comma-separated)</p>
+              <p className="text-secondary/70 text-sm">Tags to ignore when analyzing your vault (comma-separated)</p>
             </div>
           </div>
 
           <div className="flex space-x-4 pt-4">
             <button 
               onClick={handleSave}
-              className={`bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors duration-200 ${
-                !hasChanges() || saveState === 'saving' ? 'opacity-50 cursor-not-allowed' : ''
+              className={`bg-brand/80 text-primary/90 px-4 py-2 rounded-md hover:bg-brand/90 transition-colors duration-200 ${
+                !hasChanges() || saveState === 'saving' ? 'opacity-30 cursor-not-allowed' : ''
               }`}
               disabled={!hasChanges() || saveState === 'saving'}
             >
@@ -242,7 +246,9 @@ const Settings: React.FC = () => {
 
             {/* Status Messages */}
             {message && (
-              <div className={`mt-4 p-4 rounded-md ${error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+              <div className={`mt-4 p-4 rounded-md ${
+                error ? 'bg-red/5 text-red/80' : 'bg-brand/5 text-brand/80'
+              }`}>
                 <p>{message}</p>
               </div>
             )}

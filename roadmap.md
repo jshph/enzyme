@@ -108,19 +108,31 @@ DONE:
   - how to use it with zed
   - how to use it with claude
 - refactor to react DONE
+- laern how to insert blockquotes programamticaly, without generating the ai all. Output format should be doc links followed by synthesis.
+- implement the "digest" menu item in the editor - to extract mentions from the editor and retrieve docs from Enzyme, to synthesize them and output blockquotes with the docs as references.
+- auto-index on open, using stored folder
+- styling of login page
+- mentions should render as tags and links
+- interpret mentions as valid patterns for query
+- ai action button to create a prompt before inserting it
+- prompts can take reminders -- in the list of prompts, rather than in the editor. the reminder indicates the next time the prompt should be executed.
+
 
 NEXT before launch:
 
-- laern how to insert blockquotes programamticaly, without generating the ai all. Output format should be doc links followed by synthesis.
-- implement the "digest" menu item in the editor - to extract mentions from the editor and retrieve docs from Enzyme, to synthesize them and output blockquotes with the docs as references.
-- could also implement a plugin which is a view on the docs, link it to the editor
+- creating a space for a prompt
 
+
+- compelling cases for the demo (should have one semi compelling case for the standalone prompt, for scheduling it, before using the playground feature; could be a task oriented one, but tasks are not the main focus for this demo; it's research and unfinished ideas)
+
+- devise a flow for the demo -- before bed tonight. In a place to start practicing tomorrow
 
 Brainstorming:
 
 - a view on your thoughts anywhere you go --
   - which digests to the most relevant ones - metaprompting until you have a way to extract the question that surfaces the most relevant insights. A constantly evolving view, which you know by the question that was asked. And then a way to extend the question by posting it to your friends -- the most interesting question, you're creating a mirror for your friends. which you can share with a few of your thoughts.
   - allays the common critique that in an age of ai, we'll just be swimming in content that doesn't really matter to us. Contrary - we can shape the mirrors that most represent all that we've captured.
+- the demo will be show spaces, then show prompts, and the concept behind them... then show playground as a place to tinker with prompts
 
 
 

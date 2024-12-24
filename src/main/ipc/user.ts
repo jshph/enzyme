@@ -24,7 +24,7 @@ const SERVER_URL = getServerUrl();
 // Add a helper function to get the current session token
 export async function getCurrentSession() {
   const auth = store.get('auth');
-  return auth?.token;
+  return { token: auth?.token, email: auth?.email };
 }
   
 export function validateSettings(settings: any) {
@@ -56,12 +56,11 @@ export function validateSettings(settings: any) {
 
 export async function getSettings() {
   try {
-    const token = await getCurrentSession();
-    const auth = store.get('auth');
+    const { token, email } = await getCurrentSession();
     const localSettings = store.get('localSettings') || { vaultPath: '' };
 
     // Get settings from server
-    const response = await fetch(`${SERVER_URL}/user/config?email=${auth?.email || ''}`, {
+    const response = await fetch(`${SERVER_URL}/user/config?email=${email || ''}`, {
       headers: {
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` })
@@ -106,15 +105,14 @@ export function setupUserIPCRoutes() {
 
   ipcMain.handle('update-settings', async (_, newSettings) => {
     try {
-      const token = await getCurrentSession();
-      const auth = store.get('auth');
+      const { token, email } = await getCurrentSession();
       
-      if (!token || !auth?.email) {
+      if (!token || !email) {
         throw new Error('No authenticated session');
       }
 
       // Update settings on server
-      const response = await fetch(`${SERVER_URL}/update-config?email=${auth.email}`, {
+      const response = await fetch(`${SERVER_URL}/user/update-config?email=${auth.email}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

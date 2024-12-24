@@ -1,9 +1,16 @@
+declare global {
+  interface ImportMetaEnv {
+    VITE_ELECTRON_RENDERER_URL: string
+  }
+}
+
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import path, { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { ServerContext } from './server';
 import { store, logger } from './ipc/index';
-import { Menubar, menubar } from 'menubar';
+import { menubar } from 'menubar';
+import type { Menubar } from 'menubar';
 import { nativeImage } from 'electron';
 import { getSettings, validateSettings, setupUserIPCRoutes } from './ipc/user';
 import { setupAuthIPCRoutes } from './ipc/auth';
@@ -13,12 +20,15 @@ import { setupSpaceRoutes } from './ipc/space';
 import { setupPromptRoutes } from './ipc/prompts';
 
 let mainWindow: BrowserWindow | null = null;
+let mb: Menubar | null = null;
 const serverContext = new ServerContext();
 
 
+console.log('Starting app in mode:', process.defaultApp ? 'development' : 'production');
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
+  console.log('App already running');
   app.quit();
 } else {
   initializeMain();
@@ -121,7 +131,7 @@ function setupMenubar() {
   }
 
   const menubarUrl = import.meta.env.VITE_ELECTRON_RENDERER_URL + '/menubar.html'
-  const mb: Menubar = menubar({
+  mb = menubar({
     index: menubarUrl,
     icon: getMenubarIcon(),
     browserWindow: {
@@ -171,8 +181,7 @@ function setupMenubar() {
 
     // Validate settings
     settings = validateSettings(settings);
-  
-    await serverContext.startServer(settings);
+    
     logger.info('Menubar app is ready');
   });
 }
@@ -187,7 +196,9 @@ function createWindow(): void {
 
   // Show dock icon when dashboard opens
   if (process.platform === 'darwin') {
-    app.dock.show();
+    app.dock.show().catch(err => {
+      logger.error('Failed to show dock:', err);
+    });
   }
 
   mainWindow = new BrowserWindow({
@@ -207,13 +218,15 @@ function createWindow(): void {
     frame: false
   });
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-    // Hide dock icon when dashboard closes
-    if (process.platform === 'darwin') {
-      app.dock.hide();
-    }
-  });
+  // mainWindow.on('closed', () => {
+  //   mainWindow = null;
+  //   // Hide dock icon when dashboard closes if menubar is hidden
+  //   if (process.platform === 'darwin' && !mb?.window?.isVisible()) {
+  //     app.dock.hide().catch(err => {
+  //       logger.error('Failed to hide dock:', err);
+  //     });
+  //   }
+  // });
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()

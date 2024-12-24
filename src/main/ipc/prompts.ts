@@ -10,7 +10,7 @@ const SERVER_URL = getServerUrl();
 export function setupPromptRoutes() {
   ipcMain.handle('get-prompts', async () => {
     try {
-      const token = await getCurrentSession();
+      const { token } = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
 
       const response = await fetch(`${SERVER_URL}/prompts/get`, {
@@ -63,11 +63,10 @@ export function setupPromptRoutes() {
     }
   });
 
-  ipcMain.handle('create-prompt', async (_, { prompt, name }) => {
+  ipcMain.handle('create-prompt', async (_, { prompt, created_at, reminder_date }) => {
     try {
-      const auth = store.get('auth');
-      const token = await getCurrentSession();
-      if (!auth?.email || !token) throw new Error('Not authenticated');
+      const { token, email } = await getCurrentSession();
+      if (!email || !token) throw new Error('Not authenticated');
 
       const response = await fetch(`${SERVER_URL}/prompts/create`, {
         method: 'POST',
@@ -75,7 +74,7 @@ export function setupPromptRoutes() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ prompt, name, email: auth.email })
+        body: JSON.stringify({ prompt, email: auth.email, created_at, reminder_date })
       });
       return await response.json();
     } catch (error) {
@@ -84,9 +83,9 @@ export function setupPromptRoutes() {
     }
   });
 
-  ipcMain.handle('update-prompt', async (_, { id, prompt, name }) => {
+  ipcMain.handle('update-prompt', async (_, { id, prompt, name, reminder_date }) => {
     try {
-      const token = await getCurrentSession();
+      const { token } = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
 
       const response = await fetch(`${SERVER_URL}/prompts/update/${id}`, {
@@ -95,7 +94,7 @@ export function setupPromptRoutes() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ prompt, name })
+        body: JSON.stringify({ prompt, name, reminder_date })
       });
       return await response.json();
     } catch (error) {
@@ -106,7 +105,7 @@ export function setupPromptRoutes() {
 
   ipcMain.handle('delete-prompt', async (_, id) => {
     try {
-      const token = await getCurrentSession();
+      const { token } = await getCurrentSession();
       if (!token) throw new Error('Not authenticated');
 
       const response = await fetch(`${SERVER_URL}/prompts/delete/${id}`, {

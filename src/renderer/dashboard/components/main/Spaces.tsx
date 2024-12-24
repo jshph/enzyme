@@ -260,16 +260,16 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-gray-800">Spaces</h2>
+      <h2 className="text-3xl font-bold text-primary/90">Spaces</h2>
       
       {/* Create/Edit Space Form */}
-      <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
-        <h3 className="text-xl font-semibold text-gray-800">
+      <div className="bg-surface/50 p-6 rounded-sm shadow-card space-y-4">
+        <h3 className="text-xl font-semibold text-primary/90">
           {editingSpace ? 'Edit Space' : 'Create New Space'}
         </h3>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700">Space Name</label>
+          <label className="block text-sm font-medium text-primary/80">Space Name</label>
           <input 
             type="text"
             value={newSpace.name}
@@ -277,12 +277,12 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
               setNewSpace(prev => ({ ...prev, name: e.target.value }));
               updateDestinationFolder(e.target.value);
             }}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+            className="mt-1 block w-full rounded-md input-base bg-input/50 p-2"
           />
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700">Destination Folder</label>
+          <label className="block text-sm font-medium text-primary/80">Destination Folder</label>
           <div className="destination-folder-input mt-1">
             <span className="destination-folder-prefix">
               {`${settings.vaultPath}/enzyme-spaces/`}
@@ -298,24 +298,24 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
               placeholder={generateFolderName(newSpace.name)}
             />
           </div>
-          <p className="mt-1 text-sm text-gray-500">Location where submissions will be saved</p>
+          <p className="mt-1 text-sm text-secondary/70">Location where submissions will be saved</p>
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700">Enabled Tags</label>
+          <label className="block text-sm font-medium text-primary/80">Enabled Tags</label>
           <div 
-            className="mt-1 flex flex-wrap gap-2 p-2 min-h-[42px] rounded-md border border-gray-300 bg-gray-700"
+            className="mt-1 flex flex-wrap gap-2 p-2 min-h-[42px] rounded-md border border-input/30 bg-input/50"
             onClick={() => tagInputRef.current?.focus()}
           >
             {newSpace.enabledTags.map((tag) => (
               <span 
                 key={tag} 
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-brand/10 text-brand/90"
               >
                 {tag}
                 <button 
                   onClick={() => removeTag(tag)} 
-                  className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-blue-200"
+                  className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-brand/20"
                 >
                   <span className="sr-only">Remove tag</span>
                   ×
@@ -338,8 +338,8 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
           </div>
           
           {showTagSuggestions && tagSuggestions.length > 0 && (
-            <div className="absolute mt-1 w-full bg-gray-700 border border-gray-600 rounded-md shadow-lg">
-              <div className="p-2 text-xs text-gray-400">
+            <div className="absolute mt-1 w-full bg-input/50 border border-input/30 rounded-md shadow-lg">
+              <div className="p-2 text-xs text-secondary/70">
                 <span>{!tagInput ? 'Trending tags:' : 'Matching tags:'}</span>
               </div>
               <div className="max-h-32 overflow-y-auto">
@@ -347,8 +347,8 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
                   <div
                     key={tag}
                     onClick={() => selectTag(tag)}
-                    className={`px-3 py-2 cursor-pointer hover:bg-gray-600 ${
-                      selectedSuggestionIndex === index ? 'bg-gray-600' : ''
+                    className={`px-3 py-2 cursor-pointer hover:bg-input/70 ${
+                      selectedSuggestionIndex === index ? 'bg-input/70' : ''
                     }`}
                   >
                     {tag}
@@ -362,13 +362,13 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
         <div className="flex justify-end space-x-3">
           <button
             onClick={resetSpaceForm}
-            className="px-4 py-2 border rounded-md hover:bg-gray-50"
+            className="px-4 py-2 border border-input/30 rounded-md hover:bg-surface/70 text-secondary/90"
           >
             Cancel
           </button>
           <button
             onClick={() => saveSpace(newSpace, editingSpace)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-brand/80 text-primary/90 rounded-md hover:bg-brand/90"
           >
             Save
           </button>
@@ -377,7 +377,9 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
       
       {/* Message display */}
       {message && (
-        <div className={`p-4 rounded-md ${error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+        <div className={`p-4 rounded-md ${
+          error ? 'bg-red/5 text-red/80' : 'bg-brand/5 text-brand/80'
+        }`}>
           {message}
         </div>
       )}
@@ -385,32 +387,32 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
       {/* Existing Spaces */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {spaces.map((space) => (
-          <div key={space.id} className="bg-white p-6 rounded-lg shadow-sm">
+          <div key={space.id} className="bg-surface/50 p-6 rounded-sm shadow-card">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-semibold text-gray-800">{space.name}</h3>
+              <h3 className="text-xl font-semibold text-primary/90">{space.name}</h3>
               <div className="flex space-x-2">
                 <button
                   onClick={() => editSpace(space)}
-                  className="p-2 hover:bg-gray-600 rounded transition-colors"
+                  className="p-2 hover:bg-input/50 rounded transition-colors text-secondary/70 hover:text-primary/90"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600 hover:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-secondary/70 hover:text-primary/90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </button>
                 <button
                   onClick={() => deleteSpace(space.id)}
-                  className="p-2 hover:bg-gray-600 rounded transition-colors"
+                  className="p-2 hover:bg-input/50 rounded transition-colors text-secondary/70 hover:text-primary/90"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-secondary/70 hover:text-primary/90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
               </div>
             </div>
             
-            <p className="text-gray-600 mt-2">
+            <p className="text-secondary/70 mt-2">
               <span className="inline-flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 text-secondary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                 </svg>
                 <span className="text-sm font-mono">
@@ -423,7 +425,7 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
               {space.enabledTags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center px-2 py-1 rounded-md text-sm font-medium bg-blue-100 text-blue-800"
+                  className="inline-flex items-center px-2 py-1 rounded-md text-sm font-medium bg-brand/10 text-brand/90"
                 >
                   {tag}
                 </span>
@@ -435,40 +437,40 @@ const Spaces: React.FC<SpacesProps> = ({ currentView }) => {
                 type="text"
                 readOnly
                 value={`${enzymeBaseUrl}/space/${space.id}`}
-                className="flex-1 rounded-l-md border border-gray-300 px-3 py-2 bg-gray-50"
+                className="flex-1 rounded-l-md input-base bg-input/50 p-2 text-secondary/70"
               />
               <button
                 onClick={() => copySpaceUrl(space.id)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-brand/80 text-primary/90 rounded-r-md hover:bg-brand/90 transition-colors"
               >
                 {space.copyButtonText || 'Copy'}
               </button>
             </div>
             
             <div className="mt-4 flex justify-between items-center">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-secondary/70">
                 {`${space.pendingSubmissions || 0} pending submissions`}
               </span>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => refreshSpace(space.id)}
-                  className={`p-2 hover:bg-gray-600 rounded-full transition-colors ${
+                  className={`p-2 hover:bg-input/50 rounded-full transition-colors ${
                     space.isRefreshing ? 'animate-spin' : ''
                   }`}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600 hover:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-secondary/70 hover:text-primary/90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </button>
                 <button
                   onClick={() => fetchSubmissions(space.id)}
-                  className="p-2 hover:bg-gray-600 rounded-full transition-colors"
+                  className="p-2 hover:bg-input/50 rounded-full transition-colors"
                   disabled={space.isDownloading || !space.pendingSubmissions}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className={`h-5 w-5 ${
-                      space.pendingSubmissions ? 'text-blue-500' : 'text-gray-400'
+                      space.pendingSubmissions ? 'text-brand/80' : 'text-secondary/70'
                     } ${space.isDownloading ? 'animate-spin' : ''}`}
                     fill="none"
                     viewBox="0 0 24 24"

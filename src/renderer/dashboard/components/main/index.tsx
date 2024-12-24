@@ -4,21 +4,44 @@ import Spaces from './Spaces'
 import Prompts from './Prompts'
 import Login from './Login'
 import Playground from './Playground'
+import { useAuth } from '@renderer/dashboard/contexts/AuthContext'
+
 interface MainProps {
   currentView: string;
   init: () => Promise<void>;
   setCurrentView: (view: string) => void;
+  setPromptCount: (count: number) => void;
 }
 
-const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView }) => {
+const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView, setPromptCount }) => {
+  const { hiddenFeaturesEnabled } = useAuth();
+
+  const hiddenFeatures = hiddenFeaturesEnabled ? (
+    <>
+      <div style={{ display: currentView === 'spaces' ? 'block' : 'none' }}>
+        <Spaces currentView={currentView} />
+      </div>
+      <div style={{ display: currentView === 'playground' ? 'block' : 'none' }}>
+        <Playground />
+      </div>
+    </>
+  ) : null;
+
   return (
-    <div className="flex-1 ml-64 min-h-screen overflow-y-auto">
-      <div className="p-8">
-        {currentView === 'settings' && <Settings />}
-        {currentView === 'spaces' && <Spaces currentView={currentView} />}
-        {currentView === 'prompts' && <Prompts />}
-        {currentView === 'playground' && <Playground />}
-        {currentView === 'login' && <Login init={init} setCurrentView={setCurrentView}/>}
+    <div className="flex-1 ml-64 min-h-screen overflow-y-auto bg-surface/70">
+      <div className="p-8 rounded-lg h-screen">
+        <div style={{ display: currentView === 'settings' ? 'block' : 'none' }}>
+          <Settings />
+        </div>
+
+        <div style={{ display: currentView === 'prompts' ? 'block' : 'none' }}>
+          <Prompts currentView={currentView} setPromptCount={setPromptCount} />
+        </div>
+        
+        {hiddenFeatures}
+        <div style={{ display: currentView === 'login' ? 'block' : 'none' }}>
+          <Login init={init} setCurrentView={setCurrentView}/>
+        </div>
       </div>
     </div>
   )

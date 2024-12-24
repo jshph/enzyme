@@ -179,13 +179,24 @@ Start writing a new paragraph AFTER <Document> ONLY ONE SENTENCE`
       void editor.getApi(AIChatPlugin).aiChat.reload();
     },
   },
-  digest: {
+  promptAssist: {
     icon: <FeatherIcon />,
-    label: 'Digest',
-    value: 'digest',
-    onSelect: ({ editor }) => {
+    label: 'Prompt Assist',
+    value: 'prompt-assist',
+    onSelect: async ({ editor }) => {
+      // Render mentions and plaintext from editor content
+      const mentions = extractMentionsFromEditor(editor.children).join(' ');
+      
+      // Get relevant docs based on mentions
+      const relevantDocs = await window.electron.ipcRenderer.invoke('get-context', mentions);
+
+      // Submit to AI chat with docs context
       void editor.getApi(AIChatPlugin).aiChat.submit({
-        prompt: 'Digest',
+        mode: 'chat',
+        prompt: {
+          // TODO passing JSON so that we can extract the doc metadata. We will format it later.
+          default: `<RelevantDocs>\n${JSON.stringify(relevantDocs)}\n</RelevantDocs>`,
+        }
       });
     },
   },
@@ -238,7 +249,7 @@ const menuStateItems: Record<
         // aiChatItems.makeShorter,
         // aiChatItems.fixSpelling,
         // aiChatItems.simplifyLanguage,
-        aiChatItems.digest,
+        aiChatItems.promptAssist,
       ],
     },
   ],
@@ -310,3 +321,20 @@ export const AIMenuItems = ({
     </>
   );
 };
+
+function extractMentionsFromEditor(nodes: any[]): string[] {
+  const result: string[] = [];
+  
+  for (const node of nodes) {
+    if (node.type === 'mention' && node.value) {
+      const value = node.value;
+      result.push(value);
+    } else if (node.type === 'text' && node.value) {
+      result.push(node.value);
+    } else if (node.children) {
+      result.push(...extractMentionsFromEditor(node.children));
+    }
+  }
+  
+  return result;
+}

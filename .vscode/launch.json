@@ -10,7 +10,8 @@
       "runtimeArgs": ["--sourcemap"],
       "env": {
         "REMOTE_DEBUGGING_PORT": "9222"
-      }
+      },
+      "preLaunchTask": "Kill Electron Processes"
     },
     {
       "name": "Debug Renderer Process",
@@ -27,7 +28,7 @@
   "compounds": [
     {
       "name": "Debug All",
-      "configurations": ["Debug Main Process", "Debug Renderer Process"],
+      "configurations": ["Debug Enzyme", "Debug Renderer Process"],
       "presentation": {
         "order": 1
       }
