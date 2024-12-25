@@ -50,14 +50,32 @@ The initial version will include curated suggested outputs to ensure proper form
 - Users will have the option to schedule the dynamic report for email delivery, facilitating regular updates.
 
 
+DONE:
 implementation notes:
 - relevant doc extraction should extract around the mention itself. so it'll be important to funnel that metadata around the mention.
 - before we have a scheduling feature, we need to have the prompt structured output be something really compelling
+
+
+
+TODO before launch
+- editable "prompt" for each segment
+- "send" button to send the current version to email
+- setup scheduling email of a recipe
+- retry generation should work
+- from prompt to make it a question
+- a few more templates - mantras
+
+LATER
+- ui selecting a recipe
+
 - nice to have would be to build in the graph visualization stuff that i had before
 - also want this to be performant -- can some of the processing happen in the background without awaits
   - optimize for startup -- we need the settings to initialize faster than the rest of the UI renders; the prompt builder may not have its tags ready yet, but that's okay, we should have more of the UI have "loading" indicators for when indexing is happening.
 - there's definitely a bug that reflects the index doesn't have enough docs because the output gets hallucinated. Need to fix that -- before submitting prompt the index should be run. Noticing this happens when i navigate tabs to Prompt, possibly interrupting a process
-- also fix the bug where opening the app shows login view if you've already logged in
+
+finalizing steps...
+- get an apple developer account
+- migrate the api key to server side / the gen to server side (consider using streamObjects)
 
 <!-- 
 # Sketching out the Prompt Builder / Recipe Home
@@ -76,7 +94,9 @@ Goals for the copy + flow on that page:
 
 (in the base case, just present multiple options of suggested outputs in different tabs and styles, and allow the user to choose between one of them without editing them) -->
 
-
+- editable prompt - button to regenerate a section, or just make it an input box
+  - benefits: can choose a new output format for the segment - could be mantra rather than synthesis, for example.
+- selecting an entity will show default # of docs for that, but allow the user to change it using buttons
 
 
 	- this requires a custom component in plate which will render docs given a URL

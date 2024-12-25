@@ -166,6 +166,8 @@ NEXT after launch:
 - modular push notifications - server side. Listenable.
   - configure disable notifications in dashboard
 
+- editing recipes after they've been generated. have to be able to edit the prompts too
+
 # Sharing roadmap
 
 - figure out when to broadcast on zed forum

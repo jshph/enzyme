@@ -17,6 +17,7 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   const [trendingData, setTrendingData] = useState<any>(null);
   const [selectedEntities, setSelectedEntities] = useState<SelectedEntity[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const fetchTrendingData = async () => {
     const result = await window.electron.ipcRenderer.invoke('trending-data-update');
@@ -45,43 +46,83 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     });
   };
 
+  const updateSegmentPrompt = (id: number, prompt: string) => {
+    if (!suggestedOutputs || !suggestedOutputs.length) return;
+    setSuggestedOutputs(prev => {
+      const newOutputs = prev.map(output => ({
+        ...output,
+        segments: output.segments.map((segment, index) => index === id ? { ...segment, prompt } : segment)
+      }));
+      return newOutputs;
+    });
+  };
+
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.length === 0) return;
+    
+    setIsGenerating(true);
+    try {
+      // Convert selected entities to query string
+      const query = selectedEntities.map(entity => entity.name).join(' ');
 
-    // Convert selected entities to query string
-    const query = selectedEntities.map(entity => entity.name).join(' ');
+      // fetch the context using the entities
+      const context: MatchResult[] = await window.electron.ipcRenderer.invoke('get-context', query);
 
-    // fetch the context using the entities
-    const context: MatchResult[] = await window.electron.ipcRenderer.invoke('get-context', query);
+      // Get suggested output
+      const result = await window.electron.ipcRenderer.invoke('suggested-output', { 
+        context, 
+        query 
+      });
 
-    // Get suggested output
-    const result = await window.electron.ipcRenderer.invoke('suggested-output', { 
-      context, 
-      query 
-    });
+      // Construct the body
+      const body: SuggestedOutputBody = {
+        question: result.question,
+        segments: result.segments.map((segment, index) => ({
+          theme: segment.theme,
+          synthesis: {
+            id: index,
+            prompt: segment.prompt,
+            type: segment.type,
+            analysis: segment.analysis
+          },
+          docs: segment.docs.map(doc => {
+            const contextItem = context.find(result => result.file === doc);
+            const adjoinedContents = contextItem ? contextItem.extractedContents.join('\n') : '';
+            return {
+              file: doc,
+              content: adjoinedContents
+            }
+          })
+        }))
+      };
 
-    // Construct the body
-    const body: SuggestedOutputBody = {
-      question: result.question,
-      segments: result.segments.map(segment => ({
-        theme: segment.theme,
-        synthesis: {
-          type: segment.type,
-          analysis: segment.analysis
-        },
-        docs: segment.docs.map(doc => {
-          const contextItem = context.find(result => result.file === doc);
-          const adjoinedContents = contextItem ? contextItem.extractedContents.join('\n') : '';
-          return {
-            file: doc,
-            content: adjoinedContents
-          }
-        })
-      }))
-    };
-
-    setSuggestedOutputs([body]);
+      setSuggestedOutputs([body]);
+    } catch (error) {
+      console.error('Error generating recipe:', error);
+      // Optionally add error handling UI here
+    } finally {
+      setIsGenerating(false);
+    }
   }, [selectedEntities]);
+
+  const handleScheduleRecipe = async (frequency: 'weekly' | 'monthly', startDate: Date) => {
+    try {
+      await window.electron.ipcRenderer.invoke('schedule-recipe', {
+        frequency,
+        startDate,
+        recipe: suggestedOutputs?.[0], // Assuming we're scheduling the first recipe
+        entities: selectedEntities
+      });
+      // Optionally show a success toast/notification here
+    } catch (error) {
+      console.error('Error scheduling recipe:', error);
+      // Optionally show an error toast/notification here
+    }
+  };
+
+  const handleRetry = useCallback(async () => {
+    await submitPrompt();
+  }, [submitPrompt]);
 
   return (
     <>
@@ -143,28 +184,44 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         )}
 
         <button
-          disabled={!hasVaultInitialized || selectedEntities.length === 0}
-          className="w-full bg-brand/30 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-brand/70 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!hasVaultInitialized || selectedEntities.length === 0 || isGenerating}
+          className="w-full bg-background/40 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-background/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={submitPrompt}
         >
           Generate Recipe
         </button>
 
         {/* Output section */}
-        <div className="mt-8 space-y-4">
-          <h3 className="text-lg font-medium text-primary/90">Recipe Variations</h3>
-          <p className="text-sm text-primary/70">
-            Select the most relevant format for exploring your notes
-          </p>
-          <div className="gap-4">
-            {suggestedOutputs && suggestedOutputs.map((output, index) => (
-              <SuggestedOutput
-                key={index}
-                body={output}
-              />
-            ))}
+        {(suggestedOutputs || isGenerating) && (
+          <div className="mt-8 space-y-4">
+            <div className="gap-4">
+              {isGenerating ? (
+                <div className="space-y-4 animate-pulse">
+                  <div className="h-8 bg-brand/20 rounded-lg w-3/4"></div>
+                  <div className="space-y-3">
+                    <div className="h-4 bg-brand/20 rounded w-1/2"></div>
+                    <div className="h-4 bg-brand/20 rounded w-full"></div>
+                    <div className="h-4 bg-brand/20 rounded w-3/4"></div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-20 bg-brand/10 rounded-lg"></div>
+                    <div className="h-20 bg-brand/10 rounded-lg"></div>
+                  </div>
+                </div>
+              ) : (
+                suggestedOutputs && suggestedOutputs.map((output, index) => (
+                  <SuggestedOutput
+                    key={index}
+                    body={output}
+                    onEditPrompt={updateSegmentPrompt}
+                    onSchedule={handleScheduleRecipe}
+                    onRetry={handleRetry}
+                  />
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </>
   )

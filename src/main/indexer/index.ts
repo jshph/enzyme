@@ -590,12 +590,12 @@ export class FileIndexer {
     
     const topTags = Array.from(tagCounts.entries())
       .sort(sortByCount)
-      .slice(0, 10)
+      .slice(0, 25)
       .map(([name, count]) => ({ name, count }));
 
     const topLinks = Array.from(linkCounts.entries())
       .sort(sortByCount)
-      .slice(0, 10)
+      .slice(0, 25)
       .map(([name, count]) => ({ name, count }));
 
     return { tags: topTags, links: topLinks };

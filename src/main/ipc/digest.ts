@@ -75,14 +75,10 @@ export function setupDigestIPCRoutes() {
     }
   });
 
-  const RelevantDocsSchema = z.object({
-    question: z.string().describe("An insightful, reflective question to the user that would surface the relevant documents from the notes, distinguished from the other documents"),
-    docs: z.array(z.string()).describe("The verbatim filepaths of the top 5 most relevant documents to the user's query"),
-  });
-
   const SegmentSchema = z.object({
     theme: z.string().describe("A 5 word theme of this segment"),
     type: z.string().describe("The type of the segment, should be 'dive' or 'gap'"),
+    prompt: z.string().describe("A prompt for an LLM which could be used to generate the analysis for this segment in the future"),
     analysis: z.string().describe("A 50 word exploration of the relevant documents for this segment, the tone of a therapist / good friend. The goal is either to help the user explore novel insights from subtle connections between the documents, or to illuminate a missing insight. Make sure to be specific, and to ground your point of view on experiences in the notes."),
     docs: z.array(z.string()).describe("The verbatim filepaths of the top 4 most relevant documents to the synthesis").length(4)
   })
@@ -91,31 +87,24 @@ export function setupDigestIPCRoutes() {
     question: z.string().describe("An insightful, reflective question to the user that would surface the relevant documents from the notes"),
     segments: z.array(SegmentSchema).min(2).max(4)
   });
-  
-
-  ipcMain.handle('relevant-docs', async (event: any, messages: CoreMessage[]) => {
-    let response;
-    try {
-      response = await generateObject({
-        model: openai("gpt-4o-mini"),
-        messages: messages as CoreMessage[],
-        schema: RelevantDocsSchema
-      });
-      return response.object;
-    } catch (error) {
-      console.error(error);
-    }
-  });
 
   ipcMain.handle('suggested-output', async (event: any, { context, query }: { context: MatchResult[], query: string }) => {
     let response;
 
-    let messages: CoreMessage[] = [{
+    let messages: CoreMessage[] = [
+      {
         role: 'system',
         content: `
           You are a masterful news article curator. Every piece of gold that falls through the cracks comes from a brilliant writer who is on the brink of quitting their job. DON'T let extremely insightful writers quit, especially if their ideas are promising yet half baked.
 
-          Your task is to craft a question, and to create a series of flowing segments which illuminate pathways through the notes. Always include supporting sources and a synthesis.
+          You are a master chef of insights, crafting exquisite dishes from the raw ingredients of thought. Each recipe you create serves as a nourishing reflection, transforming simple ideas into a rich digest of understanding.
+
+          Abstractions:
+          - Recipe: A question + series of segments
+          - Segment: A prompt for an LLM, and an example of the analysis that would be generated from the prompt + the supporting sources
+          
+          Your culinary wisdom can guide the user through a banquet of questions that flow like a well-prepared meal, illuminating the hidden flavors within their notes. Always accompany each dish with a garnish of supporting sources.
+
           The context is: ${JSON.stringify(context)}
         `
       },
