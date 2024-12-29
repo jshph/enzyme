@@ -1,18 +1,24 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { SuggestedOutput, SuggestedOutputBody } from "../../plate-ui/suggested-output";
-import { useEffect } from "react";
 import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext";
 
 interface SelectedEntity {
   type: 'tag' | 'link';
-  name: string;
+  count: number;
 }
+
+type SelectedEntitiesMap = Map<string, SelectedEntity>;
 
 const profiles = {
   selfReflection: 'Self Reflection',
   projectManagement: 'Project Management',
   relationshipManagement: 'Relationship & Team Management'
 }
+
+type Ingredient = {
+  type: 'tag' | 'link';
+  name: string;
+};
 
 const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
@@ -21,9 +27,16 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // TODO figure out how to get the entire contents of the editor and not just the selection
 
   const [trendingData, setTrendingData] = useState<any>(null);
-  const [selectedEntities, setSelectedEntities] = useState<SelectedEntity[]>([]);
+  const [selectedEntities, setSelectedEntities] = useState<SelectedEntitiesMap>(new Map());
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState('selfReflection');
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedEntity, setDraggedEntity] = useState<{type: 'tag' | 'link', name: string, element: HTMLElement} | null>(null);
+  const [showNumber, setShowNumber] = useState<string | null>(null);
+
+  const DEFAULT_COUNT = 4;
+
+  const dragCountRef = useRef<number>(0);
 
   const fetchTrendingData = async () => {
     const result = await window.electron.ipcRenderer.invoke('trending-data-update');
@@ -43,18 +56,29 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   const toggleEntity = (type: 'tag' | 'link', name: string) => {
     setSelectedEntities(prev => {
-      const exists = prev.some(entity => entity.type === type && entity.name === name);
-      if (exists) {
-        return prev.filter(entity => !(entity.type === type && entity.name === name));
+      const next = new Map(prev);
+      if (next.has(name)) {
+        next.delete(name);
       } else {
-        return [...prev, { type, name }];
+        next.set(name, { type, count: DEFAULT_COUNT });
       }
+      return next;
+    });
+  };
+
+  const updateEntityCount = (type: 'tag' | 'link', name: string, count: number) => {
+    setSelectedEntities(prev => {
+      const next = new Map(prev);
+      next.set(name, { type, count });
+      return next;
     });
   };
 
   const updateSegmentPrompt = (id: number, prompt: string) => {
     if (!suggestedOutputs || !suggestedOutputs.length) return;
     setSuggestedOutputs(prev => {
+      if (!prev) return suggestedOutputs;
+      
       const newOutputs = prev.map(output => ({
         ...output,
         segments: output.segments.map((segment, index) => index === id ? { ...segment, prompt } : segment)
@@ -64,11 +88,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   };
 
   const submitPrompt = useCallback(async () => {
-    if (selectedEntities.length === 0) return;
+    if (selectedEntities.size === 0) return;
     
     setIsGenerating(true);
     try {
-      const query = selectedEntities.map(entity => entity.name).join(' ');
+      const query = Array.from(selectedEntities.keys()).join(' ');
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
       const result = await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
@@ -104,7 +128,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedEntities, selectedProfile]);
+  }, [selectedEntities]);
 
   const handleScheduleRecipe = async (frequency: 'weekly' | 'monthly', startDate: Date) => {
     try {
@@ -116,7 +140,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       await window.electron.ipcRenderer.invoke('create-recipe', {
         frequency,
         startDate,
-        entities: selectedEntities,
+        entities: Array.from(selectedEntities.values()),
         recipe: {
           question: suggestedOutputs[0].question,
           segments: suggestedOutputs[0].segments.map(segment => ({
@@ -140,33 +164,41 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     await submitPrompt();
   }, [submitPrompt]);
 
-  const executeFirstPendingRecipe = async () => {
-    try {
-      // Get pending recipes
-      const pendingRecipes = await window.electron.ipcRenderer.invoke('get-pending-recipes');
-      
-      if (!pendingRecipes || pendingRecipes.length === 0) {
-        new Notification('No pending recipes found');
-        return;
+  const handleMouseMove = (
+    e: React.MouseEvent,
+    draggedEntity: {type: 'tag' | 'link', name: string, element: HTMLElement} | null
+  ) => {
+    if (!isDragging || !draggedEntity) return;
+    
+    const numberElement = draggedEntity.element;
+    if (!numberElement) return;
+    
+    const numberRect = numberElement.getBoundingClientRect();
+    const pixelsPerUnit = 12;
+    const centerX = numberRect.left + (numberRect.width / 2);
+    const deltaX = e.clientX - centerX;
+    
+    const countDelta = Math.floor(deltaX / pixelsPerUnit);
+    const newCount = Math.max(1, Math.min(30, DEFAULT_COUNT + countDelta));
+    
+    // Update ref for immediate visual feedback
+    dragCountRef.current = newCount;
+    numberElement.textContent = newCount.toString();
+    
+    // Debounce the state update
+    requestAnimationFrame(() => {
+      if (dragCountRef.current !== selectedEntities.get(draggedEntity.name)?.count) {
+        updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
       }
-
-      // Execute the first pending recipe
-      const result = await window.electron.ipcRenderer.invoke('execute-recipe', pendingRecipes[0].id);
-      
-      if (result.success) {
-        new Notification('Recipe executed successfully');
-      } else {
-        new Notification('Failed to execute recipe: ' + result.error);
-      }
-    } catch (error) {
-      console.error('Error executing recipe:', error);
-      new Notification('Failed to execute recipe');
-    }
+    });
   };
 
   return (
     <>
-      <div className="space-y-6">
+      <div
+        className="space-y-6"
+        onMouseMove={(e) => handleMouseMove(e, draggedEntity)}
+        >
         {/* Header section */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-primary/90">Create a Recipe</h2>
@@ -196,29 +228,70 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         {trendingData && (
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-primary/70">Popular ingredients from your notes</h4>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {trendingData.tags.map((tag, index) => (
-                <div 
-                  key={index} 
-                  className={`px-3 py-1.5 rounded-full shadow-sm cursor-pointer transition-colors ${
-                    selectedEntities.some(e => e.type === 'tag' && e.name === tag.name)
-                      ? 'bg-brand/70'
-                      : 'bg-brand/30 hover:bg-brand/50'
-                  }`}
-                  onClick={() => toggleEntity('tag', tag.name)}
-                >{tag.name}</div>
-              ))}
-              {trendingData.links.map((link, index) => (
-                <div 
-                  key={index} 
-                  className={`px-3 py-1.5 rounded-full shadow-sm cursor-pointer transition-colors ${
-                    selectedEntities.some(e => e.type === 'link' && e.name === link.name)
-                      ? 'bg-brand/70'
-                      : 'bg-brand/30 hover:bg-brand/50'
-                  }`}
-                  onClick={() => toggleEntity('link', link.name)}
-                >{link.name}</div>
-              ))}
+            <div 
+              className="flex flex-wrap gap-2 text-xs"
+              onMouseUp={() => {
+                if (draggedEntity && dragCountRef.current) {
+                  updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
+                }
+                setIsDragging(false);
+                setDraggedEntity(null);
+                setShowNumber(null);
+                dragCountRef.current = 0;
+              }}
+              onMouseLeave={() => {
+                if (draggedEntity && dragCountRef.current) {
+                  updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
+                }
+                setIsDragging(false);
+                setDraggedEntity(null);
+                setShowNumber(null);
+                dragCountRef.current = 0;
+              }}
+            >
+              {[...trendingData.tags, ...trendingData.links].map((ingredient: Ingredient, index) => {
+                const selectedEntity = selectedEntities.get(ingredient.name);
+                const isSelected = !!selectedEntity;
+                
+                return (
+                  <div 
+                    key={index}
+                    className={`ingredient-pill group relative px-5 py-2 rounded-full shadow-sm transition-all select-none bg-brand/30
+                      ${isSelected && !isDragging ? 'hover:pl-2 hover:pr-8 bg-brand/60' : ''}
+                      ${isDragging && draggedEntity?.name === ingredient.name ? 'cursor-grabbing pl-2 pr-8' : ''}
+                      ${isDragging && draggedEntity?.name !== ingredient.name ? 'opacity-80' : ''}
+                      ${!isDragging ? 'hover:bg-brand/50 cursor-pointer' : ''}
+                      `
+                    }
+                    onClick={() => !isDragging && toggleEntity(ingredient.type, ingredient.name)}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <span>
+                        {ingredient.name}
+                      </span>
+                        <div 
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center
+                            min-w-[24px] h-6 rounded-full
+                            cursor-grab active:cursor-grabbing opacity-0
+                            ${isSelected && !isDragging ? 'group-hover:opacity-100' : ''}
+                            ${isDragging && draggedEntity?.name === ingredient.name ? 'opacity-100' : ''}
+                          `
+                          }
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            setIsDragging(true);
+                            setDraggedEntity({ type: ingredient.type, name: ingredient.name, element: e.currentTarget });
+                            setShowNumber(ingredient.name);
+                          }}
+                        >
+                          <span className="text-xs rounded-full bg-brand/50 px-2 py-0.5">
+                            {selectedEntity?.count || DEFAULT_COUNT}
+                          </span>
+                        </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -246,7 +319,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
 
           <button
-            disabled={!hasVaultInitialized || selectedEntities.length === 0 || isGenerating}
+            disabled={!hasVaultInitialized || selectedEntities.size === 0 || isGenerating}
             className="bg-brand/40 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-brand/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
             onClick={submitPrompt}
           >
