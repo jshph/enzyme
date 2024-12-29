@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import { SuggestedOutput, SuggestedOutputBody } from "../../plate-ui/suggested-output";
 import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext";
+import NoteTimeline from './NoteTimeline';
+import debounce from 'lodash/debounce';
 
 interface SelectedEntity {
   type: 'tag' | 'link';
@@ -8,6 +10,12 @@ interface SelectedEntity {
 }
 
 type SelectedEntitiesMap = Map<string, SelectedEntity>;
+
+interface TimelineItem {
+  date: Date;
+  type: 'tag' | 'link';
+  name: string;
+}
 
 const profiles = {
   selfReflection: 'Self Reflection',
@@ -33,6 +41,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedEntity, setDraggedEntity] = useState<{type: 'tag' | 'link', name: string, element: HTMLElement} | null>(null);
   const [showNumber, setShowNumber] = useState<string | null>(null);
+  const [timelineData, setTimelineData] = useState<TimelineItem[]>([]);
 
   const DEFAULT_COUNT = 4;
 
@@ -41,8 +50,16 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const fetchTrendingData = async () => {
     const result = await window.electron.ipcRenderer.invoke('trending-data-update');
     // Format the tags and links with the # and [[ ]]
-    const formattedTags = result.tags.map(tag => ({ type: 'tag', name: `#${tag.name}` }));
-    const formattedLinks = result.links.map(link => ({ type: 'link', name: `[[${link.name}]]` }));
+    const formattedTags = result.tags.map(tag => ({ 
+      type: 'tag', 
+      name: `#${tag.name}`,
+      timeline: tag.timeline 
+    }));
+    const formattedLinks = result.links.map(link => ({ 
+      type: 'link', 
+      name: `[[${link.name}]]`,
+      timeline: link.timeline 
+    }));
     setTrendingData({ tags: formattedTags, links: formattedLinks });
   };
 
@@ -72,6 +89,9 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       next.set(name, { type, count });
       return next;
     });
+    
+    // Timeline will automatically update since it depends on selectedEntities
+    // which is used to fetch the timeline data in the useEffect
   };
 
   const updateSegmentPrompt = (id: number, prompt: string) => {
@@ -164,6 +184,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     await submitPrompt();
   }, [submitPrompt]);
 
+  // Create debounced timeline update function
+  const updateTimelineDebounced = useCallback(
+    debounce((entities: Array<[string, { type: 'tag' | 'link'; count: number }]>) => {
+      window.electron.ipcRenderer.invoke('get-entity-timeline', entities)
+        .then(newTimelineData => {
+          setTimelineData(newTimelineData);
+        });
+    }, 50),
+    []
+  );
+
   const handleMouseMove = (
     e: React.MouseEvent,
     draggedEntity: {type: 'tag' | 'link', name: string, element: HTMLElement} | null
@@ -185,20 +216,45 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     dragCountRef.current = newCount;
     numberElement.textContent = newCount.toString();
     
-    // Debounce the state update
-    requestAnimationFrame(() => {
-      if (dragCountRef.current !== selectedEntities.get(draggedEntity.name)?.count) {
-        updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
-      }
-    });
+    // Use debounced update instead
+    const updatedEntities = new Map(selectedEntities);
+    updatedEntities.set(draggedEntity.name, { type: draggedEntity.type, count: newCount });
+    updateTimelineDebounced(Array.from(updatedEntities.entries()));
   };
+
+  // Add this function to handle drag end
+  const handleDragEnd = useCallback(() => {
+    if (draggedEntity && dragCountRef.current) {
+      updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
+    }
+    setIsDragging(false);
+    setDraggedEntity(null);
+    setShowNumber(null);
+    dragCountRef.current = 0;
+  }, [draggedEntity]);
+
+  // Update timeline when entities change
+  useEffect(() => {
+    if (selectedEntities.size === 0) {
+      setTimelineData([]);
+      return;
+    }
+
+    window.electron.ipcRenderer.invoke('get-entity-timeline', 
+      Array.from(selectedEntities.entries())
+    ).then(newTimelineData => {
+      setTimelineData(newTimelineData);
+    });
+  }, [selectedEntities]);
 
   return (
     <>
       <div
         className="space-y-6"
         onMouseMove={(e) => handleMouseMove(e, draggedEntity)}
-        >
+        onMouseUp={handleDragEnd}
+        onMouseLeave={handleDragEnd}
+      >
         {/* Header section */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-primary/90">Create a Recipe</h2>
@@ -257,7 +313,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                   <div 
                     key={index}
                     className={`ingredient-pill group relative px-5 py-2 rounded-full shadow-sm transition-all select-none bg-brand/30
-                      ${isSelected && !isDragging ? 'hover:pl-2 hover:pr-8 bg-brand/60' : ''}
+                      ${isSelected ? 'pl-2 pr-8 bg-brand/60' : ''}
                       ${isDragging && draggedEntity?.name === ingredient.name ? 'cursor-grabbing pl-2 pr-8' : ''}
                       ${isDragging && draggedEntity?.name !== ingredient.name ? 'opacity-80' : ''}
                       ${!isDragging ? 'hover:bg-brand/50 cursor-pointer' : ''}
@@ -270,11 +326,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                         {ingredient.name}
                       </span>
                         <div 
-                          className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center
+                          className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center
                             min-w-[24px] h-6 rounded-full
-                            cursor-grab active:cursor-grabbing opacity-0
-                            ${isSelected && !isDragging ? 'group-hover:opacity-100' : ''}
-                            ${isDragging && draggedEntity?.name === ingredient.name ? 'opacity-100' : ''}
+                            cursor-grab active:cursor-grabbing opacity-0 px-1.5 py-0.25 bg-background/5 border border-brand/50
+                            ${isSelected ? 'opacity-100' : ''}
                           `
                           }
                           onMouseDown={(e) => {
@@ -284,7 +339,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                             setShowNumber(ingredient.name);
                           }}
                         >
-                          <span className="text-xs rounded-full bg-brand/50 px-2 py-0.5">
+                          <span>
                             {selectedEntity?.count || DEFAULT_COUNT}
                           </span>
                         </div>
@@ -295,6 +350,9 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             </div>
           </div>
         )}
+
+        <NoteTimeline timelineData={timelineData} />
+
         <div className="flex justify-normal items-center space-y-2">
           {/* Add Profile selector */}
           <div className="space-y-2">
@@ -358,6 +416,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             </div>
           </div>
         )}
+
 
         {/* <button
           className="mt-4 w-full bg-red-500/20 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-red-500/30 transition-colors font-medium"

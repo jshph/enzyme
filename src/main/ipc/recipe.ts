@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { getServerUrl, logger } from "./index";
 import { getCurrentSession } from "./user";
 import { useContextServer } from "../server";
+import { getFileIndexer } from "../indexer/electron";
 
 const SERVER_URL = getServerUrl();
 const contextServer = useContextServer();
@@ -133,5 +134,11 @@ export function setupRecipeRoutes() {
       logger.error('Error updating recipe:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
+  });
+
+  ipcMain.handle('get-entity-timeline', async (_, entities) => {
+    const indexer = getFileIndexer();
+    const timeline = indexer.getEntityTimeline(entities);
+    return timeline;
   });
 } 

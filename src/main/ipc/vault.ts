@@ -16,6 +16,16 @@ export interface Digest {
 
 const indexer = getFileIndexer();
 
+interface TrendingDataWithTimeline {
+  tags: { name: string; count: number; timeline: TimelineItem[] }[];
+  links: { name: string; count: number; timeline: TimelineItem[] }[];
+}
+
+interface TimelineItem {
+  date: Date;
+  type: 'tag' | 'link';
+  name: string;
+}
 
 export function setupVaultIPCRoutes() {
   ipcMain.handle('initialize-index', async (_, settings: Settings): Promise<InitializeResult> => {
@@ -67,7 +77,22 @@ export function setupVaultIPCRoutes() {
   });
   
   ipcMain.handle('trending-data-update', (_) => {
-    return indexer.getTrendingItems();
+    const indexer = getFileIndexer();
+    const trendingItems = indexer.getTrendingItems();
+    
+    // Get timeline data for each trending item
+    const enrichedData: TrendingDataWithTimeline = {
+      tags: trendingItems.tags.map(tag => ({
+        ...tag,
+        timeline: indexer.getEntityTimeline([[tag.name, { type: 'tag', count: tag.count }]])
+      })),
+      links: trendingItems.links.map(link => ({
+        ...link,
+        timeline: indexer.getEntityTimeline([[link.name, { type: 'link', count: link.count }]])
+      }))
+    };
+
+    return enrichedData;
   });
 
   ipcMain.handle('query-for-links-and-tags', (_, query: string) => {

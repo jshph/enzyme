@@ -45,6 +45,12 @@ interface CachedSearchTerm {
   timestamp: number;
 }
 
+interface TimelineItem {
+  date: Date;
+  type: 'tag' | 'link';
+  name: string;
+}
+
 export class FileIndexer {
   private tagIndex: Map<string, IndexEntry> = new Map();
   private tagSet: Set<string> = new Set();
@@ -429,11 +435,12 @@ export class FileIndexer {
   }
 
   private extractTags(frontMatter: any, content: string): string[] {
-    const frontMatterTags = frontMatter.tags || [];
+    const frontMatterTags = frontMatter.tags || [];  
     const contentTags = (content.match(/#[\w-\/]+/g) || [])
       .map(tag => tag.substring(1));
     
-    return [...new Set([...frontMatterTags, ...contentTags])];
+    const allTags = [...new Set([...frontMatterTags, ...contentTags])];
+    return allTags;
   }
 
   // Extracts links from the content using regex and returns the link without the brackets
@@ -823,6 +830,42 @@ export class FileIndexer {
     }
 
     return results;
+  }
+
+  public getEntityTimeline(entities: Array<[string, { type: 'tag' | 'link'; count: number }]>): TimelineItem[] {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const timeline: TimelineItem[] = [];
+    
+    entities.forEach(([name, { type, count }]) => {
+      const index = type === 'tag' ? this.tagIndex : this.linkIndex;
+      
+      // Clean the name - remove # for tags and [[ ]] for links
+      const cleanName = type === 'tag' ? 
+        name.replace(/^#/, '') : 
+        name.replace(/^\[\[|\]\]$/g, '');
+      
+      const entry = index.get(cleanName);
+      
+      if (entry) {
+        const filteredFiles = entry.files
+          .filter(file => file.createdAt >= threeMonthsAgo);
+        
+        
+        filteredFiles
+          .slice(0, count)
+          .forEach(file => {
+            timeline.push({
+              date: file.createdAt,
+              type,
+              name  // Keep the original name with prefix in the timeline
+            });
+          });
+      }
+    });
+    
+    return timeline.sort((a, b) => a.date.getTime() - b.date.getTime());
   }
 }
 
