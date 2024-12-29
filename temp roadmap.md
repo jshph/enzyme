@@ -57,18 +57,20 @@ implementation notes:
 - get an apple developer account
 - start of email should have a "vanity" or "reflection" section which describes to the user how well they are doing to reflect on their notes -- maybe some quantified metric about frequency and freshness of visiting a topic, (i.e. some fun facts - last age of visited topic) and suggested action items around timeliness of revisiting a topic, and things to not forget. Goal is to help them feel accomplished about the connections between their notes.
 - remove the temp stuff that hardcodes recipe execution
+- "profiles" for generating recipes - purpose of vault can be self reflection, or project management, or relationship management / CRM
+- prompt engineering for the metaprompt (it's too confusing right now, it generates a prompt for the user and not the llm)
+- migrate the api key to server side / the gen to server side (consider using streamObjects)
+- from prompt to make it a question
+- setup scheduling email of a recipe
+- a few more templates - mantras
+- retry generation should work
 
 
 TODO before launch
 - editable "prompt" for each segment
-- "send" button to send the current version to email - and to schedule over the server
-- setup scheduling email of a recipe
-- retry generation should work
-- from prompt to make it a question
+- "email me a copy" button to send the current version to email - and to schedule over the server
 - open button should open the file in obsidian
-- migrate the api key to server side / the gen to server side (consider using streamObjects)
-
-- a few more templates - mantras
+- quick demo video for people to see it tomorrow and give some feedback
 
 
 - think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.

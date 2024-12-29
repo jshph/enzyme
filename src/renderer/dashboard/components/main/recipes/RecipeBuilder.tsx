@@ -8,6 +8,12 @@ interface SelectedEntity {
   name: string;
 }
 
+const profiles = {
+  selfReflection: 'Self Reflection',
+  projectManagement: 'Project Management',
+  relationshipManagement: 'Relationship & Team Management'
+}
+
 const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
@@ -17,6 +23,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const [trendingData, setTrendingData] = useState<any>(null);
   const [selectedEntities, setSelectedEntities] = useState<SelectedEntity[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState('selfReflection');
 
   const fetchTrendingData = async () => {
     const result = await window.electron.ipcRenderer.invoke('trending-data-update');
@@ -66,7 +73,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
       const result = await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
         context, 
-        query 
+        query,
+        profileId: selectedProfile
       });
 
       const body: SuggestedOutputBody = {
@@ -96,7 +104,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedEntities]);
+  }, [selectedEntities, selectedProfile]);
 
   const handleScheduleRecipe = async (frequency: 'weekly' | 'monthly', startDate: Date) => {
     try {
@@ -214,14 +222,37 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             </div>
           </div>
         )}
+        <div className="flex justify-normal items-center space-y-2">
+          {/* Add Profile selector */}
+          <div className="space-y-2">
+            <label htmlFor="profile-select" className="block text-sm font-medium text-primary/70">
+              Recipe Profile
+            </label>
+            <select
+              id="profile-select"
+              value={selectedProfile}
+              onChange={(e) => setSelectedProfile(e.target.value)}
+              className="w-full px-3 py-2 bg-background/40 rounded-lg shadow-sm border border-primary/20 focus:outline-none focus:ring-2 focus:ring-brand/50"
+            >
+              {Object.entries(profiles).map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-primary/50">
+              {profiles[selectedProfile].description}
+            </p>
+          </div>
 
-        <button
-          disabled={!hasVaultInitialized || selectedEntities.length === 0 || isGenerating}
-          className="w-full bg-background/40 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-background/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={submitPrompt}
-        >
-          Generate Recipe
-        </button>
+          <button
+            disabled={!hasVaultInitialized || selectedEntities.length === 0 || isGenerating}
+            className="bg-brand/40 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-brand/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
+            onClick={submitPrompt}
+          >
+            Generate Recipe
+          </button>
+        </div>
 
         {/* Output section */}
         {(suggestedOutputs || isGenerating) && (

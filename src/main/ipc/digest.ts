@@ -4,10 +4,6 @@ import { getCurrentSession } from "./user";
 import { QueryPattern, MatchType, extractPatterns, MatchResult } from '../extract/index';
 import { getFileIndexer } from "../indexer/electron";
 import { useContextServer } from "../server";
-import { CoreMessage, generateObject } from "ai";
-import { createOpenAI, openai } from "@ai-sdk/openai";
-import { z } from "zod";
-import path from "path";
 import { shell } from "electron";
 
 interface DigestUsage {
@@ -20,10 +16,6 @@ interface DigestUsage {
 const indexer = getFileIndexer();
 const SERVER_URL = getServerUrl();
 const contextServer = useContextServer();
-
-const openai = createOpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY
-});
 
 export async function getDigestUsage(): Promise<DigestUsage | null> {
   try {
@@ -72,66 +64,6 @@ export function setupDigestIPCRoutes() {
         { id: 'actions', label: 'Followup Actions' },
         { id: 'themes', label: 'Key Themes' }
       ];
-    }
-  });
-
-  const SegmentSchema = z.object({
-    theme: z.string().describe("A 5 word theme of this segment"),
-    type: z.string().describe("The type of the segment, should be 'dive' or 'gap'"),
-    prompt: z.string().describe("A prompt for an LLM which could be used to generate the analysis for this segment in the future. Should feel well-crafted, something that the user would trust to find patterns over time."),
-    analysis: z.string().describe("A 50 word exploration of the relevant documents for this segment, the tone of a therapist / good friend. The goal is either to help the user explore novel insights from subtle connections between the documents, or to illuminate a missing insight. Make sure to be specific, and to ground your point of view on experiences in the notes. Phrase it as a question; by being specific, it should feel like a probe or followup."),
-    docs: z.array(z.string()).describe("The verbatim filepaths of the top 4 most relevant documents to the synthesis").length(4)
-  })
-
-  const SuggestedOutputSchema = z.object({
-    question: z.string().describe("An insightful, reflective question to the user that would surface the relevant documents from the notes"),
-    segments: z.array(SegmentSchema).min(2).max(4)
-  });
-
-  ipcMain.handle('suggested-output', async (event: any, { context, query }: { context: MatchResult[], query: string }) => {
-    let response;
-
-    let messages: CoreMessage[] = [
-      {
-        role: 'system',
-        content: `
-          You are a masterful news article curator. Every piece of gold that falls through the cracks comes from a brilliant writer who is on the brink of quitting their job. DON'T let extremely insightful writers quit, especially if their ideas are promising yet half baked.
-
-          You are a master chef of insights, crafting exquisite dishes from the raw ingredients of thought. Each recipe you create serves as a nourishing reflection, transforming simple ideas into a rich digest of understanding.
-
-          Abstractions:
-          - Recipe: A question + series of segments
-          - Segment: A prompt for an LLM, and an example of the analysis that would be generated from the prompt + the supporting sources
-          
-          Your culinary wisdom can guide the user through a banquet of questions that flow like a well-prepared meal, illuminating the hidden flavors within their notes. Always accompany each dish with a garnish of supporting sources.
-
-          The context is: ${JSON.stringify(context)}
-        `
-      },
-      {
-        role: 'user',
-        content: query
-      }  
-    ]
-    const maxRetries = 3;
-    let attempt = 0;
-
-    while (attempt < maxRetries) {
-      try {
-        response = await generateObject({
-          model: openai("gpt-4o-mini"),
-          temperature: 0.7,
-          messages: messages as CoreMessage[],
-          schema: SuggestedOutputSchema
-        });
-        return response.object;
-      } catch (error) {
-        console.error(`Attempt ${attempt + 1} failed:`, error);
-        attempt++;
-        if (attempt === maxRetries) {
-          return null;
-        }
-      }
     }
   });
 
@@ -287,7 +219,7 @@ export function setupDigestIPCRoutes() {
     }
   });
 
-  ipcMain.handle('generate-suggested-output', async (event, { context, query }) => {
+  ipcMain.handle('generate-suggested-output', async (event, { context, query, profileId }) => {
     try {
       const { token } = await getCurrentSession();
       
@@ -297,7 +229,7 @@ export function setupDigestIPCRoutes() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ context, query })
+        body: JSON.stringify({ context, query, profileId })
       });
 
       if (!response.ok) {

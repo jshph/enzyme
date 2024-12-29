@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { cn } from '@udecode/cn';
-import { Calendar, Mail, RefreshCw } from 'lucide-react';
+import { Calendar, Mail, RefreshCw, ChevronRight } from 'lucide-react';
 
 interface SuggestedOutputProps {
   body: SuggestedOutputBody;
@@ -21,7 +21,7 @@ interface OutputSection {
 export interface BaseSegment {
   theme: string;
   synthesis: {
-    type: 'dive' | 'gap';
+    type: 'dive' | 'gap' | 'mantra';
     prompt: string;
     analysis: string;
   };
@@ -44,6 +44,15 @@ export const SuggestedOutput = React.forwardRef<
   const [showScheduler, setShowScheduler] = useState(false);
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('weekly');
   const [startDate, setStartDate] = useState<Date>(new Date());
+  const [expandedPrompts, setExpandedPrompts] = useState<number[]>([]);
+
+  const togglePrompt = (index: number) => {
+    setExpandedPrompts(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
+  };
 
   const openInObsidian = async (filePath: string) => {
     await window.electron.ipcRenderer.invoke('open-in-obsidian', filePath);
@@ -69,10 +78,35 @@ export const SuggestedOutput = React.forwardRef<
           // Theme - Persistent
           newSections.push({
             type: 'theme',
-            title: `Prompt: ${segment.theme}`,
+            title: (
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => togglePrompt(index)}
+                  className="p-1 rounded hover:bg-secondary/10"
+                >
+                  <ChevronRight 
+                    className={cn(
+                      "w-4 h-4 transition-transform",
+                      expandedPrompts.includes(index) && "transform rotate-90"
+                    )} 
+                  />
+                </button>
+                <span className="text-md font-bold">
+                  Topic: 
+                  <span className="ml-2 px-3 py-1.5 rounded-full bg-brand/10 text-white">{segment.theme}</span>
+                </span>
+              </div>
+            ),
             content: (
-              <div className="bg-background border-2 border-primary/80 p-4 rounded-lg shadow-sm text-sm">
-                <p className="font-medium text-primary">{segment.synthesis.prompt}</p>
+              <div className="space-y-2">
+                {expandedPrompts.includes(index) && (
+                  <div className="mt-2 border-l-2 ml-3 border-secondary/20 pl-4">
+                    <div className="bg-secondary/5 p-4 rounded-md">
+                      <h4 className="text-xs font-medium mb-2 text-secondary">Analysis Recipe</h4>
+                      <p className="text-sm text-secondary/80">{segment.synthesis.prompt}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           });
@@ -80,7 +114,7 @@ export const SuggestedOutput = React.forwardRef<
           // Exploration - Dynamic
           newSections.push({
             type: 'synthesis',
-            title: 'Generated: ' + (segment.synthesis.type === 'dive' ? 'Deep Dive' : 'Gap Analysis'),
+            title: (segment.synthesis.type === 'dive' ? 'Deep Dive' : segment.synthesis.type === 'mantra' ? 'Mantra' : 'Gap Analysis'),
             content: (
               <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100 text-sm">
                 <p>{segment.synthesis.analysis}</p>
@@ -134,7 +168,7 @@ export const SuggestedOutput = React.forwardRef<
     };
 
     parseAndSetSections();
-  }, [body]);
+  }, [body, expandedPrompts]);
 
   const ScheduleDialog = () => (
     <div className="absolute bottom-16 right-0 bg-background border border-primary/20 rounded-lg p-4 shadow-lg w-72">
