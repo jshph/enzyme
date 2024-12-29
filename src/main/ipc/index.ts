@@ -4,6 +4,12 @@ import dotenv from 'dotenv';
 import path from 'path';
 import winston from 'winston';
 import { SpaceInfo } from "./space";
+import { setupAuthIPCRoutes } from './auth';
+import { setupDigestIPCRoutes } from './digest';
+import { setupVaultIPCRoutes } from './vault';
+import { setupSpaceRoutes } from './space';
+import { setupRecipeRoutes } from './recipe';
+import { setupUserIPCRoutes } from "./user";
 
 interface Auth {
   email: string;
@@ -92,4 +98,13 @@ export const logger = createLogger();
 
 export function getServerUrl() {
   return import.meta.env.VITE_SERVER_URL as string;
+}
+
+export function setupIPC() {
+  setupAuthIPCRoutes();
+  setupDigestIPCRoutes();
+  setupVaultIPCRoutes();
+  setupUserIPCRoutes();
+  setupSpaceRoutes();
+  setupRecipeRoutes();
 }

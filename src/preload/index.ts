@@ -32,12 +32,7 @@ const api = {
   createSpace: (spaceData: SpaceInfo) => ipcRenderer.invoke('create-space', spaceData),
   submitToSpace: (spaceName: string, submission: any) => ipcRenderer.invoke('submit-to-space', { spaceName, submission }),
   clearSpaces: () => ipcRenderer.invoke('clear-spaces'),
-  fetchSpaceSubmissions: (spaceId: string) => ipcRenderer.invoke('fetch-space-submissions', spaceId),
-
-  // Prompts
-  createPrompt: (prompt: string, name: string) => ipcRenderer.invoke('create-prompt', { prompt, name }),
-  updatePrompt: (id: string, prompt: string, name: string) => ipcRenderer.invoke('update-prompt', { id, prompt, name }),
-  deletePrompt: (id: string) => ipcRenderer.invoke('delete-prompt', id),
+  fetchSpaceSubmissions: (spaceId: string) => ipcRenderer.invoke('fetch-space-submissions', spaceId)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

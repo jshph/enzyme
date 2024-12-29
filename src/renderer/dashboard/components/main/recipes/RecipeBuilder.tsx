@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { SuggestedOutput, SuggestedOutputBody } from "../../plate-ui/suggested-output";
 import { useEffect } from "react";
-import { MatchResult } from "../../editor/use-chat";
 import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext";
 
 interface SelectedEntity {
@@ -9,7 +8,7 @@ interface SelectedEntity {
   name: string;
 }
 
-const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
+const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
   
@@ -62,19 +61,14 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     
     setIsGenerating(true);
     try {
-      // Convert selected entities to query string
       const query = selectedEntities.map(entity => entity.name).join(' ');
+      const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
-      // fetch the context using the entities
-      const context: MatchResult[] = await window.electron.ipcRenderer.invoke('get-context', query);
-
-      // Get suggested output
-      const result = await window.electron.ipcRenderer.invoke('suggested-output', { 
+      const result = await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
         context, 
         query 
       });
 
-      // Construct the body
       const body: SuggestedOutputBody = {
         question: result.question,
         segments: result.segments.map((segment, index) => ({
@@ -99,7 +93,6 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       setSuggestedOutputs([body]);
     } catch (error) {
       console.error('Error generating recipe:', error);
-      // Optionally add error handling UI here
     } finally {
       setIsGenerating(false);
     }
@@ -107,22 +100,61 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   const handleScheduleRecipe = async (frequency: 'weekly' | 'monthly', startDate: Date) => {
     try {
-      await window.electron.ipcRenderer.invoke('schedule-recipe', {
+      if (!suggestedOutputs?.[0]) {
+        throw new Error('No recipe generated yet');
+      }
+
+      // Create recipe with the full structure
+      await window.electron.ipcRenderer.invoke('create-recipe', {
         frequency,
         startDate,
-        recipe: suggestedOutputs?.[0], // Assuming we're scheduling the first recipe
-        entities: selectedEntities
+        entities: selectedEntities,
+        recipe: {
+          question: suggestedOutputs[0].question,
+          segments: suggestedOutputs[0].segments.map(segment => ({
+            theme: segment.theme,
+            type: segment.synthesis.type,
+            prompt: segment.synthesis.prompt
+          }))
+        }
       });
-      // Optionally show a success toast/notification here
+
+      // Show success notification
+      // TODO: Add notification system
     } catch (error) {
       console.error('Error scheduling recipe:', error);
-      // Optionally show an error toast/notification here
+      // Show error notification
+      // TODO: Add notification system
     }
   };
 
   const handleRetry = useCallback(async () => {
     await submitPrompt();
   }, [submitPrompt]);
+
+  const executeFirstPendingRecipe = async () => {
+    try {
+      // Get pending recipes
+      const pendingRecipes = await window.electron.ipcRenderer.invoke('get-pending-recipes');
+      
+      if (!pendingRecipes || pendingRecipes.length === 0) {
+        new Notification('No pending recipes found');
+        return;
+      }
+
+      // Execute the first pending recipe
+      const result = await window.electron.ipcRenderer.invoke('execute-recipe', pendingRecipes[0].id);
+      
+      if (result.success) {
+        new Notification('Recipe executed successfully');
+      } else {
+        new Notification('Failed to execute recipe: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error executing recipe:', error);
+      new Notification('Failed to execute recipe');
+    }
+  };
 
   return (
     <>
@@ -222,9 +254,16 @@ const PromptBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             </div>
           </div>
         )}
+
+        {/* <button
+          className="mt-4 w-full bg-red-500/20 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-red-500/30 transition-colors font-medium"
+          onClick={executeFirstPendingRecipe}
+        >
+          Test: Execute First Pending Recipe
+        </button> */}
       </div>
     </>
   )
 }
 
-export default PromptBuilder;
+export default RecipeBuilder;

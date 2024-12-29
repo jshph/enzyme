@@ -116,6 +116,7 @@
     "js-yaml": "^4.1.0",
     "lucide-react": "^0.468.0",
     "menubar": "^9.5.1",
+    "node-cron": "^3.0.3",
     "pdf-lib": "^1.17.1",
     "prismjs": "^1.29.0",
     "react-beautiful-dnd": "^13.1.1",

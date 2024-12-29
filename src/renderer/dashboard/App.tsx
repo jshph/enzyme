@@ -3,6 +3,7 @@ import { useSettingsContext } from './contexts/SettingsContext'
 import Sidebar from './components/Sidebar'
 import Main from './components/main'
 import { useAuth } from './contexts/AuthContext'
+import { RecipeExecutor } from './components/RecipeExecutor'
 
 // Create an inner component to use hooks
 const AppContent: React.FC = () => {
@@ -73,6 +74,8 @@ const AppContent: React.FC = () => {
           setCurrentView={setCurrentView}
         />
       </div>
+      
+      <RecipeExecutor />
     </div>
   )
 }

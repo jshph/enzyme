@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { cn } from '@udecode/cn';
-import { Calendar, RefreshCw } from 'lucide-react';
+import { Calendar, Mail, RefreshCw } from 'lucide-react';
 
 interface SuggestedOutputProps {
   body: SuggestedOutputBody;
@@ -59,7 +59,7 @@ export const SuggestedOutput = React.forwardRef<
           type: 'question',
           title: 'Question',
           content: (
-            <div className="bg-secondary/20  p-4 rounded-lg shadow-sm">
+            <div className="bg-secondary/20  p-4 rounded-md shadow-sm">
               <p className="font-medium text-primary">{body.question}</p>
             </div>
           )
@@ -71,7 +71,7 @@ export const SuggestedOutput = React.forwardRef<
             type: 'theme',
             title: `Prompt: ${segment.theme}`,
             content: (
-              <div className="bg-background border-2 border-primary/80 p-4 rounded-lg shadow-sm">
+              <div className="bg-background border-2 border-primary/80 p-4 rounded-lg shadow-sm text-sm">
                 <p className="font-medium text-primary">{segment.synthesis.prompt}</p>
               </div>
             )
@@ -82,7 +82,7 @@ export const SuggestedOutput = React.forwardRef<
             type: 'synthesis',
             title: 'Generated: ' + (segment.synthesis.type === 'dive' ? 'Deep Dive' : 'Gap Analysis'),
             content: (
-              <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100">
+              <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100 text-sm">
                 <p>{segment.synthesis.analysis}</p>
               </div>
             )
@@ -214,6 +214,17 @@ export const SuggestedOutput = React.forwardRef<
           <span>Schedule Recipe</span>
         </button>
         {showScheduler && <ScheduleDialog />}
+      <button
+        onClick={() => {
+          // Logic to handle emailing a copy of the suggested output
+          console.log('Emailing a copy of the suggested output...');
+          // You can replace the console log with the actual email sending logic
+        }}
+        className="flex items-center space-x-2 px-4 py-2 text-sm bg-secondary/20 hover:bg-secondary/30 rounded-md transition-colors"
+      >
+        <Mail className="w-4 h-4" />
+        <span>Email me a copy</span>
+      </button>
       </div>
     </div>
   );

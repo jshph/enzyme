@@ -58,6 +58,12 @@ export default defineConfig({
         },
         external: ['electron']
       }
+    },
+    server: {
+      hmr: {
+        protocol: 'ws',
+        host: 'localhost'
+      }
     }
   }
 })

@@ -54,16 +54,24 @@ DONE:
 implementation notes:
 - relevant doc extraction should extract around the mention itself. so it'll be important to funnel that metadata around the mention.
 - before we have a scheduling feature, we need to have the prompt structured output be something really compelling
-
+- get an apple developer account
+- start of email should have a "vanity" or "reflection" section which describes to the user how well they are doing to reflect on their notes -- maybe some quantified metric about frequency and freshness of visiting a topic, (i.e. some fun facts - last age of visited topic) and suggested action items around timeliness of revisiting a topic, and things to not forget. Goal is to help them feel accomplished about the connections between their notes.
+- remove the temp stuff that hardcodes recipe execution
 
 
 TODO before launch
 - editable "prompt" for each segment
-- "send" button to send the current version to email
+- "send" button to send the current version to email - and to schedule over the server
 - setup scheduling email of a recipe
 - retry generation should work
 - from prompt to make it a question
+- open button should open the file in obsidian
+- migrate the api key to server side / the gen to server side (consider using streamObjects)
+
 - a few more templates - mantras
+
+
+- think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
 
 LATER
 - ui selecting a recipe
@@ -74,8 +82,6 @@ LATER
 - there's definitely a bug that reflects the index doesn't have enough docs because the output gets hallucinated. Need to fix that -- before submitting prompt the index should be run. Noticing this happens when i navigate tabs to Prompt, possibly interrupting a process
 
 finalizing steps...
-- get an apple developer account
-- migrate the api key to server side / the gen to server side (consider using streamObjects)
 
 <!-- 
 # Sketching out the Prompt Builder / Recipe Home

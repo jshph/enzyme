@@ -8,20 +8,16 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import path, { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { ServerContext } from './server';
-import { store, logger } from './ipc/index';
+import { store, logger, setupIPC } from './ipc/index';
 import { menubar } from 'menubar';
 import type { Menubar } from 'menubar';
 import { nativeImage } from 'electron';
 import { getSettings, validateSettings, setupUserIPCRoutes } from './ipc/user';
-import { setupAuthIPCRoutes } from './ipc/auth';
-import { setupVaultIPCRoutes } from './ipc/vault';
-import { setupDigestIPCRoutes } from './ipc/digest';
-import { setupSpaceRoutes } from './ipc/space';
-import { setupPromptRoutes } from './ipc/prompts';
 
 let mainWindow: BrowserWindow | null = null;
 let mb: Menubar | null = null;
 const serverContext = new ServerContext();
+
 
 
 console.log('Starting app in mode:', process.defaultApp ? 'development' : 'production');
@@ -75,14 +71,9 @@ function initializeMain() {
 
   setupMenubar();
   setupDashboard();
-
-  setupUserIPCRoutes();
-  setupAuthIPCRoutes();
-  setupVaultIPCRoutes();
-  setupDigestIPCRoutes();
-  setupSpaceRoutes();
-  setupPromptRoutes();
+  
   // Handle uncaught exceptions
+  setupIPC();
 
   // process.on('uncaughtException', (error) => {
   //   logger.error('Uncaught exception:', error);
@@ -240,10 +231,16 @@ function createWindow(): void {
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   // if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
-  mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
-  // } else {
-  //   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
-  // }
+  if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
+    mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
+  } else {
+    mainWindow.loadFile(join(__dirname, '../renderer/dashboard.html'))
+  }
+
+  // Add this event handler
+  mainWindow.webContents.on('destroyed', () => {
+    mainWindow = null;
+  });
 }
 
 
@@ -252,6 +249,7 @@ function setupDashboard() {
   // initialization and is ready to create browser windows.
   // Some APIs can only be used after this event occurs.
   app.whenReady().then(() => {
+
     // Set app user model id for windows
     electronApp.setAppUserModelId('com.electron')
 
@@ -270,7 +268,6 @@ function setupDashboard() {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
   })
-
   // Quit when all windows are closed, except on macOS. There, it's common
   // for applications and their menu bar to stay active until the user quits
   // explicitly with Cmd + Q.
@@ -280,7 +277,3 @@ function setupDashboard() {
     }
   })
 }
-
-// In this file you can include the rest of your app"s specific main process
-// code. You can also put them in separate files and require them here.
-

@@ -78,8 +78,8 @@ export function setupDigestIPCRoutes() {
   const SegmentSchema = z.object({
     theme: z.string().describe("A 5 word theme of this segment"),
     type: z.string().describe("The type of the segment, should be 'dive' or 'gap'"),
-    prompt: z.string().describe("A prompt for an LLM which could be used to generate the analysis for this segment in the future"),
-    analysis: z.string().describe("A 50 word exploration of the relevant documents for this segment, the tone of a therapist / good friend. The goal is either to help the user explore novel insights from subtle connections between the documents, or to illuminate a missing insight. Make sure to be specific, and to ground your point of view on experiences in the notes."),
+    prompt: z.string().describe("A prompt for an LLM which could be used to generate the analysis for this segment in the future. Should feel well-crafted, something that the user would trust to find patterns over time."),
+    analysis: z.string().describe("A 50 word exploration of the relevant documents for this segment, the tone of a therapist / good friend. The goal is either to help the user explore novel insights from subtle connections between the documents, or to illuminate a missing insight. Make sure to be specific, and to ground your point of view on experiences in the notes. Phrase it as a question; by being specific, it should feel like a probe or followup."),
     docs: z.array(z.string()).describe("The verbatim filepaths of the top 4 most relevant documents to the synthesis").length(4)
   })
 
@@ -284,6 +284,30 @@ export function setupDigestIPCRoutes() {
       shell.openExternal(obsidianUri);
     } catch (error) {
       console.error('Error opening file in Obsidian:', error);
+    }
+  });
+
+  ipcMain.handle('generate-suggested-output', async (event, { context, query }) => {
+    try {
+      const { token } = await getCurrentSession();
+      
+      const response = await fetch(`${SERVER_URL}/digest/generate-suggested`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ context, query })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate suggested output');
+      }
+
+      return await response.json();
+    } catch (error) {
+      logger.error('Failed to generate suggested output:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   });
 }
