@@ -1,4 +1,4 @@
-import { Settings, app } from "electron";
+import { Settings, app, ipcMain, BrowserWindow } from "electron";
 import Store from "electron-store";
 import dotenv from 'dotenv';
 import path from 'path';
@@ -27,6 +27,26 @@ export const store = new Store<{
   spaces: SpaceInfo[]
 }>();
 
+// Track app initialization state
+let isAppReady = false;
+let isVaultInitialized = false;
+
+function broadcastAppState() {
+  BrowserWindow.getAllWindows().forEach(window => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('app-state-update', {
+        isAppReady,
+        isVaultInitialized
+      });
+    }
+  });
+}
+
+// Listen for when Electron has finished initialization
+app.whenReady().then(() => {
+  isAppReady = true;
+  broadcastAppState();
+});
 
 function loadEnvironment() {
   try {
@@ -100,7 +120,31 @@ export function getServerUrl() {
   return import.meta.env.VITE_SERVER_URL as string;
 }
 
+// Add a new function to check if vault is configured
+function isVaultConfigured() {
+  const localSettings = store.get('localSettings');
+  return localSettings?.vaultPath && localSettings.vaultPath.length > 0;
+}
+
 export function setupIPC() {
+  // Get current app state
+  ipcMain.handle('get-app-state', () => ({
+    isAppReady,
+    isVaultInitialized
+  }));
+
+  // Update vault state
+  ipcMain.handle('set-vault-initialized', (_, initialized: boolean) => {
+    isVaultInitialized = initialized;
+    broadcastAppState();
+    return isVaultInitialized;
+  });
+
+  // Add a new IPC handler to check vault status
+  ipcMain.handle('check-vault-status', () => {
+    return isVaultConfigured();
+  });
+
   setupAuthIPCRoutes();
   setupDigestIPCRoutes();
   setupVaultIPCRoutes();

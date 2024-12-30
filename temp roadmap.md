@@ -66,18 +66,20 @@ implementation notes:
 - retry generation should work
 - move timeline view to the top above the ingredients
 - work on the interactivity consistency. also make the range indicator persist when an entity is selected.
+- quick demo video for people to see it tomorrow and give some feedback
+- selected range should apply to the query step
+- less glitchy index initialization step
 
 
 TODO before launch
 - editable "prompt" for each segment
 - "email me a copy" button to send the current version to email - and to schedule over the server
 - open button should open the file in obsidian
-- quick demo video for people to see it tomorrow and give some feedback
 
-- selected range should apply to the query step
 - fix the dragging causing elements to deselect
-- less glitchy index initialization step
 - dock should work
+- fix double notification of "index complete"
+- fix the scheduling -- no context provided
 - recipe view should be accessible if not logged in, but cannot save recipe or execute more than twice
 - adjust the animation of the nodes - while dragging, the nodes should be higher opacity.
 - optional - sliding left and right will "stream" the node changes.

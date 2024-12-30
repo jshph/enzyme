@@ -107,13 +107,13 @@ const ScheduledRecipes: React.FC<{ currentView: string }> = ({ currentView }) =>
               <div className="flex space-x-2">
                 <button 
                   onClick={() => executeNow(recipe.id)} 
-                  className="text-brand hover:text-brand/80"
+                  className="text-brand text-sm mr-2 hover:text-brand/80"
                 >
                   Run
                 </button>
                 <button 
                   onClick={() => deleteRecipe(recipe.id)} 
-                  className="text-red hover:text-red/80"
+                  className="text-red text-sm mr-2 hover:text-red/80"
                 >
                   Delete
                 </button>

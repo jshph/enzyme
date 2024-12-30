@@ -35,6 +35,12 @@ const api = {
   fetchSpaceSubmissions: (spaceId: string) => ipcRenderer.invoke('fetch-space-submissions', spaceId)
 }
 
+// Define the app state type
+interface AppState {
+  isAppReady: boolean
+  isVaultInitialized: boolean
+}
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
@@ -48,7 +54,18 @@ const api = {
         on: (channel: string, func: (...args: any[]) => void) => {
           ipcRenderer.on(channel, (_, ...args) => func(...args))
         },
-        invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args)
+        invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+        removeListener: (channel: string, func: (...args: any[]) => void) => ipcRenderer.removeListener(channel, func),
+        getAppState: () => ipcRenderer.invoke('get-app-state'),
+        setVaultInitialized: (initialized: boolean) => 
+          ipcRenderer.invoke('set-vault-initialized', initialized),
+        onAppStateChange: (callback: (state: AppState) => void) => {
+          const subscription = (_: any, state: AppState) => callback(state)
+          ipcRenderer.on('app-state-update', subscription)
+          return () => {
+            ipcRenderer.removeListener('app-state-update', subscription)
+          }
+        }
       }
     })
     contextBridge.exposeInMainWorld('api', api)

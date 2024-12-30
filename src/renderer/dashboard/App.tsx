@@ -1,60 +1,67 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSettingsContext } from './contexts/SettingsContext'
 import Sidebar from './components/Sidebar'
 import Main from './components/main'
 import { useAuth } from './contexts/AuthContext'
 import { RecipeExecutor } from './components/RecipeExecutor'
 
-// Create an inner component to use hooks
+interface AppState {
+  isAppReady: boolean;
+  isVaultInitialized: boolean;
+}
+
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState('settings')
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState(false)
+  const [appState, setAppState] = useState<AppState>({ 
+    isAppReady: false, 
+    isVaultInitialized: false 
+  })
   const { refreshSettings, initializeVault } = useSettingsContext()
   const { isAuthenticated } = useAuth()
 
-  const init = async () => {
-    try {
-      // Refresh settings
-      await refreshSettings()
-
-    } catch (err) {
-      console.error('Error during initialization:', err)
-      setMessage('Failed to initialize application')
-      setError(true)
-    }
-  }
-
-  const initVault = async () => {
-    try {
-      await initializeVault()
-    } catch (err) {
-      console.error('Error during vault initialization:', err)
-      setMessage('Failed to initialize vault')
-      setError(true)
-    }
-  }
-
-  // Initialize on mount
+  // Listen for app state updates
   useEffect(() => {
-    init()
+    // Get initial state
+    window.electron.ipcRenderer.getAppState().then(setAppState)
 
-    initVault()
+    // Set up subscription to state changes
+    const unsubscribe = window.electron.ipcRenderer.onAppStateChange(setAppState)
 
-    // Set up visibility change handler
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        init()
+    // Cleanup subscription
+    return () => {
+      unsubscribe()
+    }
+  }, [])
+
+  // Initialize vault when app is ready
+  useEffect(() => {
+    const initVault = async () => {
+      if (appState.isAppReady && !appState.isVaultInitialized) {
+        try {
+          await refreshSettings()
+          await initializeVault()
+          await window.electron.ipcRenderer.setVaultInitialized(true)
+        } catch (err) {
+          console.error('Failed to initialize vault:', err)
+          setCurrentView('settings')
+        }
       }
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    initVault()
+  }, [appState.isAppReady, isAuthenticated])
 
-    // Cleanup
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [isAuthenticated])
+  // Show loading state while app initializes
+  if (!appState.isAppReady) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand/80 mx-auto"></div>
+          <p className="mt-4 text-secondary/70">Starting Enzyme...</p>
+        </div>
+      </div>
+    )
+  }
 
   const quitApp = async () => {
     await window.electron.ipcRenderer.send('quit-app')
@@ -69,9 +76,9 @@ const AppContent: React.FC = () => {
           quitApp={quitApp}
         />
         <Main 
-          currentView={currentView} 
-          init={init}
+          currentView={currentView}
           setCurrentView={setCurrentView}
+          isVaultInitialized={appState.isVaultInitialized}
         />
       </div>
       
@@ -80,7 +87,6 @@ const AppContent: React.FC = () => {
   )
 }
 
-// Main App component with providers
 const App: React.FC = () => {
   return (
     <AppContent />

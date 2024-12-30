@@ -495,14 +495,23 @@ export class FileIndexer {
   }
 
   getFilesForTag(tag: string): FileMetadata[] {
+    if (this.isIndexing) {
+      throw new Error('Indexing in progress');
+    }
     return this.tagIndex.get(tag.toLowerCase())?.files || [];
   }
 
   getFilesForLink(link: string): FileMetadata[] {
+    if (this.isIndexing) {
+      throw new Error('Indexing in progress');
+    }
     return this.linkIndex.get(link)?.files || [];
   }
 
   getFilesInFolder(folderPath: string): FileMetadata[] {
+    if (this.isIndexing) {
+      throw new Error('Indexing in progress');
+    }
     return this.folderIndex.get(folderPath)?.files || [];
   }
 

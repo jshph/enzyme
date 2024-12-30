@@ -40,10 +40,9 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const [selectedProfile, setSelectedProfile] = useState('selfReflection');
   const [isDragging, setIsDragging] = useState(false);
   const [draggedEntity, setDraggedEntity] = useState<{type: 'tag' | 'link', name: string, element: HTMLElement} | null>(null);
-  const [showNumber, setShowNumber] = useState<string | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineItem[]>([]);
 
-  const DEFAULT_COUNT = 4;
+  const DEFAULT_COUNT = 10;
 
   const dragCountRef = useRef<number>(0);
 
@@ -112,7 +111,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     
     setIsGenerating(true);
     try {
-      const query = Array.from(selectedEntities.keys()).join(' ');
+      const query = Array.from(selectedEntities.entries()).map(([name, { count }]) => `${name}<${count}`).join(' ');
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
       const result = await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
@@ -229,7 +228,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     }
     setIsDragging(false);
     setDraggedEntity(null);
-    setShowNumber(null);
+
     dragCountRef.current = 0;
   }, [draggedEntity]);
 
@@ -292,7 +291,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 }
                 setIsDragging(false);
                 setDraggedEntity(null);
-                setShowNumber(null);
                 dragCountRef.current = 0;
               }}
               onMouseLeave={() => {
@@ -301,7 +299,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 }
                 setIsDragging(false);
                 setDraggedEntity(null);
-                setShowNumber(null);
                 dragCountRef.current = 0;
               }}
             >
@@ -336,7 +333,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                             e.stopPropagation();
                             setIsDragging(true);
                             setDraggedEntity({ type: ingredient.type, name: ingredient.name, element: e.currentTarget });
-                            setShowNumber(ingredient.name);
                           }}
                         >
                           <span>
@@ -378,7 +374,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
           <button
             disabled={!hasVaultInitialized || selectedEntities.size === 0 || isGenerating}
-            className="bg-brand/40 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-brand/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
+            className="bg-brand/40 py-3 px-4 text-sm rounded-md shadow-md cursor-pointer hover:bg-brand/60 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
             onClick={submitPrompt}
           >
             Generate Recipe
