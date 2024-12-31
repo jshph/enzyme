@@ -81,7 +81,8 @@ TODO before launch
 - open button should open the file in obsidian
 
 - recipe view should be accessible if not logged in, but cannot save recipe or execute more than twice
-
+- track executions as a table in supabse and compare to a hardcoded limit server side
+- handle the bearer token better for nonauthenticated users hitting generate-suggested
 
 - think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
 

@@ -18,12 +18,6 @@ interface TimelineItem {
   name: string;
 }
 
-const profiles = {
-  selfReflection: 'Self Reflection',
-  projectManagement: 'Project Management',
-  relationshipManagement: 'Relationship & Team Management'
-}
-
 type Ingredient = {
   type: 'tag' | 'link';
   name: string;
@@ -34,13 +28,24 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const { hasVaultInitialized } = useSettingsContext();
   const { isAuthenticated } = useAuth();
   const [executionsRemaining, setExecutionsRemaining] = useState<number | null>(null);
-  
+  const [profiles, setProfiles] = useState<any[]>([{ id: 'selfReflection', name: 'Self Reflection', description: 'Focus on personal growth and insight development' }]);
+  const [selectedProfile, setSelectedProfile] = useState('selfReflection');
+  const [selectedProfileTypes, setSelectedProfileTypes] = useState<any[]>([]);
+
+  useEffect(() => {
+    window.electron.ipcRenderer.invoke('get-profiles')
+      .then(profiles => {
+        setProfiles(profiles);
+        setSelectedProfileTypes(profiles.find(profile => profile.id === selectedProfile)?.types || []);
+      });
+  }, []);
+
+
   // TODO figure out how to get the entire contents of the editor and not just the selection
 
   const [trendingData, setTrendingData] = useState<any>(null);
   const [selectedEntities, setSelectedEntities] = useState<SelectedEntitiesMap>(new Map());
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState('selfReflection');
   const [isDragging, setIsDragging] = useState(false);
   const [draggedEntity, setDraggedEntity] = useState<{type: 'tag' | 'link', name: string, element: HTMLElement} | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineItem[]>([]);
@@ -122,6 +127,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
+      console.log("selected profile", selectedProfile);  
+
       const result = await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
         context, 
         query,
@@ -155,7 +162,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedEntities]);
+  }, [selectedEntities, selectedProfile]);
 
   const handleScheduleRecipe = async (frequency: 'weekly' | 'monthly', startDate: Date) => {
     try {
@@ -168,13 +175,14 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         frequency,
         startDate,
         entities: makeQuery(),
+        profile: selectedProfile,
         recipe: {
           question: suggestedOutputs[0].question,
           segments: suggestedOutputs[0].segments.map(segment => ({
             theme: segment.theme,
             type: segment.synthesis.type,
             prompt: segment.synthesis.prompt
-          }))
+          })),
         }
       });
 
@@ -269,10 +277,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     }
   }, [isAuthenticated]);
 
+  const handleProfileChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newProfileId = e.target.value;
+    setSelectedProfile(newProfileId);
+    const newProfile = profiles.find(profile => profile.id === newProfileId);
+    setSelectedProfileTypes(newProfile?.types || []);
+  }, [profiles]);
+
   return (
     <>
       <div
-        className="space-y-6"
+        className="space-y-6 py-4"
         onMouseMove={(e) => handleMouseMove(e, draggedEntity)}
         onMouseUp={handleDragEnd}
         onMouseLeave={handleDragEnd}
@@ -380,17 +395,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             <select
               id="profile-select"
               value={selectedProfile}
-              onChange={(e) => setSelectedProfile(e.target.value)}
+              onChange={handleProfileChange}
               className="w-full px-3 py-2 bg-background/40 rounded-lg shadow-sm border border-primary/20 focus:outline-none focus:ring-2 focus:ring-brand/50"
             >
-              {Object.entries(profiles).map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
+              {profiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
                 </option>
               ))}
             </select>
             <p className="text-xs text-primary/50">
-              {profiles[selectedProfile].description}
+              {profiles.find(profile => profile.id === selectedProfile)?.description}
             </p>
           </div>
 
@@ -429,6 +444,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                     onEditPrompt={updateSegmentPrompt}
                     onSchedule={handleScheduleRecipe}
                     onRetry={handleRetry}
+                    profileTypes={selectedProfileTypes}
                   />
                 ))
               )}

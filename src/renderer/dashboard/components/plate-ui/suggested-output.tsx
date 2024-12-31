@@ -11,6 +11,7 @@ interface SuggestedOutputProps {
   onEditPrompt: (id: number, prompt: string) => void;
   onSchedule?: (frequency: 'weekly' | 'monthly', startDate: Date) => void;
   onRetry?: () => void;
+  profileTypes?: { type: string; name: string }[];
 }
 
 interface OutputSection {
@@ -22,7 +23,7 @@ interface OutputSection {
 export interface BaseSegment {
   theme: string;
   synthesis: {
-    type: 'dive' | 'gap' | 'mantra';
+    type: string;
     prompt: string;
     analysis: string;
   };
@@ -40,7 +41,7 @@ export interface SuggestedOutputBody {
 export const SuggestedOutput = React.forwardRef<
   HTMLDivElement,
   SuggestedOutputProps
->(({ body, className, onEditPrompt, onSchedule, onRetry }, ref) => {
+>(({ body, className, onEditPrompt, onSchedule, onRetry, profileTypes }, ref) => {
   const { isAuthenticated } = useAuth();
   const [sections, setSections] = useState<OutputSection[]>([]);
   const [showScheduler, setShowScheduler] = useState(false);
@@ -113,10 +114,11 @@ export const SuggestedOutput = React.forwardRef<
             )
           });
 
+
           // Exploration - Dynamic
           newSections.push({
             type: 'synthesis',
-            title: (segment.synthesis.type === 'dive' ? 'Deep Dive' : segment.synthesis.type === 'mantra' ? 'Mantra' : 'Gap Analysis'),
+            title: (profileTypes?.find(type => type.type === segment.synthesis.type)?.name || ''),
             content: (
               <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100 text-sm">
                 <p>{segment.synthesis.analysis}</p>

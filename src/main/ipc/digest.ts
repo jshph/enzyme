@@ -5,6 +5,7 @@ import { QueryPattern, MatchType, extractPatterns, MatchResult } from '../extrac
 import { getFileIndexer } from "../indexer/electron";
 import { useContextServer } from "../server";
 import { shell } from "electron";
+import path from 'path';
 
 interface DigestUsage {
   used: number;

@@ -16,6 +16,17 @@ if (!store.has('unauthenticatedExecutions')) {
 }
 
 export function setupRecipeRoutes() {
+  ipcMain.handle('get-profiles', async () => {
+    try {
+      const response = await fetch(`${SERVER_URL}/recipe_schedules/profiles`);
+      const { profiles } = await response.json();
+      return profiles;
+    } catch (error) {
+      logger.error('Failed to get profiles:', error);
+      return [];
+    }
+  });
+
   ipcMain.handle('get-pending-recipes', async () => {
     try {
       const { token } = await getCurrentSession();
@@ -49,7 +60,7 @@ export function setupRecipeRoutes() {
     }
   });
 
-  ipcMain.handle('create-recipe', async (event, { frequency, startDate, entities, recipe }) => {
+  ipcMain.handle('create-recipe', async (event, { frequency, startDate, entities, recipe, profile }) => {
     try {
       const { token } = await getCurrentSession();
       
@@ -68,7 +79,8 @@ export function setupRecipeRoutes() {
           frequency,
           next_run: startDate,
           entities,
-          recipe // Contains question and segments structure
+          recipe,
+          profile
         })
       });
 

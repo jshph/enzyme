@@ -78,7 +78,13 @@ export function setupAuthIPCRoutes() {
 
       const data = await response.json();
       if (!response.ok || data.error) {
+        store.delete('auth');
         return { isAuthenticated: false, error: data.error };
+      }
+
+      if (!data.isAuthenticated) {
+        store.delete('auth');
+        return { isAuthenticated: false };
       }
       
       // Update stored auth if we get a new token

@@ -26,14 +26,12 @@ const Settings: React.FC = () => {
         updateSetting('vaultPath', result);
         
         try {
-          setMessage('Initializing vault...');
           setError(false);
 
           // Initialize vault
           await initializeVault();
           await verifySession();
           
-          setMessage('Vault initialized successfully');
           setError(false);
           
           setTimeout(() => {
@@ -93,6 +91,14 @@ const Settings: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Status Messages */}
+      {message && (
+        <div className={`mt-4 p-4 rounded-md ${
+          error ? 'bg-red/5 text-red/80' : 'bg-brand/5 text-brand/80'
+        }`}>
+          <p>{message}</p>
+        </div>
+      )}
       {/* Vault Configuration Tab */}
       <div className="space-y-6">
         <div className="bg-brand/5 p-4 rounded-lg">
@@ -223,15 +229,6 @@ const Settings: React.FC = () => {
               </span>
             </button>
           </div>
-
-            {/* Status Messages */}
-            {message && (
-              <div className={`mt-4 p-4 rounded-md ${
-                error ? 'bg-red/5 text-red/80' : 'bg-brand/5 text-brand/80'
-              }`}>
-                <p>{message}</p>
-              </div>
-            )}
           </div>
       </div>
     </div>
