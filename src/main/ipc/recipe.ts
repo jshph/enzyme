@@ -79,7 +79,7 @@ export function setupRecipeRoutes() {
       const { schedule } = await scheduleResponse.json();
 
       // Get context for the recipe's entities
-      const query = schedule.entities.map(entity => entity.name).join(' ');
+      const query = schedule.entities
       const context = await contextServer.getContext(query, 'json');
 
       // Execute the recipe with context

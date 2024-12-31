@@ -45,6 +45,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const DEFAULT_COUNT = 10;
 
   const dragCountRef = useRef<number>(0);
+  const wasRecentlyDragging = useRef(false);
 
   const fetchTrendingData = async () => {
     const result = await window.electron.ipcRenderer.invoke('trending-data-update');
@@ -105,13 +106,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       return newOutputs;
     });
   };
+  
+  const makeQuery = () => {
+    return Array.from(selectedEntities.entries()).map(([name, { count }]) => `${name}<${count}`).join(' ');
+  }
 
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
     
     setIsGenerating(true);
     try {
-      const query = Array.from(selectedEntities.entries()).map(([name, { count }]) => `${name}<${count}`).join(' ');
+      const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
       const result = await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
@@ -159,7 +164,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       await window.electron.ipcRenderer.invoke('create-recipe', {
         frequency,
         startDate,
-        entities: Array.from(selectedEntities.values()),
+        entities: makeQuery(),
         recipe: {
           question: suggestedOutputs[0].question,
           segments: suggestedOutputs[0].segments.map(segment => ({
@@ -221,14 +226,19 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     updateTimelineDebounced(Array.from(updatedEntities.entries()));
   };
 
-  // Add this function to handle drag end
+  // Create a single handler for ending drags
   const handleDragEnd = useCallback(() => {
     if (draggedEntity && dragCountRef.current) {
       updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
+      wasRecentlyDragging.current = true;
+      
+      // Reset the flag after a short delay
+      setTimeout(() => {
+        wasRecentlyDragging.current = false;
+      }, 100);
     }
     setIsDragging(false);
     setDraggedEntity(null);
-
     dragCountRef.current = 0;
   }, [draggedEntity]);
 
@@ -285,22 +295,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             <h4 className="text-sm font-medium text-primary/70">Popular ingredients from your notes</h4>
             <div 
               className="flex flex-wrap gap-2 text-xs"
-              onMouseUp={() => {
-                if (draggedEntity && dragCountRef.current) {
-                  updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
-                }
-                setIsDragging(false);
-                setDraggedEntity(null);
-                dragCountRef.current = 0;
-              }}
-              onMouseLeave={() => {
-                if (draggedEntity && dragCountRef.current) {
-                  updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
-                }
-                setIsDragging(false);
-                setDraggedEntity(null);
-                dragCountRef.current = 0;
-              }}
             >
               {[...trendingData.tags, ...trendingData.links].map((ingredient: Ingredient, index) => {
                 const selectedEntity = selectedEntities.get(ingredient.name);
@@ -316,7 +310,16 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                       ${!isDragging ? 'hover:bg-brand/50 cursor-pointer' : ''}
                       `
                     }
-                    onClick={() => !isDragging && toggleEntity(ingredient.type, ingredient.name)}
+                    onMouseDown={(e) => {
+                      // Prevent text selection during dragging
+                      e.preventDefault();
+                    }}
+                    onClick={(e) => {
+                      // Check the ref instead of the state
+                      if (!wasRecentlyDragging.current) {
+                        toggleEntity(ingredient.type, ingredient.name);
+                      }
+                    }}
                   >
                     <div className="flex items-center space-x-2">
                       <span>
@@ -330,9 +333,15 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                           `
                           }
                           onMouseDown={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
+                            wasRecentlyDragging.current = false;
+                            setDraggedEntity({ 
+                              type: ingredient.type, 
+                              name: ingredient.name, 
+                              element: e.currentTarget 
+                            });
                             setIsDragging(true);
-                            setDraggedEntity({ type: ingredient.type, name: ingredient.name, element: e.currentTarget });
                           }}
                         >
                           <span>
