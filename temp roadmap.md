@@ -70,6 +70,9 @@ implementation notes:
 - selected range should apply to the query step
 - less glitchy index initialization step
 - fix the dragging causing elements to deselect
+- dock should work
+- fix double notification of "index complete"
+- fix the scheduling -- no context provided
 
 
 TODO before launch
@@ -77,9 +80,6 @@ TODO before launch
 - "email me a copy" button to send the current version to email - and to schedule over the server
 - open button should open the file in obsidian
 
-- dock should work
-- fix double notification of "index complete"
-- fix the scheduling -- no context provided
 - recipe view should be accessible if not logged in, but cannot save recipe or execute more than twice
 
 
@@ -89,11 +89,7 @@ LATER
 - ui selecting a recipe
 
 - nice to have would be to build in the graph visualization stuff that i had before
-- also want this to be performant -- can some of the processing happen in the background without awaits
-  - optimize for startup -- we need the settings to initialize faster than the rest of the UI renders; the prompt builder may not have its tags ready yet, but that's okay, we should have more of the UI have "loading" indicators for when indexing is happening.
-- there's definitely a bug that reflects the index doesn't have enough docs because the output gets hallucinated. Need to fix that -- before submitting prompt the index should be run. Noticing this happens when i navigate tabs to Prompt, possibly interrupting a process
 
-finalizing steps...
 
 <!-- 
 # Sketching out the Prompt Builder / Recipe Home

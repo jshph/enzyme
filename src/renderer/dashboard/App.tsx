@@ -17,7 +17,7 @@ const AppContent: React.FC = () => {
     isVaultInitialized: false 
   })
   const { refreshSettings, initializeVault } = useSettingsContext()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isAuthReady } = useAuth()
 
   // Listen for app state updates
   useEffect(() => {
@@ -26,30 +26,34 @@ const AppContent: React.FC = () => {
 
     // Set up subscription to state changes
     const unsubscribe = window.electron.ipcRenderer.onAppStateChange(setAppState)
-
-    // Cleanup subscription
-    return () => {
-      unsubscribe()
-    }
+    return () => unsubscribe()
   }, [])
 
-  // Initialize vault when app is ready
+  // Initialize vault when app is ready and auth state is known
   useEffect(() => {
     const initVault = async () => {
-      if (appState.isAppReady && !appState.isVaultInitialized) {
-        try {
-          await refreshSettings()
-          await initializeVault()
-          await window.electron.ipcRenderer.setVaultInitialized(true)
-        } catch (err) {
-          console.error('Failed to initialize vault:', err)
-          setCurrentView('settings')
-        }
+      // Only proceed if app is ready and auth state is determined
+      if (!appState.isAppReady || !isAuthReady) {
+        return
+      }
+
+      // Don't reinitialize if already done
+      if (appState.isVaultInitialized) {
+        return
+      }
+
+      try {
+        await refreshSettings()
+        await initializeVault()
+        await window.electron.ipcRenderer.invoke('set-vault-initialized', true)
+      } catch (err) {
+        console.error('Failed to initialize vault:', err)
+        setCurrentView('settings')
       }
     }
 
     initVault()
-  }, [appState.isAppReady, isAuthenticated])
+  }, [appState.isAppReady, isAuthReady])
 
   // Show loading state while app initializes
   if (!appState.isAppReady) {

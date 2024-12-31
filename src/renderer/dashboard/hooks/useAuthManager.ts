@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 
 export const useAuthManager = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -14,6 +15,7 @@ export const useAuthManager = () => {
       setIsAuthenticated(true);
       setEmail(response.user.email);
     }
+    setIsAuthReady(true);
   };
   // Set initial auth state
   useEffect(() => {
@@ -99,6 +101,7 @@ export const useAuthManager = () => {
 
   return {
     isAuthenticated,
+    isAuthReady,
     email,
     loading,
     message,

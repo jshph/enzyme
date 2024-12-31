@@ -1,16 +1,8 @@
-import { app } from 'electron';
-import { is } from '@electron-toolkit/utils';
-
-// Use import.meta instead of process.env for certain environment checks
-const isDev = import.meta.env?.DEV ?? false;
-const mode = isDev ? 'development' : 'production';
-
-console.log('=== ESM Environment Check ===');
-console.log('Mode (from import.meta):', mode);
-console.log('DEV:', import.meta.env?.DEV);
-console.log('PROD:', import.meta.env?.PROD);
-console.log('App is packaged:', app.isPackaged);
-console.log('====================================');
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import path, { join } from 'path'
+import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { ServerContext } from './server';
+import { store, logger, setupIPC } from './ipc/index';
 
 declare global {
   interface ImportMetaEnv {
@@ -18,18 +10,8 @@ declare global {
   }
 }
 
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import path, { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { ServerContext } from './server';
-import { store, logger, setupIPC } from './ipc/index';
-import { menubar } from 'menubar';
-import type { Menubar } from 'menubar';
-import { nativeImage } from 'electron';
-import { getSettings, validateSettings, setupUserIPCRoutes } from './ipc/user';
 
 let mainWindow: BrowserWindow | null = null;
-let mb: Menubar | null = null;
 const serverContext = new ServerContext();
 
 // Add this helper at the top of your file
@@ -48,9 +30,6 @@ const getPlatform = () => {
     isUnixLike: Boolean(process?.env?.HOME),
     isWindowsLike: Boolean(process?.env?.USERPROFILE)
   };
-
-  // Log the detection results
-  console.log('Platform detection:', platform);
 
   // Determine platform using multiple signals
   if (platform.hasDock || platform.fromProcess === 'darwin' || 
@@ -75,17 +54,8 @@ function handleDock(action: 'show' | 'hide'): Promise<void> {
     const platform = getPlatform();
     
     if (platform === 'darwin' && app.dock) {
-      const dockAction = action === 'show' ? app.dock.show() : app.dock.hide();
-      
-      dockAction
-        .then(() => {
-          logger.info(`Dock ${action} successful`);
-          resolve();
-        })
-        .catch((err) => {
-          logger.error(`Failed to ${action} dock:`, err);
-          resolve();
-        });
+      action === 'show' ? app.dock.show() : app.dock.hide();
+      resolve();
     } else {
       // Not on macOS or no dock API
       logger.debug(`Dock operation '${action}' skipped (platform: ${platform})`);
@@ -107,7 +77,6 @@ if (!gotTheLock) {
 function initializeMain() {
   logger.info('App starting in mode:', process.defaultApp ? 'development' : 'production');
   logger.info('Command line arguments:', process.argv);
-  console.log(import.meta.env);
 
   
   app.on('before-quit', async () => {
@@ -143,19 +112,8 @@ function initializeMain() {
     createWindow();
   });
 
-  setupMenubar();
   setupDashboard();
-  
-  // Handle uncaught exceptions
   setupIPC();
-
-  // process.on('uncaughtException', (error) => {
-  //   logger.error('Uncaught exception:', error);
-  // });
-
-  // process.on('unhandledRejection', (reason, promise) => {
-  //   logger.error('Unhandled rejection at:', promise, 'reason:', reason);
-  // });
 
   if (!app.isPackaged) {
     try {
@@ -164,93 +122,7 @@ function initializeMain() {
       logger.error('Failed to load electron-debug:', err);
     }
   }
-
-  // // Hide the dock icon initially if on macOS
-  // if (process.platform === 'darwin') {
-  //   app.dock.hide();
-  // }
 }
-
-
-function setupMenubar() {
-
-  function getMenubarIcon() {
-    try {
-      let iconPath;
-      if (app.isPackaged) {
-        iconPath = `${process.resourcesPath}/IconTemplate.png`;
-      } else {
-        iconPath = `${process.resourcesPath}/IconTemplate.png`;
-      }
-      
-      const icon = nativeImage.createFromPath(iconPath);
-      if (icon.isEmpty()) {
-        logger.error('Failed to load menubar icon');
-        return nativeImage.createEmpty();
-      }
-      return icon;
-    } catch (error) {
-      logger.error('Error creating menubar icon:', error);
-      return nativeImage.createEmpty();
-    }
-  }
-
-  const menubarUrl = import.meta.env.VITE_ELECTRON_RENDERER_URL + '/menubar.html'
-  mb = menubar({
-    index: menubarUrl,
-    icon: getMenubarIcon(),
-    browserWindow: {
-      width: 400,
-      height: 800,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: false,
-        preload: `/Users/joshuapham/Hacks/enzyme/out/preload/index.mjs`
-      },
-      vibrancy: 'tooltip',
-    }
-  });
-  
-  mb.on('after-create-window', () => {
-    logger.info('Menubar window created');
-  });
-  
-  mb.on('after-show', () => {
-    logger.info('Menubar window shown');
-  });
-  
-  mb.on('after-hide', () => {
-    logger.info('Menubar window hidden');
-  });
-  
-  mb.on('focus-lost', () => {
-    logger.info('Menubar window lost focus');
-  });
-  
-  // if (process.env.NODE_ENV === 'development') {
-  //   const watchPath = path.join(app.getAppPath(), 'src', 'renderer', '**/*');
-  //   chokidar.watch(watchPath, {
-  //     ignored: /(^|[\/\\])\../,
-  //     persistent: true
-  //   }).on('change', (path) => {
-  //     logger.info('Renderer file changed:', path);
-  //     if (mb.window) {
-  //       mb.window.reload();
-  //     }
-  //   });
-  // }
-  
-  mb.on('ready', async () => {
-    let settings = await getSettings();
-
-    // Validate settings
-    settings = validateSettings(settings);
-    
-    logger.info('Menubar app is ready');
-  });
-}
-
 
 
 function createWindow(): void {

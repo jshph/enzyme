@@ -10,6 +10,7 @@ interface MainProps {
   currentView: string;
   init: () => Promise<void>;
   setCurrentView: (view: string) => void;
+  isVaultInitialized: boolean;
 }
 
 const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView }) => {
