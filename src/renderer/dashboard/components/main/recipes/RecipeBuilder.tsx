@@ -3,6 +3,7 @@ import { SuggestedOutput, SuggestedOutputBody } from "../../plate-ui/suggested-o
 import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext";
 import NoteTimeline from './NoteTimeline';
 import debounce from 'lodash/debounce';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface SelectedEntity {
   type: 'tag' | 'link';
@@ -31,6 +32,8 @@ type Ingredient = {
 const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
+  const { isAuthenticated } = useAuth();
+  const [executionsRemaining, setExecutionsRemaining] = useState<number | null>(null);
   
   // TODO figure out how to get the entire contents of the editor and not just the selection
 
@@ -256,6 +259,16 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     });
   }, [selectedEntities]);
 
+  // Add this effect to check execution limits
+  useEffect(() => {
+    if (!isAuthenticated) {
+      window.electron.ipcRenderer.invoke('check-recipe-execution-allowed')
+        .then(({ allowed, remainingExecutions }) => {
+          setExecutionsRemaining(remainingExecutions);
+        });
+    }
+  }, [isAuthenticated]);
+
   return (
     <>
       <div
@@ -386,7 +399,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             className="bg-brand/40 py-3 px-4 text-sm rounded-md shadow-md cursor-pointer hover:bg-brand/60 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
             onClick={submitPrompt}
           >
-            Generate Recipe
+            {isAuthenticated ? 'Generate Recipe' : 
+              `Generate Recipe (${executionsRemaining} free tries remaining)`}
           </button>
         </div>
 
@@ -422,6 +436,13 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
         )}
 
+        {suggestedOutputs && !isAuthenticated && (
+          <div className="mt-4 p-4 bg-brand/10 rounded-lg">
+            <p className="text-sm text-primary/70">
+              Log in to save recipes and schedule automated insights from your notes.
+            </p>
+          </div>
+        )}
 
         {/* <button
           className="mt-4 w-full bg-red-500/20 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-red-500/30 transition-colors font-medium"

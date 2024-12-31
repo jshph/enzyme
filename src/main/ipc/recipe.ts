@@ -3,9 +3,17 @@ import { getServerUrl, logger } from "./index";
 import { getCurrentSession } from "./user";
 import { useContextServer } from "../server";
 import { getFileIndexer } from "../indexer/electron";
+import Store from 'electron-store';
 
 const SERVER_URL = getServerUrl();
 const contextServer = useContextServer();
+const store = new Store();
+const MAX_UNAUTHENTICATED_EXECUTIONS = 2;
+
+// Initialize counter if not exists
+if (!store.has('unauthenticatedExecutions')) {
+  store.set('unauthenticatedExecutions', 0);
+}
 
 export function setupRecipeRoutes() {
   ipcMain.handle('get-pending-recipes', async () => {
@@ -45,6 +53,11 @@ export function setupRecipeRoutes() {
     try {
       const { token } = await getCurrentSession();
       
+      // Only allow creation if authenticated
+      if (!token) {
+        return { success: false, error: 'Authentication required to save recipes' };
+      }
+
       const response = await fetch(`${SERVER_URL}/recipe_schedules/create`, {
         method: 'POST',
         headers: {
@@ -66,10 +79,36 @@ export function setupRecipeRoutes() {
     }
   });
 
+  ipcMain.handle('check-recipe-execution-allowed', async () => {
+    try {
+      const { token } = await getCurrentSession();
+      if (token) return { allowed: true };
+
+      const count = store.get('unauthenticatedExecutions', 0) as number;
+      return { 
+        allowed: count < MAX_UNAUTHENTICATED_EXECUTIONS,
+        remainingExecutions: MAX_UNAUTHENTICATED_EXECUTIONS - count
+      };
+    } catch (error) {
+      return { allowed: false, error: 'Failed to check execution limits' };
+    }
+  });
+
   ipcMain.handle('execute-recipe', async (event, recipeId: string) => {
     try {
       const { token } = await getCurrentSession();
       
+      if (!token) {
+        const count = store.get('unauthenticatedExecutions', 0) as number;
+        if (count >= MAX_UNAUTHENTICATED_EXECUTIONS) {
+          return { 
+            success: false, 
+            error: 'Free execution limit reached. Please log in to continue.' 
+          };
+        }
+        store.set('unauthenticatedExecutions', count + 1);
+      }
+
       // Get the recipe schedule
       const scheduleResponse = await fetch(`${SERVER_URL}/recipe_schedules/get/${recipeId}`, {
         headers: {

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { cn } from '@udecode/cn';
 import { Calendar, Mail, RefreshCw, ChevronRight } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SuggestedOutputProps {
   body: SuggestedOutputBody;
@@ -40,6 +41,7 @@ export const SuggestedOutput = React.forwardRef<
   HTMLDivElement,
   SuggestedOutputProps
 >(({ body, className, onEditPrompt, onSchedule, onRetry }, ref) => {
+  const { isAuthenticated } = useAuth();
   const [sections, setSections] = useState<OutputSection[]>([]);
   const [showScheduler, setShowScheduler] = useState(false);
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('weekly');
@@ -240,25 +242,29 @@ export const SuggestedOutput = React.forwardRef<
           <RefreshCw className="w-4 h-4" />
           <span>Retry</span>
         </button>
+        
         <button
           onClick={() => setShowScheduler(!showScheduler)}
-          className="flex items-center space-x-2 px-4 py-2 text-sm bg-brand/70 hover:bg-brand/80 rounded-md transition-colors"
+          disabled={!isAuthenticated}
+          className="flex items-center space-x-2 px-4 py-2 text-sm bg-brand/70 hover:bg-brand/80 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Calendar className="w-4 h-4" />
           <span>Schedule Recipe</span>
         </button>
         {showScheduler && <ScheduleDialog />}
-      <button
-        onClick={() => {
-          // Logic to handle emailing a copy of the suggested output
-          console.log('Emailing a copy of the suggested output...');
-          // You can replace the console log with the actual email sending logic
-        }}
-        className="flex items-center space-x-2 px-4 py-2 text-sm bg-secondary/20 hover:bg-secondary/30 rounded-md transition-colors"
-      >
-        <Mail className="w-4 h-4" />
-        <span>Email me a copy</span>
-      </button>
+        
+        <button
+          disabled={!isAuthenticated}
+          onClick={() => {
+            // Logic to handle emailing a copy of the suggested output
+            console.log('Emailing a copy of the suggested output...');
+            // You can replace the console log with the actual email sending logic
+          }}
+          className="flex items-center space-x-2 px-4 py-2 text-sm bg-secondary/20 hover:bg-secondary/30 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Mail className="w-4 h-4" />
+          <span>Email me a copy</span>
+        </button>
       </div>
     </div>
   );

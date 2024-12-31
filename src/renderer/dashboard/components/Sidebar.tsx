@@ -13,19 +13,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp 
   return (
     <div className="w-64 bg-surface shadow-lg fixed h-screen overflow-y-auto">
       <nav className="mt-12">
-
-          {/* {isAuthenticated && (
-            <a onClick={() => setCurrentView('spaces')} 
-                className={`flex items-center px-4 py-3 cursor-pointer hover:bg-input ${
-                  currentView === 'spaces' ? 'bg-brand/10 text-brand' : 'text-primary'
-                }`}>
-                <span className="ml-2">Spaces</span>
-            </a>
-          )} */}
-          <a onClick={isAuthenticated ? () => setCurrentView('recipes') : undefined} 
-              className={`flex items-center px-4 py-3 hover:bg-input text-sm ${
+          <a onClick={() => setCurrentView('recipes')} 
+              className={`flex items-center px-4 py-3 cursor-pointer hover:bg-input text-sm ${
                 currentView === 'recipes' ? 'bg-brand/10 text-brand' : 'text-primary'
-              } ${isAuthenticated ? 'cursor-pointer' : 'opacity-50'}`}>
+              }`}>
               <span className="ml-2">Recipe Home</span>
           </a>
 
