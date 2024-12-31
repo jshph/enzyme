@@ -1,3 +1,17 @@
+import { app } from 'electron';
+import { is } from '@electron-toolkit/utils';
+
+// Use import.meta instead of process.env for certain environment checks
+const isDev = import.meta.env?.DEV ?? false;
+const mode = isDev ? 'development' : 'production';
+
+console.log('=== ESM Environment Check ===');
+console.log('Mode (from import.meta):', mode);
+console.log('DEV:', import.meta.env?.DEV);
+console.log('PROD:', import.meta.env?.PROD);
+console.log('App is packaged:', app.isPackaged);
+console.log('====================================');
+
 declare global {
   interface ImportMetaEnv {
     VITE_ELECTRON_RENDERER_URL: string
@@ -18,7 +32,67 @@ let mainWindow: BrowserWindow | null = null;
 let mb: Menubar | null = null;
 const serverContext = new ServerContext();
 
+// Add this helper at the top of your file
+const getPlatform = () => {
+  // Try multiple ways to detect platform
+  const platform = {
+    // Primary checks
+    fromProcess: process?.platform,
+    fromNavigator: typeof navigator !== 'undefined' ? navigator.platform : undefined,
+    
+    // Check for specific APIs
+    hasDock: Boolean(app.dock),
+    hasWindowsFeatures: Boolean(app.setAppUserModelId),
+    
+    // Check for specific paths
+    isUnixLike: Boolean(process?.env?.HOME),
+    isWindowsLike: Boolean(process?.env?.USERPROFILE)
+  };
 
+  // Log the detection results
+  console.log('Platform detection:', platform);
+
+  // Determine platform using multiple signals
+  if (platform.hasDock || platform.fromProcess === 'darwin' || 
+      platform.fromNavigator?.includes('Mac')) {
+    return 'darwin';
+  }
+  if (platform.hasWindowsFeatures || platform.fromProcess === 'win32' || 
+      platform.isWindowsLike) {
+    return 'win32';
+  }
+  if (platform.isUnixLike || platform.fromProcess === 'linux') {
+    return 'linux';
+  }
+  
+  // Default to the most restrictive platform
+  return 'unknown';
+};
+
+// Helper function for dock operations using the robust platform detection
+function handleDock(action: 'show' | 'hide'): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const platform = getPlatform();
+    
+    if (platform === 'darwin' && app.dock) {
+      const dockAction = action === 'show' ? app.dock.show() : app.dock.hide();
+      
+      dockAction
+        .then(() => {
+          logger.info(`Dock ${action} successful`);
+          resolve();
+        })
+        .catch((err) => {
+          logger.error(`Failed to ${action} dock:`, err);
+          resolve();
+        });
+    } else {
+      // Not on macOS or no dock API
+      logger.debug(`Dock operation '${action}' skipped (platform: ${platform})`);
+      resolve();
+    }
+  });
+}
 
 console.log('Starting app in mode:', process.defaultApp ? 'development' : 'production');
 const gotTheLock = app.requestSingleInstanceLock();
@@ -31,9 +105,9 @@ if (!gotTheLock) {
 }
 
 function initializeMain() {
-
   logger.info('App starting in mode:', process.defaultApp ? 'development' : 'production');
   logger.info('Command line arguments:', process.argv);
+  console.log(import.meta.env);
 
   
   app.on('before-quit', async () => {
@@ -185,61 +259,47 @@ function createWindow(): void {
     return;
   }
 
-  // Show dock icon when dashboard opens
-  if (process.platform === 'darwin') {
-    app.dock.show().catch(err => {
-      logger.error('Failed to show dock:', err);
+  // Add more diagnostic information
+  app.whenReady().then(async () => {
+    await handleDock('show');
+
+    mainWindow = new BrowserWindow({
+      width: 1280,
+      height: 1024,
+      minWidth: 1280,
+      minHeight: 1024,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+        preload: `/Users/joshuapham/Hacks/enzyme/out/preload/index.mjs`
+      },
+      titleBarStyle: 'hiddenInset',
+      trafficLightPosition: { x: 15, y: 15 },
+      backgroundColor: '#202020',
+      frame: false
     });
-  }
 
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 1024,
-    minWidth: 1280,
-    minHeight: 1024,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: false,
-      preload: `/Users/joshuapham/Hacks/enzyme/out/preload/index.mjs`
-    },
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 15, y: 15 },
-    backgroundColor: '#202020',
-    frame: false
-  });
+    mainWindow.webContents.setWindowOpenHandler((details) => {
+      shell.openExternal(details.url)
+      return { action: 'deny' }
+    })
 
-  // mainWindow.on('closed', () => {
-  //   mainWindow = null;
-  //   // Hide dock icon when dashboard closes if menubar is hidden
-  //   if (process.platform === 'darwin' && !mb?.window?.isVisible()) {
-  //     app.dock.hide().catch(err => {
-  //       logger.error('Failed to hide dock:', err);
-  //     });
-  //   }
-  // });
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
-  })
+    // HMR for renderer base on electron-vite cli.
+    // Load the remote URL for development or the local html file for production.
+    // if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
+    if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
+      mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
+    } else {
+      mainWindow.loadFile(join(__dirname, '../renderer/dashboard.html'))
+    }
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
-
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  // if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
-  if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/dashboard.html'))
-  }
-
-  // Add this event handler
-  mainWindow.webContents.on('destroyed', () => {
-    mainWindow = null;
+    // Add this event handler
+    mainWindow.on('closed', async () => {
+      mainWindow = null;
+      await handleDock('hide');
+    });
   });
 }
 

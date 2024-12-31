@@ -69,6 +69,7 @@ implementation notes:
 - quick demo video for people to see it tomorrow and give some feedback
 - selected range should apply to the query step
 - less glitchy index initialization step
+- fix the dragging causing elements to deselect
 
 
 TODO before launch
@@ -76,13 +77,10 @@ TODO before launch
 - "email me a copy" button to send the current version to email - and to schedule over the server
 - open button should open the file in obsidian
 
-- fix the dragging causing elements to deselect
 - dock should work
 - fix double notification of "index complete"
 - fix the scheduling -- no context provided
 - recipe view should be accessible if not logged in, but cannot save recipe or execute more than twice
-- adjust the animation of the nodes - while dragging, the nodes should be higher opacity.
-- optional - sliding left and right will "stream" the node changes.
 
 
 - think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
