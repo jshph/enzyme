@@ -7,25 +7,6 @@ import '../styles/dashboard.css'
 import { SettingsProvider } from './contexts/SettingsContext'
 
 const Component: React.FC = () => {
-
-  // const [ipcReady, setIpcReady] = useState(false)
-
-  // useEffect(() => {
-  //   const handleIpcReady = () => setIpcReady(true)
-  //   window.electron.ipcRenderer.on('ipc-ready', handleIpcReady)
-  //   return () => {
-  //     window.electron.ipcRenderer.removeListener('ipc-ready', handleIpcReady)
-  //   }
-  // }, [])
-
-  // if (!ipcReady) {
-  //   return (
-  //     <div className="flex items-center justify-center min-h-screen">
-  //       <div className="loader"></div>
-  //     </div>
-  //   )
-  // }
-
   return (
     <AuthProvider>
       <SettingsProvider>

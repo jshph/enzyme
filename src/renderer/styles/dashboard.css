@@ -7,6 +7,14 @@ body {
   min-width: 1200px;
 }
 
+.draggable {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

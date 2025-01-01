@@ -11,8 +11,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp 
   const { isAuthenticated, email, handleLogout } = useAuth();
 
   return (
-    <div className="w-64 bg-surface shadow-lg fixed h-screen overflow-y-auto">
-      <nav className="mt-12">
+    <div className="w-64 bg-surface shadow-lg fixed h-screen overflow-y-auto draggable">
+      <nav className="mt-12 no-drag">
           <a onClick={() => setCurrentView('recipes')} 
               className={`flex items-center px-4 py-3 cursor-pointer hover:bg-input text-sm ${
                 currentView === 'recipes' ? 'bg-brand/10 text-brand' : 'text-primary'
