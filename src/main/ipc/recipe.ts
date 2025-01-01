@@ -153,6 +153,31 @@ export function setupRecipeRoutes() {
     }
   });
 
+  ipcMain.handle('email-recipe-output', async (event, suggestedOutputs) => {
+    try {
+      const { token } = await getCurrentSession();
+      const response = await fetch(`${SERVER_URL}/recipe_schedules/email-recipe-output`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ suggestedOutputs })
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send email');
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to email recipe output:', error);
+      throw error; // Let the renderer handle the error
+    }
+  });
+
   ipcMain.handle('get-all-recipes', async () => {
     try {
       const { token } = await getCurrentSession();

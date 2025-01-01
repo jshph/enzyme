@@ -73,21 +73,27 @@ implementation notes:
 - dock should work
 - fix double notification of "index complete"
 - fix the scheduling -- no context provided
-
-
-TODO before launch
-- editable "prompt" for each segment
+- recipe view should be accessible if not logged in, but cannot save recipe or execute more than twice
 - "email me a copy" button to send the current version to email - and to schedule over the server
 - open button should open the file in obsidian
 
-- recipe view should be accessible if not logged in, but cannot save recipe or execute more than twice
+
+TODO before launch
+
 - track executions as a table in supabse and compare to a hardcoded limit server side
 - handle the bearer token better for nonauthenticated users hitting generate-suggested
+- draggable from anywhere in the window
+- streaming output sections
+- revise copy of the recipe view so it's easier to understand and onboard
+- figure out onboarding - revisit obsidian notes (things like auto tagging, etc)
+- login view needs to have more info
+- look into interactive graph view
 
 - think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
 
 LATER
 - ui selecting a recipe
+- editable "prompt" for each segment
 
 - nice to have would be to build in the graph visualization stuff that i had before
 
@@ -108,25 +114,9 @@ Goals for the copy + flow on that page:
 - Show only what the user needs in order to get started with this workflow / know what it does for them
 
 (in the base case, just present multiple options of suggested outputs in different tabs and styles, and allow the user to choose between one of them without editing them) -->
-
-- editable prompt - button to regenerate a section, or just make it an input box
-  - benefits: can choose a new output format for the segment - could be mantra rather than synthesis, for example.
-- selecting an entity will show default # of docs for that, but allow the user to change it using buttons
-
-
-	- this requires a custom component in plate which will render docs given a URL
-- [ ] "create prompt" button
-
-- [ ] shorter editor
 - [ ] and then once all this is done, embed the graph viz underneath the prompt builder. include a heatmap view of tag use over time.. hovering over one of the items will render the note in context
 	- could have scrubbable timeline view - drag earlier than just a month ago to see the tags and entities change. Or to see the graph view change (updated outlinks etc)... but have the graph view 
 
-could also refine prompt mapping --- should select from one of a few different types of prompts to generate - based on what is useful (or perplexity style - show the other suggested questions beneath it)
-
-and then also enable the user to refine what type of prompt they would find most useful
-
-make sure the digest functionality works
-have some default prompts, one of which is the resolution / enneagram one
 refactor the obsidian plugin to use this as a backend
 set the milestones and not have it be dependent upon waiting for betaworks to get me in
 but also calibrate these goals against my personal mantras for the new year

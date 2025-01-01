@@ -164,6 +164,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     }
   }, [selectedEntities, selectedProfile]);
 
+  const handleEmailRecipeOutput = async () => {
+    await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
+  }
+
   const handleScheduleRecipe = async (frequency: 'weekly' | 'monthly', startDate: Date) => {
     try {
       if (!suggestedOutputs?.[0]) {
@@ -411,7 +415,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
           <button
             disabled={!hasVaultInitialized || selectedEntities.size === 0 || isGenerating}
-            className="bg-brand/40 py-3 px-4 text-sm rounded-md shadow-md cursor-pointer hover:bg-brand/60 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
+            className="bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md cursor-pointer hover:bg-brand/60 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
             onClick={submitPrompt}
           >
             {isAuthenticated ? 'Generate Recipe' : 
@@ -444,6 +448,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                     onEditPrompt={updateSegmentPrompt}
                     onSchedule={handleScheduleRecipe}
                     onRetry={handleRetry}
+                    onEmailButtonClick={handleEmailRecipeOutput}
                     profileTypes={selectedProfileTypes}
                   />
                 ))
@@ -459,13 +464,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             </p>
           </div>
         )}
-
-        {/* <button
-          className="mt-4 w-full bg-red-500/20 py-2 px-4 rounded-lg shadow-md cursor-pointer hover:bg-red-500/30 transition-colors font-medium"
-          onClick={executeFirstPendingRecipe}
-        >
-          Test: Execute First Pending Recipe
-        </button> */}
       </div>
     </>
   )

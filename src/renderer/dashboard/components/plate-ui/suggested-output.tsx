@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { cn } from '@udecode/cn';
-import { Calendar, Mail, RefreshCw, ChevronRight } from 'lucide-react';
+import { Calendar, Mail, RefreshCw, ChevronRight, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface SuggestedOutputProps {
@@ -11,6 +11,7 @@ interface SuggestedOutputProps {
   onEditPrompt: (id: number, prompt: string) => void;
   onSchedule?: (frequency: 'weekly' | 'monthly', startDate: Date) => void;
   onRetry?: () => void;
+  onEmailButtonClick?: () => void;
   profileTypes?: { type: string; name: string }[];
 }
 
@@ -38,16 +39,36 @@ export interface SuggestedOutputBody {
   segments: BaseSegment[];
 }
 
+interface ButtonState {
+  isLoading: boolean;
+  isSuccess: boolean;
+  message: string;
+}
+
 export const SuggestedOutput = React.forwardRef<
   HTMLDivElement,
   SuggestedOutputProps
->(({ body, className, onEditPrompt, onSchedule, onRetry, profileTypes }, ref) => {
+>(({ body, className, onEditPrompt, onSchedule, onRetry, onEmailButtonClick, profileTypes }, ref) => {
   const { isAuthenticated } = useAuth();
   const [sections, setSections] = useState<OutputSection[]>([]);
   const [showScheduler, setShowScheduler] = useState(false);
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('weekly');
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [expandedPrompts, setExpandedPrompts] = useState<number[]>([]);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleSuccess, setScheduleSuccess] = useState(false);
+  const [isEmailing, setIsEmailing] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
+  const [scheduleButtonState, setScheduleButtonState] = useState<ButtonState>({
+    isLoading: false,
+    isSuccess: false,
+    message: 'Schedule Recipe'
+  });
+  const [emailButtonState, setEmailButtonState] = useState<ButtonState>({
+    isLoading: false,
+    isSuccess: false,
+    message: 'Email me a copy'
+  });
 
   const togglePrompt = (index: number) => {
     setExpandedPrompts(prev => 
@@ -174,6 +195,18 @@ export const SuggestedOutput = React.forwardRef<
     parseAndSetSections();
   }, [body, expandedPrompts]);
 
+  // Helper for temporary success state with message
+  const showTemporarySuccess = (
+    setState: (state: ButtonState) => void,
+    successMessage: string,
+    defaultMessage: string
+  ) => {
+    setState({ isLoading: false, isSuccess: true, message: successMessage });
+    setTimeout(() => {
+      setState({ isLoading: false, isSuccess: false, message: defaultMessage });
+    }, 2000);
+  };
+
   const ScheduleDialog = () => (
     <div className="absolute bottom-16 right-0 bg-background border border-primary/20 rounded-lg p-4 shadow-lg w-72">
       <div className="space-y-4">
@@ -201,17 +234,49 @@ export const SuggestedOutput = React.forwardRef<
           <button 
             onClick={() => setShowScheduler(false)}
             className="px-3 py-1.5 text-sm rounded-md hover:bg-secondary/10"
+            disabled={scheduleButtonState.isLoading}
           >
             Cancel
           </button>
           <button 
-            onClick={() => {
-              onSchedule?.(frequency, startDate);
-              setShowScheduler(false);
+            onClick={async () => {
+              setScheduleButtonState({ isLoading: true, isSuccess: false, message: 'Scheduling...' });
+              try {
+                await onSchedule?.(frequency, startDate);
+                showTemporarySuccess(
+                  setScheduleButtonState,
+                  'Scheduled!',
+                  'Schedule Recipe'
+                );
+                setShowScheduler(false);
+              } catch (error) {
+                setScheduleButtonState({ 
+                  isLoading: false, 
+                  isSuccess: false, 
+                  message: 'Failed to schedule' 
+                });
+                setTimeout(() => {
+                  setScheduleButtonState({ 
+                    isLoading: false, 
+                    isSuccess: false, 
+                    message: 'Schedule Recipe' 
+                  });
+                }, 2000);
+              }
             }}
-            className="px-3 py-1.5 text-sm bg-brand/70 hover:bg-brand/80 rounded-md"
+            disabled={scheduleButtonState.isLoading || scheduleButtonState.isSuccess}
+            className={cn(
+              "px-3 py-1.5 text-sm rounded-md flex items-center gap-2",
+              scheduleButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-brand/70 hover:bg-brand/80",
+              scheduleButtonState.isLoading && "opacity-50 cursor-wait"
+            )}
           >
-            Schedule
+            {scheduleButtonState.isLoading ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : scheduleButtonState.isSuccess ? (
+              <Check className="w-4 h-4" />
+            ) : null}
+            <span>{scheduleButtonState.message}</span>
           </button>
         </div>
       </div>
@@ -247,25 +312,62 @@ export const SuggestedOutput = React.forwardRef<
         
         <button
           onClick={() => setShowScheduler(!showScheduler)}
-          disabled={!isAuthenticated}
-          className="flex items-center space-x-2 px-4 py-2 text-sm bg-brand/70 hover:bg-brand/80 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!isAuthenticated || scheduleButtonState.isLoading || scheduleButtonState.isSuccess}
+          className={cn(
+            "flex items-center space-x-2 px-4 py-2 text-sm rounded-md transition-colors",
+            scheduleButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-brand/70 hover:bg-brand/80",
+            "disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
         >
-          <Calendar className="w-4 h-4" />
-          <span>Schedule Recipe</span>
+          {scheduleButtonState.isSuccess ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <Calendar className="w-4 h-4" />
+          )}
+          <span>{scheduleButtonState.message}</span>
         </button>
         {showScheduler && <ScheduleDialog />}
         
         <button
-          disabled={!isAuthenticated}
-          onClick={() => {
-            // Logic to handle emailing a copy of the suggested output
-            console.log('Emailing a copy of the suggested output...');
-            // You can replace the console log with the actual email sending logic
+          disabled={!isAuthenticated || emailButtonState.isLoading || emailButtonState.isSuccess}
+          onClick={async () => {
+            setEmailButtonState({ isLoading: true, isSuccess: false, message: 'Sending...' });
+            try {
+              await onEmailButtonClick?.();
+              showTemporarySuccess(
+                setEmailButtonState,
+                'Email sent!',
+                'Email me a copy'
+              );
+            } catch (error) {
+              setEmailButtonState({ 
+                isLoading: false, 
+                isSuccess: false, 
+                message: 'Failed to send' 
+              });
+              setTimeout(() => {
+                setEmailButtonState({ 
+                  isLoading: false, 
+                  isSuccess: false, 
+                  message: 'Email me a copy' 
+                });
+              }, 2000);
+            }
           }}
-          className="flex items-center space-x-2 px-4 py-2 text-sm bg-secondary/20 hover:bg-secondary/30 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={cn(
+            "flex items-center space-x-2 px-4 py-2 text-sm rounded-md transition-colors",
+            emailButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-secondary/20 hover:bg-secondary/30",
+            "disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
         >
-          <Mail className="w-4 h-4" />
-          <span>Email me a copy</span>
+          {emailButtonState.isLoading ? (
+            <RefreshCw className="w-4 h-4 animate-spin" />
+          ) : emailButtonState.isSuccess ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <Mail className="w-4 h-4" />
+          )}
+          <span>{emailButtonState.message}</span>
         </button>
       </div>
     </div>

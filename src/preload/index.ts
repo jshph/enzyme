@@ -14,10 +14,6 @@ const api = {
   authVerifySession: () => ipcRenderer.invoke('auth:verify-session'),
   logout: () => ipcRenderer.invoke('auth:logout'),
 
-  // Digest
-  getPromptTemplates: () => ipcRenderer.invoke('get-prompt-templates'),
-  analyzeVault: (templateId: string | null, userPrompt: string | null) => ipcRenderer.invoke('analyze-vault', templateId, userPrompt),
-
   // Vault
   initializeIndex: (settings: Settings) => ipcRenderer.invoke('initialize-index', settings),
   reindexDirectory: (settings: Settings) => ipcRenderer.invoke('reindex-directory', settings),
