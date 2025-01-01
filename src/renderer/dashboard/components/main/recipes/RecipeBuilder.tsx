@@ -27,7 +27,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
   const { isAuthenticated } = useAuth();
-  const [executionsRemaining, setExecutionsRemaining] = useState<number | null>(null);
   const [profiles, setProfiles] = useState<any[]>([{ id: 'selfReflection', name: 'Self Reflection', description: 'Focus on personal growth and insight development' }]);
   const [selectedProfile, setSelectedProfile] = useState('selfReflection');
   const [selectedProfileTypes, setSelectedProfileTypes] = useState<any[]>([]);
@@ -119,6 +118,20 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     return Array.from(selectedEntities.entries()).map(([name, { count }]) => `${name}<${count}`).join(' ');
   }
 
+  const [generationsRemaining, setGenerationsRemaining] = useState(0);
+
+  // Check generation limits on mount and auth change
+  useEffect(() => {
+    window.electron.ipcRenderer.invoke('check-generation-limits')
+      .then(({ remaining }) => {
+        setGenerationsRemaining(Math.max(0, remaining));
+      })
+      .catch(() => {
+        // If there's an error, set to 0 to maintain consistent type
+        setGenerationsRemaining(0);
+      });
+  }, [isAuthenticated]);
+
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
     
@@ -127,13 +140,26 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
-      console.log("selected profile", selectedProfile);  
-
       const result = await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
         context, 
         query,
         profileId: selectedProfile
       });
+
+      // Always update remaining generations
+      setGenerationsRemaining(Math.max(0, result.remaining ?? 0));
+
+      if (!result.success) {
+        if (result.error === 'Daily generation limit reached' || result.error === 'Weekly generation limit reached') {
+          new Notification('Generation Limit Reached', {
+            body: isAuthenticated ? 
+              "You've reached your weekly limit of 5 generations. Please try again next week." :
+              "You've reached your daily limit of 2 generations. Please log in for more generations."
+          });
+          return;
+        }
+        throw new Error(result.error);
+      }
 
       const body: SuggestedOutputBody = {
         question: result.question,
@@ -159,10 +185,13 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       setSuggestedOutputs([body]);
     } catch (error) {
       console.error('Error generating recipe:', error);
+      new Notification('Error', {
+        body: "Failed to generate recipe. Please try again."
+      });
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedEntities, selectedProfile]);
+  }, [selectedEntities, selectedProfile, isAuthenticated]);
 
   const handleEmailRecipeOutput = async () => {
     await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
@@ -270,16 +299,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       setTimelineData(newTimelineData);
     });
   }, [selectedEntities]);
-
-  // Add this effect to check execution limits
-  useEffect(() => {
-    if (!isAuthenticated) {
-      window.electron.ipcRenderer.invoke('check-recipe-execution-allowed')
-        .then(({ allowed, remainingExecutions }) => {
-          setExecutionsRemaining(remainingExecutions);
-        });
-    }
-  }, [isAuthenticated]);
 
   const handleProfileChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProfileId = e.target.value;
@@ -414,12 +433,14 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
 
           <button
-            disabled={!hasVaultInitialized || selectedEntities.size === 0 || isGenerating}
+            disabled={!hasVaultInitialized || selectedEntities.size === 0 || isGenerating || generationsRemaining === 0}
             className="bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md cursor-pointer hover:bg-brand/60 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
             onClick={submitPrompt}
           >
-            {isAuthenticated ? 'Generate Recipe' : 
-              `Generate Recipe (${executionsRemaining} free tries remaining)`}
+            {isGenerating ? 'Generating...' : 
+              generationsRemaining !== null ? 
+                `Generate Recipe (${generationsRemaining} left ${isAuthenticated ? 'this week' : 'today'})` : 
+                'Generate Recipe'}
           </button>
         </div>
 

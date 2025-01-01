@@ -59,28 +59,4 @@ export function setupDigestIPCRoutes() {
       console.error('Error opening file in Obsidian:', error);
     }
   });
-
-  ipcMain.handle('generate-suggested-output', async (event, { context, query, profileId }) => {
-    try {
-      const { token } = await getCurrentSession();
-      
-      const response = await fetch(`${SERVER_URL}/digest/generate-suggested`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ context, query, profileId })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate suggested output');
-      }
-
-      return await response.json();
-    } catch (error) {
-      logger.error('Failed to generate suggested output:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  });
 }

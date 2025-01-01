@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { getServerUrl, logger } from "./index";
+import { getServerUrl, store as configStore, logger } from "./index";
 import { getCurrentSession } from "./user";
 import { useContextServer } from "../server";
 import { getFileIndexer } from "../indexer/electron";
@@ -7,12 +7,16 @@ import Store from 'electron-store';
 
 const SERVER_URL = getServerUrl();
 const contextServer = useContextServer();
-const store = new Store();
-const MAX_UNAUTHENTICATED_EXECUTIONS = 2;
+const generationStore = new Store();
+const MAX_UNAUTHENTICATED_GENERATIONS = 2; // Per day
+const UNAUTHENTICATED_STORE_KEY = 'unauthenticatedGenerations';
 
-// Initialize counter if not exists
-if (!store.has('unauthenticatedExecutions')) {
-  store.set('unauthenticatedExecutions', 0);
+// Initialize store with date tracking
+if (!generationStore.has(UNAUTHENTICATED_STORE_KEY)) {
+  generationStore.set(UNAUTHENTICATED_STORE_KEY, {
+    count: 0,
+    lastResetDate: new Date().toDateString()
+  });
 }
 
 export function setupRecipeRoutes() {
@@ -91,36 +95,134 @@ export function setupRecipeRoutes() {
     }
   });
 
-  ipcMain.handle('check-recipe-execution-allowed', async () => {
+  ipcMain.handle('check-generation-limits', async () => {
     try {
-      const { token } = await getCurrentSession();
-      if (token) return { allowed: true };
+      const { token, email } = await getCurrentSession();
+      
+      // If authenticated, check weekly server-side limit
+      if (token) {
+        const response = await fetch(`${SERVER_URL}/digest/usage?email=${encodeURIComponent(email)}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        return {
+          allowed: data.remaining > 0,
+          remaining: Math.max(0, data.remaining),
+          authenticated: true
+        };
+      }
 
-      const count = store.get('unauthenticatedExecutions', 0) as number;
-      return { 
-        allowed: count < MAX_UNAUTHENTICATED_EXECUTIONS,
-        remainingExecutions: MAX_UNAUTHENTICATED_EXECUTIONS - count
+      // If not authenticated, check local daily limit
+      const stored = generationStore.get(UNAUTHENTICATED_STORE_KEY) as {
+        count: number;
+        lastResetDate: string;
+      };
+
+      // Reset count if it's a new day
+      const today = new Date().toDateString();
+      if (stored.lastResetDate !== today) {
+        generationStore.set(UNAUTHENTICATED_STORE_KEY, {
+          count: 0,
+          lastResetDate: today
+        });
+        return {
+          allowed: true,
+          remaining: MAX_UNAUTHENTICATED_GENERATIONS,
+          authenticated: false
+        };
+      }
+
+      const remaining = Math.max(0, MAX_UNAUTHENTICATED_GENERATIONS - stored.count);
+      return {
+        allowed: remaining > 0,
+        remaining,
+        authenticated: false
       };
     } catch (error) {
-      return { allowed: false, error: 'Failed to check execution limits' };
+      logger.error('Failed to check generation limits:', error);
+      return { allowed: false, remaining: 0, authenticated: false };
+    }
+  });
+
+  ipcMain.handle('generate-suggested-output', async (event, { context, query, profileId }) => {
+    try {
+      const { token } = await getCurrentSession();
+      
+      // Handle unauthenticated state
+      if (!token) {
+        const stored = generationStore.get(UNAUTHENTICATED_STORE_KEY) as {
+          count: number;
+          lastResetDate: string;
+        };
+
+        // Check if we need to reset for new day
+        const today = new Date().toDateString();
+        if (stored.lastResetDate !== today) {
+          generationStore.set(UNAUTHENTICATED_STORE_KEY, {
+            count: 1, // Start at 1 since we're generating now
+            lastResetDate: today
+          });
+        } else {
+          // Only increment count for unauthenticated users
+          generationStore.set(UNAUTHENTICATED_STORE_KEY, {
+            ...stored,
+            count: stored.count + 1
+          });
+        }
+
+        // Check if we've hit the limit
+        const updatedStored = generationStore.get(UNAUTHENTICATED_STORE_KEY) as {
+          count: number;
+        };
+        
+        if (updatedStored.count > MAX_UNAUTHENTICATED_GENERATIONS) {
+          return { 
+            success: false, 
+            error: 'Daily generation limit reached',
+            remaining: 0
+          };
+        }
+      }
+
+      // Make the API call
+      const response = await fetch(`${SERVER_URL}/digest/generate-suggested`, {
+        method: 'POST',
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ context, query, profileId })
+      });
+
+      const result = await response.json();
+
+      // For unauthenticated users, calculate remaining locally
+      if (!token) {
+        const stored = generationStore.get(UNAUTHENTICATED_STORE_KEY) as {
+          count: number;
+        };
+        const remaining = Math.max(0, MAX_UNAUTHENTICATED_GENERATIONS - stored.count);
+        return {
+          ...result,
+          remaining
+        };
+      }
+
+      // For authenticated users, use server response
+      return result; // Server already includes the remaining count
+    } catch (error) {
+      logger.error('Failed to generate suggested output:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        remaining: 0
+      };
     }
   });
 
   ipcMain.handle('execute-recipe', async (event, recipeId: string) => {
     try {
       const { token } = await getCurrentSession();
-      
-      if (!token) {
-        const count = store.get('unauthenticatedExecutions', 0) as number;
-        if (count >= MAX_UNAUTHENTICATED_EXECUTIONS) {
-          return { 
-            success: false, 
-            error: 'Free execution limit reached. Please log in to continue.' 
-          };
-        }
-        store.set('unauthenticatedExecutions', count + 1);
-      }
-
       // Get the recipe schedule
       const scheduleResponse = await fetch(`${SERVER_URL}/recipe_schedules/get/${recipeId}`, {
         headers: {
@@ -146,10 +248,19 @@ export function setupRecipeRoutes() {
         })
       });
 
-      return response.json();
+      const result = await response.json();
+      
+      // Pass through the remaining executions count
+      return {
+        ...result,
+        remaining: result.remaining
+      };
     } catch (error) {
       logger.error('Failed to execute recipe:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   });
 

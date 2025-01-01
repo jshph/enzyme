@@ -88,6 +88,8 @@ TODO before launch
 - figure out onboarding - revisit obsidian notes (things like auto tagging, etc)
 - login view needs to have more info
 - look into interactive graph view
+- "remove recipe" button which forwards to enzyme.garden success page
+- swap to using deepseek v3
 
 - think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
 
