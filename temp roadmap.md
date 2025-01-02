@@ -76,20 +76,19 @@ implementation notes:
 - recipe view should be accessible if not logged in, but cannot save recipe or execute more than twice
 - "email me a copy" button to send the current version to email - and to schedule over the server
 - open button should open the file in obsidian
+- track executions as a table in supabse and compare to a hardcoded limit server side
+- swap to using deepseek v3
+- draggable from anywhere in the window
 
 
 TODO before launch
 
-- track executions as a table in supabse and compare to a hardcoded limit server side
-- handle the bearer token better for nonauthenticated users hitting generate-suggested
-- draggable from anywhere in the window
 - streaming output sections
 - revise copy of the recipe view so it's easier to understand and onboard
 - figure out onboarding - revisit obsidian notes (things like auto tagging, etc)
 - login view needs to have more info
 - look into interactive graph view
 - "remove recipe" button which forwards to enzyme.garden success page
-- swap to using deepseek v3
 
 - think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
 

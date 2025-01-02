@@ -44,7 +44,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   const [trendingData, setTrendingData] = useState<any>(null);
   const [selectedEntities, setSelectedEntities] = useState<SelectedEntitiesMap>(new Map());
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [awaitingFirstToken, setAwaitingFirstToken] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedEntity, setDraggedEntity] = useState<{type: 'tag' | 'link', name: string, element: HTMLElement} | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineItem[]>([]);
@@ -135,63 +135,61 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
     
-    setIsGenerating(true);
+    setAwaitingFirstToken(true);
+
     try {
       const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
-      const result = await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
+      // Set up listener for chunks
+      const handleChunk = ({chunk, done}: {chunk: any, done: boolean}) => {
+        setAwaitingFirstToken(false);
+        if (!chunk) return;
+        if (done) {
+          window.electron.ipcRenderer.removeListener('suggested-output-chunk', handleChunk);
+        }
+
+
+        setSuggestedOutputs(_ => {
+          const body: SuggestedOutputBody = {
+            question: chunk.question,
+            segments: chunk.segments?.map((segment, index) => ({
+              theme: segment.theme,
+              synthesis: {
+                id: index,
+                prompt: segment.prompt,
+                type: segment.type,
+                analysis: segment.analysis
+              },
+              docs: segment.docs?.map(doc => {
+                const contextItem = context.find(result => result.file === doc);
+                const adjoinedContents = contextItem ? contextItem.extractedContents.join('\n') : '';
+                return {
+                  file: doc,
+                  content: adjoinedContents
+                }
+              }) || []
+            })) || []
+          };
+
+          return [body];
+        });
+      };
+
+      window.electron.ipcRenderer.on('suggested-output-chunk', handleChunk);
+
+      window.electron.ipcRenderer.invoke('generate-suggested-output', { 
         context, 
         query,
         profileId: selectedProfile
       });
-
-      // Always update remaining generations
-      setGenerationsRemaining(Math.max(0, result.remaining ?? 0));
-
-      if (!result.success) {
-        if (result.error === 'Daily generation limit reached' || result.error === 'Weekly generation limit reached') {
-          new Notification('Generation Limit Reached', {
-            body: isAuthenticated ? 
-              "You've reached your weekly limit of 5 generations. Please try again next week." :
-              "You've reached your daily limit of 2 generations. Please log in for more generations."
-          });
-          return;
-        }
-        throw new Error(result.error);
-      }
-
-      const body: SuggestedOutputBody = {
-        question: result.question,
-        segments: result.segments.map((segment, index) => ({
-          theme: segment.theme,
-          synthesis: {
-            id: index,
-            prompt: segment.prompt,
-            type: segment.type,
-            analysis: segment.analysis
-          },
-          docs: segment.docs.map(doc => {
-            const contextItem = context.find(result => result.file === doc);
-            const adjoinedContents = contextItem ? contextItem.extractedContents.join('\n') : '';
-            return {
-              file: doc,
-              content: adjoinedContents
-            }
-          })
-        }))
-      };
-
-      setSuggestedOutputs([body]);
     } catch (error) {
       console.error('Error generating recipe:', error);
       new Notification('Error', {
         body: "Failed to generate recipe. Please try again."
       });
-    } finally {
-      setIsGenerating(false);
     }
-  }, [selectedEntities, selectedProfile, isAuthenticated]);
+  }, [selectedEntities, selectedProfile]);
 
   const handleEmailRecipeOutput = async () => {
     await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
@@ -433,11 +431,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
 
           <button
-            disabled={!hasVaultInitialized || selectedEntities.size === 0 || isGenerating || generationsRemaining === 0}
+            disabled={!hasVaultInitialized || selectedEntities.size === 0 || awaitingFirstToken || generationsRemaining === 0}
             className="bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md cursor-pointer hover:bg-brand/60 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
             onClick={submitPrompt}
           >
-            {isGenerating ? 'Generating...' : 
+            {awaitingFirstToken ? 'Generating...' : 
               generationsRemaining !== null ? 
                 `Generate Recipe (${generationsRemaining} left ${isAuthenticated ? 'this week' : 'today'})` : 
                 'Generate Recipe'}
@@ -445,35 +443,32 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         </div>
 
         {/* Output section */}
-        {(suggestedOutputs || isGenerating) && (
+        {(suggestedOutputs?.[0]?.segments?.length || 0 > 0 || awaitingFirstToken) && (
           <div className="mt-8 space-y-4">
             <div className="gap-4">
-              {isGenerating ? (
-                <div className="space-y-4 animate-pulse">
-                  <div className="h-8 bg-brand/20 rounded-lg w-3/4"></div>
-                  <div className="space-y-3">
-                    <div className="h-4 bg-brand/20 rounded w-1/2"></div>
-                    <div className="h-4 bg-brand/20 rounded w-full"></div>
-                    <div className="h-4 bg-brand/20 rounded w-3/4"></div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="h-20 bg-brand/10 rounded-lg"></div>
-                    <div className="h-20 bg-brand/10 rounded-lg"></div>
-                  </div>
-                </div>
-              ) : (
-                suggestedOutputs && suggestedOutputs.map((output, index) => (
-                  <SuggestedOutput
-                    key={index}
-                    body={output}
-                    onEditPrompt={updateSegmentPrompt}
-                    onSchedule={handleScheduleRecipe}
-                    onRetry={handleRetry}
-                    onEmailButtonClick={handleEmailRecipeOutput}
-                    profileTypes={selectedProfileTypes}
-                  />
-                ))
-              )}
+              <SuggestedOutput
+                body={suggestedOutputs?.[0]}
+                onEditPrompt={updateSegmentPrompt}
+                onSchedule={handleScheduleRecipe}
+                onRetry={handleRetry}
+                onEmailButtonClick={handleEmailRecipeOutput}
+                profileTypes={selectedProfileTypes}
+              />
+            </div>
+          </div>
+        )}
+
+        {awaitingFirstToken && (
+          <div className="space-y-4 animate-pulse">
+            <div className="h-8 bg-brand/20 rounded-lg w-3/4"></div>
+            <div className="space-y-3">
+              <div className="h-4 bg-brand/20 rounded w-1/2"></div>
+              <div className="h-4 bg-brand/20 rounded w-full"></div>
+              <div className="h-4 bg-brand/20 rounded w-3/4"></div>
+            </div>
+            <div className="space-y-2">
+              <div className="h-20 bg-brand/10 rounded-lg"></div>
+              <div className="h-20 bg-brand/10 rounded-lg"></div>
             </div>
           </div>
         )}

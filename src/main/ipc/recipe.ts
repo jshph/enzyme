@@ -184,7 +184,7 @@ export function setupRecipeRoutes() {
         }
       }
 
-      // Make the API call
+      // Make the API call with streaming
       const response = await fetch(`${SERVER_URL}/digest/generate-suggested`, {
         method: 'POST',
         headers: {
@@ -194,22 +194,29 @@ export function setupRecipeRoutes() {
         body: JSON.stringify({ context, query, profileId })
       });
 
-      const result = await response.json();
+      // Set up streaming
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
 
-      // For unauthenticated users, calculate remaining locally
-      if (!token) {
-        const stored = generationStore.get(UNAUTHENTICATED_STORE_KEY) as {
-          count: number;
-        };
-        const remaining = Math.max(0, MAX_UNAUTHENTICATED_GENERATIONS - stored.count);
-        return {
-          ...result,
-          remaining
-        };
+      // Stream the chunks back to renderer
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        // Convert the chunk to text and parse as JSON
+        try {
+          const chunk = new TextDecoder().decode(value);
+          const partialResult = JSON.parse(chunk);
+          // Send the partial result to renderer
+          event.sender.send('suggested-output-chunk', { chunk: partialResult, done: false });
+        } catch (error) {
+          continue;
+        }
       }
 
-      // For authenticated users, use server response
-      return result; // Server already includes the remaining count
+      event.sender.send('suggested-output-chunk', { chunk: null, done: true });
+
+      return { success: true };
     } catch (error) {
       logger.error('Failed to generate suggested output:', error);
       return { 

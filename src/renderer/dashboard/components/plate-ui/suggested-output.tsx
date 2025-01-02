@@ -55,10 +55,6 @@ export const SuggestedOutput = React.forwardRef<
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('weekly');
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [expandedPrompts, setExpandedPrompts] = useState<number[]>([]);
-  const [isScheduling, setIsScheduling] = useState(false);
-  const [scheduleSuccess, setScheduleSuccess] = useState(false);
-  const [isEmailing, setIsEmailing] = useState(false);
-  const [emailSuccess, setEmailSuccess] = useState(false);
   const [scheduleButtonState, setScheduleButtonState] = useState<ButtonState>({
     isLoading: false,
     isSuccess: false,
@@ -184,11 +180,7 @@ export const SuggestedOutput = React.forwardRef<
         setSections(newSections);
       } catch (error) {
         console.error('Error parsing structure:', error);
-        setSections([{
-          type: 'synthesis',
-          title: 'Error',
-          content: <p>Error parsing content</p>
-        }]);
+        setSections([]);
       }
     };
 
