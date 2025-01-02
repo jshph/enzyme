@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { cn } from '@udecode/cn';
 import { Calendar, Mail, RefreshCw, ChevronRight, Check } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SuggestedOutputProps {
   body: SuggestedOutputBody;
@@ -105,10 +104,10 @@ export const SuggestedOutput = React.forwardRef<
                   className="p-1 rounded hover:bg-secondary/10"
                 >
                   <ChevronRight 
-                    className={cn(
-                      "w-4 h-4 transition-transform",
-                      expandedPrompts.includes(index) && "transform rotate-90"
-                    )} 
+                    className={`
+                      w-4 h-4 transition-transform
+                      ${expandedPrompts.includes(index) ? 'transform rotate-90' : ''}
+                    `} 
                   />
                 </button>
                 <span className="text-md font-bold">
@@ -257,11 +256,11 @@ export const SuggestedOutput = React.forwardRef<
               }
             }}
             disabled={scheduleButtonState.isLoading || scheduleButtonState.isSuccess}
-            className={cn(
-              "px-3 py-1.5 text-sm rounded-md flex items-center gap-2",
-              scheduleButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-brand/70 hover:bg-brand/80",
-              scheduleButtonState.isLoading && "opacity-50 cursor-wait"
-            )}
+            className={`
+              px-3 py-1.5 text-sm rounded-md flex items-center gap-2
+              ${scheduleButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-brand/70 hover:bg-brand/80"}
+              ${scheduleButtonState.isLoading && "opacity-50 cursor-wait"}
+            `}
           >
             {scheduleButtonState.isLoading ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -280,10 +279,10 @@ export const SuggestedOutput = React.forwardRef<
   return (
     <div
       ref={ref}
-      className={cn(
-        'rounded-lg border border-primary/20 bg-background/60 p-6 space-y-6',
-        className
-      )}
+      className={`
+        rounded-lg border border-primary/20 bg-background/60 p-6 space-y-6
+        ${className}
+      `}
     >
       {sections.map((section, index) => (
         <div key={index}>
@@ -305,11 +304,11 @@ export const SuggestedOutput = React.forwardRef<
         <button
           onClick={() => setShowScheduler(!showScheduler)}
           disabled={!isAuthenticated || scheduleButtonState.isLoading || scheduleButtonState.isSuccess}
-          className={cn(
-            "flex items-center space-x-2 px-4 py-2 text-sm rounded-md transition-colors",
-            scheduleButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-brand/70 hover:bg-brand/80",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
-          )}
+          className={`
+            flex items-center space-x-2 px-4 py-2 text-sm rounded-md transition-colors
+            ${scheduleButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-brand/70 hover:bg-brand/80"}
+            disabled:opacity-50 disabled:cursor-not-allowed
+          `}
         >
           {scheduleButtonState.isSuccess ? (
             <Check className="w-4 h-4" />
@@ -346,11 +345,11 @@ export const SuggestedOutput = React.forwardRef<
               }, 2000);
             }
           }}
-          className={cn(
-            "flex items-center space-x-2 px-4 py-2 text-sm rounded-md transition-colors",
-            emailButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-secondary/20 hover:bg-secondary/30",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
-          )}
+          className={`
+            flex items-center space-x-2 px-4 py-2 text-sm rounded-md transition-colors
+            ${emailButtonState.isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-secondary/20 hover:bg-secondary/30"}
+            disabled:opacity-50 disabled:cursor-not-allowed
+          `}
         >
           {emailButtonState.isLoading ? (
             <RefreshCw className="w-4 h-4 animate-spin" />

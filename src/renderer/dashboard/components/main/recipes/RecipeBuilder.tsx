@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, useEffect } from "react";
-import { SuggestedOutput, SuggestedOutputBody } from "../../plate-ui/suggested-output";
+import { SuggestedOutput, SuggestedOutputBody } from "../../SuggestedOutput";
 import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext";
 import NoteTimeline from './NoteTimeline';
 import debounce from 'lodash/debounce';
@@ -143,8 +143,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
       // Set up listener for chunks
       const handleChunk = ({chunk, done}: {chunk: any, done: boolean}) => {
+        if (!chunk || !chunk.question || !chunk.segments) return;
         setAwaitingFirstToken(false);
-        if (!chunk) return;
         if (done) {
           window.electron.ipcRenderer.removeListener('suggested-output-chunk', handleChunk);
         }
@@ -315,33 +315,20 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       >
         {/* Header section */}
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-primary/90">Create a Recipe</h2>
-          <p className="text-sm text-primary/70">
-            Transform your notes into structured insights. Start by adding a few ingredients below - 
-            they'll help surface relevant content from your knowledge base.
-          </p>
+          <h2 className="text-xl font-semibold text-primary/90">Create a recipe</h2>
+          <p className="text-sm text-primary/50">Discover patterns in your vault through lightweight, customizable recipes.<br/>Select ingredients below to define your recipe's scope and surface relevant connections.</p>
         </div>
 
         {/* Recipe builder section */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-primary/90">Ingredients</h3>
-            <span className="text-xs text-primary/50">Add tags and links to explore connections</span>
+          <div className="justify-between">
+            <h3 className="text-lg font-semibold text-primary/90">Ingredients</h3>
           </div>
-          
-          {/* <DndProvider backend={HTML5Backend}>
-            <Plate editor={editor}>
-              <EditorContainer variant="demo" className="h-24">
-                <Editor />
-              </EditorContainer>
-            </Plate>
-          </DndProvider> */}
         </div>
 
         {/* Suggested ingredients section */}
         {trendingData && (
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-primary/70">Popular ingredients from your notes</h4>
             <div 
               className="flex flex-wrap gap-2 text-xs"
             >
@@ -410,8 +397,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         <div className="flex justify-normal items-center space-y-2">
           {/* Add Profile selector */}
           <div className="space-y-2">
-            <label htmlFor="profile-select" className="block text-sm font-medium text-primary/70">
-              Recipe Profile
+            <label htmlFor="profile-select" className="block text-lg font-semibold text-primary/90">
+              Choose a recipe profile
             </label>
             <select
               id="profile-select"
@@ -425,9 +412,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-primary/50">
-              {profiles.find(profile => profile.id === selectedProfile)?.description}
-            </p>
           </div>
 
           <button
@@ -441,6 +425,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 'Generate Recipe'}
           </button>
         </div>
+        <p className="text-sm text-primary/50">Discover emerging themes and connections from selected ingredients. Creates a structured synthesis while preserving links to source notes.</p>
+
 
         {/* Output section */}
         {(suggestedOutputs?.[0]?.segments?.length || 0 > 0 || awaitingFirstToken) && (

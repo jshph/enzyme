@@ -79,14 +79,15 @@ implementation notes:
 - track executions as a table in supabse and compare to a hardcoded limit server side
 - swap to using deepseek v3
 - draggable from anywhere in the window
-
+- streaming output sections
+- revise copy of the recipe view so it's easier to understand and onboard
 
 TODO before launch
 
-- streaming output sections
-- revise copy of the recipe view so it's easier to understand and onboard
+- login view needs to have more info 
+
 - figure out onboarding - revisit obsidian notes (things like auto tagging, etc)
-- login view needs to have more info
+
 - look into interactive graph view
 - "remove recipe" button which forwards to enzyme.garden success page
 
