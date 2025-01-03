@@ -49,6 +49,8 @@ interface TimelineItem {
   date: Date;
   type: 'tag' | 'link';
   name: string;
+  file?: string;
+  extractedContents?: string[];
 }
 
 export class FileIndexer {
@@ -861,14 +863,14 @@ export class FileIndexer {
         const filteredFiles = entry.files
           .filter(file => file.createdAt >= threeMonthsAgo);
         
-        
         filteredFiles
           .slice(0, count)
           .forEach(file => {
             timeline.push({
               date: file.createdAt,
               type,
-              name  // Keep the original name with prefix in the timeline
+              name,  // Keep the original name with prefix in the timeline
+              file: file.path // Add the file path to timeline items
             });
           });
       }

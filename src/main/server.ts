@@ -58,11 +58,9 @@ export class ServerContext {
     const queryPatterns: QueryPattern[] = parseQueryString(query);
     const results = await extractPatterns(queryPatterns, this.config?.defaultPatternLimit);
     
-    const combinedResults = [
-      ...results
-    ];
+    const combinedResults = [...results];
 
-    const formattedResults: string[] | MatchResult[] = combinedResults.map(result => {
+    const formattedResults = combinedResults.map(result => {
       const folder = result.file.split(path.sep).slice(0, -1).join(path.sep);
       if (format === 'md') {
         return TEMPLATE_RESULT.replace('{file}', result.file)
@@ -76,8 +74,7 @@ export class ServerContext {
       }
     });
 
-    return formattedResults;
-
+    return formattedResults as string[] | MatchResult[];
   }
 
   public async getDocContent(path: string): Promise<string> {

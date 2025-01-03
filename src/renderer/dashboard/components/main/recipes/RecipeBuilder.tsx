@@ -4,6 +4,9 @@ import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext
 import NoteTimeline from './NoteTimeline';
 import debounce from 'lodash/debounce';
 import { useAuth } from '../../../contexts/AuthContext';
+import { GraphView, GraphViewRef } from "../../GraphView";
+import path from 'path';
+import * as d3 from 'd3';
 
 interface SelectedEntity {
   type: 'tag' | 'link';
@@ -23,6 +26,17 @@ type Ingredient = {
   name: string;
 };
 
+interface DocumentNode {
+  id: string;
+  summary: string;
+  links: string[];
+}
+
+interface MentionNode {
+  id: string;
+  text: string;
+}
+
 const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
@@ -30,6 +44,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const [profiles, setProfiles] = useState<any[]>([{ id: 'selfReflection', name: 'Self Reflection', description: 'Focus on personal growth and insight development' }]);
   const [selectedProfile, setSelectedProfile] = useState('selfReflection');
   const [selectedProfileTypes, setSelectedProfileTypes] = useState<any[]>([]);
+  const graphViewRef = useRef<GraphViewRef>(null);
 
   useEffect(() => {
     window.electron.ipcRenderer.invoke('get-profiles')
@@ -53,6 +68,104 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   const dragCountRef = useRef<number>(0);
   const wasRecentlyDragging = useRef(false);
+
+  const selectedIdsRef = useRef<Set<string>>(new Set());
+  const [hoveredNode, setHoveredNode] = useState<{id: string, text: string, type: string} | null>(null);
+  const contextDocsRef = useRef<Map<string, {contents: string, extractedContents: string[]}>>(new Map());
+
+
+  // Add this helper function to keep selectedIdsRef in sync
+  const updateSelectedEntity = useCallback((name: string, doAdd: boolean) => {
+    setSelectedEntities(prev => {
+      const next = new Map(prev);
+      if (doAdd) {
+        next.set(name, { 
+          type: name.startsWith('#') ? 'tag' : 'link', 
+          count: DEFAULT_COUNT 
+        });
+        selectedIdsRef.current.add(name);
+      } else {
+        next.delete(name);
+        selectedIdsRef.current.delete(name);
+        // Remove the deselected node and its connections from the graph
+        graphViewRef.current?.removeNodesAndLinks(name);
+      }
+      return next;
+    });
+  }, []);
+
+  // Update handleSelectNode to use the helper
+  const handleSelectNode = useCallback((node: {id: string, text: string, type: string}, doAdd: boolean) => {
+    if (node.type === 'mention') {
+      updateSelectedEntity(node.id, doAdd);
+    }
+  }, [updateSelectedEntity]);
+
+  // Add this function to process context into graph data
+  const processContextForGraph = useCallback((context: any[], selectedEntities: SelectedEntitiesMap) => {
+    if (!graphViewRef.current) return;
+
+    const documents: DocumentNode[] = [];
+    const mentions: MentionNode[] = [];
+    const links: {source: string, target: string}[] = [];
+    
+    // Track all mentions found in docs
+    const mentionsInDocs = new Set<string>();
+
+    // Process each document from context
+    context.forEach(({file, extractedContents}) => {
+      // Store context for later reference
+      contextDocsRef.current.set(file, {contents: '', extractedContents});
+      
+      // Create document node
+      const docNode: DocumentNode = {
+        id: file,
+        summary: path.basename(file),
+        links: []
+      };
+      documents.push(docNode);
+
+      // Process extracted contents for mentions
+      extractedContents.forEach(content => {
+        // Find tags
+        const tagMatches = content.match(/#[\w-]+/g) || [];
+        tagMatches.forEach(tag => {
+          mentionsInDocs.add(tag);
+          links.push({source: file, target: tag});
+        });
+
+        // Find links
+        const linkMatches = content.match(/\[\[([^\]]+)\]\]/g) || [];
+        linkMatches.forEach(link => {
+          const cleanLink = link.replace(/[\[\]]/g, '');
+          mentionsInDocs.add(`[[${cleanLink}]]`);
+          links.push({source: file, target: `[[${cleanLink}]]`});
+        });
+      });
+    });
+
+    // Add nodes for selected entities that weren't found in docs
+    selectedEntities.forEach((entity, name) => {
+      if (!mentionsInDocs.has(name)) {
+        mentions.push({
+          id: name,
+          text: name
+        });
+      }
+    });
+
+    // Add nodes for mentions found in docs
+    mentionsInDocs.forEach(mention => {
+      mentions.push({
+        id: mention,
+        text: mention
+      });
+    });
+
+    // Update the graph
+    graphViewRef.current.addToSimulation(links, documents, mentions);
+  }, []);
+
 
   const fetchTrendingData = async () => {
     const result = await window.electron.ipcRenderer.invoke('trending-data-update');
@@ -78,27 +191,47 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   const [suggestedOutputs, setSuggestedOutputs] = useState<SuggestedOutputBody[]>();
 
-  const toggleEntity = (type: 'tag' | 'link', name: string) => {
-    setSelectedEntities(prev => {
-      const next = new Map(prev);
-      if (next.has(name)) {
-        next.delete(name);
-      } else {
-        next.set(name, { type, count: DEFAULT_COUNT });
-      }
-      return next;
-    });
-  };
+  // Update toggleEntity to use the helper and handle context updates
+  const toggleEntity = useCallback(async (type: 'tag' | 'link', name: string) => {
+    const isAdding = !selectedEntities.has(name);
+    updateSelectedEntity(name, isAdding);
 
-  const updateEntityCount = (type: 'tag' | 'link', name: string, count: number) => {
+    // Only fetch new context if we're adding an entity
+    if (isAdding) {
+      const updatedEntities = new Map(selectedEntities);
+      updatedEntities.set(name, { type, count: DEFAULT_COUNT });
+
+      const query = Array.from(updatedEntities.entries())
+        .map(([name, { count }]) => `${name}<${count}`)
+        .join(' ');
+
+      const context = await window.electron.ipcRenderer.invoke('get-context', query);
+      const limitedContext = context.slice(0, 30);
+      processContextForGraph(limitedContext, updatedEntities);
+    }
+  }, [selectedEntities, processContextForGraph, updateSelectedEntity]);
+
+  // Update updateEntityCount to handle selectedIdsRef properly
+  const updateEntityCount = async (type: 'tag' | 'link', name: string, count: number) => {
     setSelectedEntities(prev => {
       const next = new Map(prev);
       next.set(name, { type, count });
       return next;
     });
     
-    // Timeline will automatically update since it depends on selectedEntities
-    // which is used to fetch the timeline data in the useEffect
+    // Make sure the entity is in selectedIdsRef
+    if (!selectedIdsRef.current.has(name)) {
+      selectedIdsRef.current.add(name);
+    }
+    
+    // Update node visibility based on new count
+    const nodes = d3.selectAll(".main-node").data();
+    nodes.forEach((node: any, index: number) => {
+      if (node.type === 'document') {
+        const selected = index < count;
+        graphViewRef.current?.updateNodeSelected(node.id, selected);
+      }
+    });
   };
 
   const updateSegmentPrompt = (id: number, prompt: string) => {
@@ -140,6 +273,9 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     try {
       const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
+
+      // Process context for graph visualization
+      processContextForGraph(context, selectedEntities);
 
       // Set up listener for chunks
       const handleChunk = ({chunk, done}: {chunk: any, done: boolean}) => {
@@ -189,7 +325,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         body: "Failed to generate recipe. Please try again."
       });
     }
-  }, [selectedEntities, selectedProfile]);
+  }, [selectedEntities, selectedProfile, processContextForGraph]);
 
   const handleEmailRecipeOutput = async () => {
     await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
@@ -393,6 +529,21 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         )}
 
         <NoteTimeline timelineData={timelineData} />
+
+        <div className="w-full h-full overflow-hidden relative">
+          <div className="flex items-center flex-col relative">
+            <div className="flex-grow relative h-[800px] w-[800px]">
+              <GraphView
+                ref={graphViewRef}
+                width={800}
+                height={800}
+                selectedIdsRef={selectedIdsRef}
+                selectNodeHandler={handleSelectNode}
+                handleSetHoveredNode={setHoveredNode}
+              />
+            </div>
+          </div>
+        </div>
 
         <div className="flex justify-normal items-center space-y-2">
           {/* Add Profile selector */}
