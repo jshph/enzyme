@@ -136,10 +136,10 @@ function createWindow(): void {
     await handleDock('show');
 
     mainWindow = new BrowserWindow({
-      width: 1280,
-      height: 1024,
-      minWidth: 1280,
-      minHeight: 1024,
+      width: 1400,
+      height: 1080,
+      minWidth: 1400,
+      minHeight: 1080,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,

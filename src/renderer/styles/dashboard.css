@@ -2,11 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  min-height: 800px;
-  min-width: 1200px;
-}
-
 .draggable {
   -webkit-app-region: drag;
 }

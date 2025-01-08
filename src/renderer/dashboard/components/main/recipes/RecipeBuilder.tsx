@@ -4,7 +4,7 @@ import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext
 import NoteTimeline from './NoteTimeline';
 import debounce from 'lodash/debounce';
 import { useAuth } from '../../../contexts/AuthContext';
-import { GraphView, GraphViewRef } from "../../GraphView";
+import { GraphView, GraphViewRef, DocumentNode, MentionNode } from "../../GraphView";
 import path from 'path';
 import * as d3 from 'd3';
 
@@ -25,17 +25,6 @@ type Ingredient = {
   type: 'tag' | 'link';
   name: string;
 };
-
-interface DocumentNode {
-  id: string;
-  summary: string;
-  links: string[];
-}
-
-interface MentionNode {
-  id: string;
-  text: string;
-}
 
 const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
@@ -64,13 +53,12 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const [draggedEntity, setDraggedEntity] = useState<{type: 'tag' | 'link', name: string, element: HTMLElement} | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineItem[]>([]);
 
-  const DEFAULT_COUNT = 10;
+  const DEFAULT_COUNT = 30;
 
   const dragCountRef = useRef<number>(0);
   const wasRecentlyDragging = useRef(false);
 
   const selectedIdsRef = useRef<Set<string>>(new Set());
-  const [hoveredNode, setHoveredNode] = useState<{id: string, text: string, type: string} | null>(null);
   const contextDocsRef = useRef<Map<string, {contents: string, extractedContents: string[]}>>(new Map());
 
 
@@ -94,13 +82,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     });
   }, []);
 
-  // Update handleSelectNode to use the helper
-  const handleSelectNode = useCallback((node: {id: string, text: string, type: string}, doAdd: boolean) => {
-    if (node.type === 'mention') {
-      updateSelectedEntity(node.id, doAdd);
-    }
-  }, [updateSelectedEntity]);
-
   // Add this function to process context into graph data
   const processContextForGraph = useCallback((context: any[], selectedEntities: SelectedEntitiesMap) => {
     if (!graphViewRef.current) return;
@@ -121,44 +102,46 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       const docNode: DocumentNode = {
         id: file,
         summary: path.basename(file),
-        links: []
+        links: [],
+        type: 'document'
       };
       documents.push(docNode);
 
       // Process extracted contents for mentions
       extractedContents.forEach(content => {
         // Find tags
-        const tagMatches = content.match(/#[\w-]+/g) || [];
+        const tagMatches = content.match(/#[\w-\/]+/g) || [];
         tagMatches.forEach(tag => {
           mentionsInDocs.add(tag);
           links.push({source: file, target: tag});
         });
 
-        // Find links
-        const linkMatches = content.match(/\[\[([^\]]+)\]\]/g) || [];
-        linkMatches.forEach(link => {
-          const cleanLink = link.replace(/[\[\]]/g, '');
-          mentionsInDocs.add(`[[${cleanLink}]]`);
-          links.push({source: file, target: `[[${cleanLink}]]`});
-        });
+        // // Find links
+        // const linkMatches = content.match(/\[\[([^\]]+)\]\]/g) || [];
+        // linkMatches.forEach(link => {
+        //   const cleanLink = link.replace(/[\[\]]/g, '');
+        //   mentionsInDocs.add(`[[${cleanLink}]]`);
+        //   links.push({source: file, target: `[[${cleanLink}]]`});
+        // });
       });
     });
 
     // Add nodes for selected entities that weren't found in docs
-    selectedEntities.forEach((entity, name) => {
-      if (!mentionsInDocs.has(name)) {
-        mentions.push({
-          id: name,
-          text: name
-        });
-      }
-    });
+    // selectedEntities.forEach((entity, name) => {
+    //   if (!mentionsInDocs.has(name)) {
+    //     mentions.push({
+    //       id: name,
+    //       text: name
+    //     });
+    //   }
+    // });
 
     // Add nodes for mentions found in docs
     mentionsInDocs.forEach(mention => {
       mentions.push({
         id: mention,
-        text: mention
+        text: mention,
+        type: 'mention'
       });
     });
 
@@ -207,11 +190,38 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
       const limitedContext = context.slice(0, 30);
-      processContextForGraph(limitedContext, updatedEntities);
-    }
-  }, [selectedEntities, processContextForGraph, updateSelectedEntity]);
 
-  // Update updateEntityCount to handle selectedIdsRef properly
+      // Create graph data from context
+      const documents = limitedContext.map(({file, extractedContents}) => ({
+        id: file,
+        summary: path.basename(file),
+        links: [],
+        type: 'document'
+      }));
+
+      const mentions = [{
+        id: name,
+        text: name,
+        type: 'mention'
+      }];
+
+      const links = limitedContext.map(({file}) => ({
+        source: name,
+        target: file
+      }));
+
+      // Update graph with new data
+      graphViewRef.current?.addToSimulation(links, documents, mentions);
+
+      // Update the count of the entity
+      updateEntityCount(type, name, 30);
+    } else {
+      // If removing, use removeNodesAndLinks
+      graphViewRef.current?.removeNodesAndLinks(name);
+    }
+  }, [selectedEntities, updateSelectedEntity]);
+
+  // Update updateEntityCount to handle graph updates
   const updateEntityCount = async (type: 'tag' | 'link', name: string, count: number) => {
     setSelectedEntities(prev => {
       const next = new Map(prev);
@@ -224,14 +234,34 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       selectedIdsRef.current.add(name);
     }
     
-    // Update node visibility based on new count
-    const nodes = d3.selectAll(".main-node").data();
-    nodes.forEach((node: any, index: number) => {
-      if (node.type === 'document') {
-        const selected = index < count;
-        graphViewRef.current?.updateNodeSelected(node.id, selected);
-      }
-    });
+    // Update node visibility with the new count
+    graphViewRef.current?.updateNodesSelected([name], count);
+
+    // Fetch new context with updated count
+    const query = Array.from(selectedEntities.entries())
+      .map(([entityName, entity]) => 
+        `${entityName}<${entityName === name ? count : entity.count}`
+      )
+      .join(' ');
+
+    const context = await window.electron.ipcRenderer.invoke('get-context', query);
+    const limitedContext = context.slice(0, count);
+
+    // Create graph data from context
+    const documents = limitedContext.map(({file, extractedContents}) => ({
+      id: file,
+      summary: path.basename(file),
+      links: [],
+      type: 'document'
+    }));
+
+    // Update graph with new data - no new mentions needed since they already exist
+    const links = limitedContext.map(({file}) => ({
+      source: name,
+      target: file
+    }));
+
+    graphViewRef.current?.addToSimulation(links, documents, []);
   };
 
   const updateSegmentPrompt = (id: number, prompt: string) => {
@@ -538,8 +568,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 width={800}
                 height={800}
                 selectedIdsRef={selectedIdsRef}
-                selectNodeHandler={handleSelectNode}
-                handleSetHoveredNode={setHoveredNode}
               />
             </div>
           </div>

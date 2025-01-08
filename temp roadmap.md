@@ -81,6 +81,8 @@ implementation notes:
 - draggable from anywhere in the window
 - streaming output sections
 - revise copy of the recipe view so it's easier to understand and onboard
+- graph view:
+  - width of window to 1400, graph ratio to 4/3
 
 TODO before launch
 
@@ -92,6 +94,15 @@ TODO before launch
 - "remove recipe" button which forwards to enzyme.garden success page
 
 - think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
+
+
+- graph view remaining tasks
+  - make sure the count is reflected properly, it's too few right now
+  - reduce font size to 10pt
+  - highlight the mentioned node but not all of the one hops from its docs
+  - ensure that selected ids which are 1 hops are highlighted, not just because they are 1-hops
+  - make sure edge highlighting is valid - maybe lower opacity overlay
+  - adjust colors to theme colors not lightgreen
 
 LATER
 - ui selecting a recipe

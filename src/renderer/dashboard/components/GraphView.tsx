@@ -11,6 +11,20 @@ import React, {
 
 const ZOOM_THRESHOLD = 1.5; // Adjust this value to set when document text appears
 
+export interface DocumentNode {
+  id: string;
+  summary: string;
+  type: 'document';
+  links: string[];
+}
+
+export interface MentionNode {
+  id: string;
+  text: string;
+  type: 'mention';
+}
+
+
 function createGraph(
   width: number,
   height: number,
@@ -114,7 +128,7 @@ function createSimulation(
 ) {
   return d3
     .forceSimulation([])
-    .force("charge", d3.forceManyBody().strength(-100)) //forceParams.charge))
+    .force("charge", d3.forceManyBody().strength(-100))
     .force("center", d3.forceCenter(width / 2, height / 2))
     .force("collision", d3.forceCollide().radius(forceParams.collisionRadius))
     .force("link", createForceLinks([], forceParams));
@@ -145,6 +159,7 @@ function renderNodes(
   nodes: any,
   className: string,
   style: any,
+  selectedIdsRef: MutableRefObject<Set<string>>,
   eventHandlers: { [key: string]: (event: d3.D3Event, d: any) => void },
   doRenderText = true
 ) {
@@ -158,7 +173,10 @@ function renderNodes(
     .append("g")
     .attr("class", className)
     .style("cursor", "pointer")
-    .style("opacity", (d: any) => d.type === 'document' ? (d.selected ? 0.7 : 0.3) : 0.7)
+    .style("opacity", (d: any) => {
+      const isSelected = selectedIdsRef.current.has(d.id);
+      return isSelected ? 0.7 : 0.3;
+    })
     .style(
       "font-weight",
       (d: any) => `var(--node-font-weight-${idToSuffix(d.id)}, 400)`
@@ -173,7 +191,11 @@ function renderNodes(
         .append("text")
         .attr("dy", "0.35em")
         .style("fill", d => d.type === 'mention' ? 'rgba(144, 238, 144, 0.6)' : '#e4e6eb')
-        .style("font-size", "12px");
+        .style("font-size", "12px")
+        .style("opacity", d => {
+          return d.type === 'mention' && selectedIdsRef.current.has(d.id) ? 1 : 0.3;
+        });
+
       const words = d.text.split(" ");
       const lines: string[] = [];
 
@@ -201,7 +223,6 @@ function renderNodes(
   nodeEnter
     .on("mouseover", eventHandlers.mouseover)
     .on("mouseout", eventHandlers.mouseout)
-    .on("click", eventHandlers.click);
 
   return nodeSelection.merge(nodeEnter);
 }
@@ -220,28 +241,25 @@ export type GraphViewProps = {
   width?: number;
   height?: number;
   selectedIdsRef: MutableRefObject<Set<string>>;
-  selectNodeHandler: (node: { id: string; text: string; type: string }, doAdd: boolean) => void;
-  handleSetHoveredNode: (node: { id: string; text: string; type: string } | null) => void;
 };
 
 export type GraphViewRef = {
-  updateNodeSelected: (nodeId: string, selected: boolean) => void;
+  updateNodesSelected: (nodeIds: string[], count: number) => void;
   addToSimulation: (
     links: { source: string; target: string }[],
     documents: any[],
-    mentions: any[]
+    mentions: any[],
   ) => void;
   removeNodesAndLinks: (mentionId: string) => void;
 };
 
+// Update the GraphView component to use the new unified function
 export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
   (props, ref) => {
     const {
       width = 800,
       height = 600,
-      selectedIdsRef,
-      selectNodeHandler,
-      handleSetHoveredNode
+      selectedIdsRef
     } = props;
 
     const svgRef = useRef<SVGSVGElement | null>(null);
@@ -282,10 +300,14 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
     const opacityLayerRef = useRef<SVGRectElement | null>(null);
     const [highlights, setHighlights] = useState<any[]>([]);
 
+    // const entityDocumentsRef = useRef<Map<string, Set<string>>>(new Map());
+    const entityDocumentRankingsRef = useRef<Map<string, Map<string, number>>>(new Map());
+
+    // Track which entities are selecting each document and their rankings
+    const documentSelectionsRef = useRef<Map<string, Map<string, number>>>(new Map());
+
     const handleMouseOver = (event: d3.D3Event, d: any) => {
       // if (!mainNode.current || !mainLink.current) return;
-      handleSetHoveredNode(d);
-
       const neighbors = adjacencyListRef.current.get(d.id) || new Set<string>();
 
       // Highlight the hovered node and its neighbors
@@ -324,7 +346,6 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
     };
 
     const handleMouseOut = () => {
-      handleSetHoveredNode(null);
       const opacityLayer = d3.select(opacityLayerRef.current);
 
       resetHighlights();
@@ -339,19 +360,6 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
           // Reset all highlights
         });
     };
-
-    function handleClick(this: SVGGElement, event: d3.D3Event, d: any) {
-      if (selectedIdsRef.current.has(d.id)) {
-        updateNodeSelected(d.id, false);
-        selectedIdsRef.current.delete(d.id);
-        selectNodeHandler(d, false);
-      } else {
-        updateNodeSelected(d.id, true);
-        selectedIdsRef.current.add(d.id);
-        selectNodeHandler(d, true);
-      }
-    }
-
     // New effect to update force parameters
     useEffect(() => {
       if (!simulationRef.current) return;
@@ -383,26 +391,56 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       simulationRef.current.alpha(0.8).restart();
     }, [forceParams]);
 
-    const handleForceParamChange =
-      (param: keyof typeof forceParams) =>
-      (event: Event, newValue: number | number[]) => {
-        setForceParams((prev) => ({ ...prev, [param]: newValue as number }));
-      };
+    const updateNodesSelected = (nodeIds: string[], count: number) => {
+      if (!svgRef.current) return;
 
-    const updateNodeSelected = (nodeId: string, selected: boolean) => {
-      if (svgRef.current) {
-        // Update font weight
-        document.documentElement.style.setProperty(
-          `--node-font-weight-${idToSuffix(nodeId)}`,
-          selected ? "600" : "400"
-        );
+      // Update document weights based on all active selections
+      documentSelectionsRef.current.forEach((entityRankings, docId) => {
+        let shouldBeBold = false;
         
-        // Update node visibility
-        d3.select(svgRef.current)
-          .selectAll(".main-node")
-          .filter((d: any) => d.id === nodeId)
-          .style("opacity", selected ? 0.7 : 0.3);
-      }
+        // Check if any selecting entity ranks this document within their count
+        entityRankings.forEach((rank, entityId) => {
+          if (selectedIdsRef.current.has(entityId)) {
+            const entityCount = count; // You might want to store individual counts per entity
+            if (rank <= entityCount) {
+              shouldBeBold = true;
+            }
+          }
+        });
+
+        // Update the font weight
+        document.documentElement.style.setProperty(
+          `--node-font-weight-${idToSuffix(docId)}`,
+          shouldBeBold ? "600" : "400"
+        );
+      });
+
+      // Update node and text opacity based on selections
+      const nodeSelection = d3.select(svgRef.current)
+        .selectAll(".main-node")
+        .filter((d: any) => {
+          if (d.type === 'mention') {
+            return nodeIds.includes(d.id);
+          } else if (d.type === 'document') {
+            return documentSelectionsRef.current.has(d.id);
+          }
+          return false;
+        });
+      
+      nodeSelection.each(function(d: any) {
+        const node = d3.select(this);
+        let opacity;
+        
+        if (d.type === 'mention') {
+          opacity = 1;
+          node.select("text").style("opacity", 1);
+        } else if (d.type === 'document') {
+          // Document is highlighted if any entity is selecting it
+          opacity = documentSelectionsRef.current.has(d.id) ? 0.7 : 0.3;
+        }
+        
+        node.style("opacity", opacity);
+      });
     };
 
     // Add this helper function to update adjacency list
@@ -437,247 +475,266 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       });
     };
 
-    // Update addToSimulation to use updateAdjacencyList
-    const addToSimulation = (
-      links: { source: string; target: string }[],
-      documents: any[],
-      mentions: any[]
-    ) => {
-      const simulation = simulationRef.current;
-      if (!simulation) return;
-      console.log("adding to simulation", documents, mentions);
-
-      // Process links
-      const adjList = adjacencyListRef.current;
-      links.forEach((link) => {
-        if (!adjList.has(link.source)) adjList.set(link.source, new Set());
-        if (!adjList.has(link.target)) adjList.set(link.target, new Set());
-        adjList.get(link.source)!.add(link.target);
-        adjList.get(link.target)!.add(link.source);
-      });
-
-      // Create new nodes
-      const newDocumentNodes = createNodes(
-        documents,
-        "document",
-        (d) => ({ text: d.summary, links: d.links }),
-        (d) => d.id
-      );
-      const newMentionNodes = createNodes(
-        mentions,
-        "mention",
-        (d) => ({ text: d.text }),
-        (d) => d.id
-      );
-      const newNodes = [...newDocumentNodes, ...newMentionNodes];
-
-      // Get current simulation state
-      const currentNodes = simulation.nodes();
-      const nodePositions = new Map(
-        currentNodes.map((d) => [d.id, { x: d.x, y: d.y }])
+    // Add this helper function to clean up simulation links
+    const cleanupSimulationLinks = (simulation: d3.Simulation<any, undefined>) => {
+      const links = simulation.force("link")?.links() || [];
+      const nodes = new Set(simulation.nodes().map(n => n.id));
+      
+      // Filter out any links where either end is missing from nodes
+      const validLinks = links.filter(link => 
+        nodes.has(link.source.id) && nodes.has(link.target.id)
       );
 
-      // Position new nodes around their neighbors
-      newNodes.forEach((node: any) => {
-        const neighbors = Array.from(adjList.get(node.id) || []);
-        if (neighbors.length > 0) {
-          const neighborPositions = neighbors
-            .map((id) => nodePositions.get(id))
-            .filter(
-              (pos): pos is { x: number; y: number } => pos !== undefined
-            );
-
-          if (neighborPositions.length > 0) {
-            const avgX = d3.mean(neighborPositions, (d) => d.x);
-            const avgY = d3.mean(neighborPositions, (d) => d.y);
-            node.x = avgX! + (Math.random() - 0.5) * 50;
-            node.y = avgY! + (Math.random() - 0.5) * 50;
-          } else {
-            node.x = Math.random() * 100;
-            node.y = Math.random() * 100;
-          }
-        } else {
-          node.x = Math.random() * 100;
-          node.y = Math.random() * 100;
-        }
+      // Deduplicate links between the same node pairs
+      const uniqueLinks = new Map();
+      validLinks.forEach(link => {
+        const linkId = link.source.id < link.target.id ? 
+          `${link.source.id}-${link.target.id}` : 
+          `${link.target.id}-${link.source.id}`;
+        uniqueLinks.set(linkId, link);
       });
 
-      // Update simulation data
-      const updatedNodes = [...currentNodes, ...newNodes];
-      const updatedLinks = [...simulation.force("link").links(), ...links];
+      return Array.from(uniqueLinks.values());
+    };
 
-      simulation.nodes(updatedNodes);
-      simulation.force("link", createForceLinks(updatedLinks, forceParams));
-
-      // Restore node positions
-      simulation.nodes().forEach((node) => {
-        const pos = nodePositions.get(node.id);
-        if (pos) {
-          node.x = pos.x;
-          node.y = pos.y;
-        }
-      });
-
-      // Render new elements
-      renderLinks(graphRef.current, links, "main-link", {
-        stroke: "#999",
-        strokeOpacity: 0.4,
-      });
-
-      renderNodes(
-        graphRef.current,
-        newNodes,
-        "main-node",
-        {
-          radius: 3,
-          fill: (d: any) =>
-            d.type === "document" ? "steelblue" : "lightgreen",
-        },
-        {
-          mouseover: handleMouseOver,
-          mouseout: handleMouseOut,
-          click: handleClick,
-        }
-      );
-
-      // Reset alpha and restart simulation
-      simulation.alpha(0.1).restart();
-      simulation.alpha(0.1).restart();
-
-      // Set up tick function only once
-      if (!simulation.on("tick")) {
-        simulation.on("tick", () => {
-          updatePositions(
-            d3.selectAll(".main-link"),
-            d3.selectAll(".main-node")
-          );
-        });
+    // Add this helper to validate a link between two nodes
+    const isValidLink = (
+      sourceNode: any, 
+      targetNode: any,
+      validDocuments: Set<string>,
+      selectedEntities: Set<string>,
+      validOneHopMentions: Set<string>,
+      simulationNodes: Set<string>
+    ): boolean => {
+      // First verify both nodes exist in simulation
+      if (!simulationNodes.has(sourceNode.id) || !simulationNodes.has(targetNode.id)) {
+        return false;
       }
 
-      // Update adjacency list with new links
-      updateAdjacencyList(updatedLinks);
+      // Rest of the validation remains the same
+      if (sourceNode.id === targetNode.id) return false;
+
+      const isMentionToDocument = 
+        (sourceNode.type === 'mention' && targetNode.type === 'document') ||
+        (sourceNode.type === 'document' && targetNode.type === 'mention');
+      if (!isMentionToDocument) return false;
+
+      const [mention, document] = sourceNode.type === 'mention' ?
+        [sourceNode, targetNode] : [targetNode, sourceNode];
+
+      if (!validDocuments.has(document.id)) return false;
+
+      return selectedEntities.has(mention.id) || validOneHopMentions.has(mention.id);
     };
 
-    // Update removeNodesAndLinks to maintain adjacency list
-    const removeNodesAndLinks = (mentionId: string) => {
-      const simulation = simulationRef.current;
-      if (!simulation) return;
+    // Add this helper at the top level
+    const getUniqueNodes = (nodes: any[]): any[] => {
+      const uniqueNodes = new Map();
+      nodes.forEach(node => {
+        uniqueNodes.set(node.id, node);
+      });
+      return Array.from(uniqueNodes.values());
+    };
 
-      // Get current state
-      const currentLinks = simulation.force("link")?.links() || [];
-      const currentNodes = simulation.nodes();
-      
-      // Track different node types and states
-      const selectedEntities = new Set(Array.from(selectedIdsRef.current));
-      const oneHopMentions = new Set<string>();
-      const mentionToDocuments = new Map<string, Set<string>>();
-      const documentToMentions = new Map<string, Set<string>>();
 
-      // Build relationship maps
-      currentLinks.forEach(link => {
-        const sourceId = link.source.id;
-        const targetId = link.target.id;
-        const sourceType = link.source.type;
-        const targetType = link.target.type;
-
-        if (sourceType === 'mention' && targetType === 'document') {
-          if (!mentionToDocuments.has(sourceId)) mentionToDocuments.set(sourceId, new Set());
-          if (!documentToMentions.has(targetId)) documentToMentions.set(targetId, new Set());
-          mentionToDocuments.get(sourceId)!.add(targetId);
-          documentToMentions.get(targetId)!.add(sourceId);
-          
-          // Track one-hop mentions (mentions found in documents)
-          if (!selectedEntities.has(sourceId)) {
-            oneHopMentions.add(sourceId);
-          }
-        } else if (sourceType === 'document' && targetType === 'mention') {
-          if (!mentionToDocuments.has(targetId)) mentionToDocuments.set(targetId, new Set());
-          if (!documentToMentions.has(sourceId)) documentToMentions.set(sourceId, new Set());
-          mentionToDocuments.get(targetId)!.add(sourceId);
-          documentToMentions.get(sourceId)!.add(targetId);
-          
-          // Track one-hop mentions
-          if (!selectedEntities.has(targetId)) {
-            oneHopMentions.add(targetId);
+    // Add this helper function to process and validate nodes/links
+    function processGraphData(
+      currentNodes: any[],
+      currentLinks: any[],
+      selectedEntities: Set<string>,
+      validDocuments: Set<string>,
+      connectionMap: Map<string, Set<string>>
+    ) {
+      // 1. Identify valid one-hop mentions (connected to valid documents)
+      const validOneHopMentions = new Set<string>();
+      currentNodes.forEach(node => {
+        if (node.type === 'mention' && !selectedEntities.has(node.id)) {
+          const connections = connectionMap.get(node.id) || new Set();
+          if (Array.from(connections).some(docId => validDocuments.has(docId))) {
+            validOneHopMentions.add(node.id);
           }
         }
       });
 
-      // Determine which nodes to keep
-      const mentionsToKeep = new Set<string>();
-      const documentsToKeep = new Set<string>();
-
-      // Keep selected entities (except the one being removed)
-      selectedEntities.forEach(entityId => {
-        if (entityId !== mentionId) {
-          mentionsToKeep.add(entityId);
-          // Keep documents connected to kept entities
-          mentionToDocuments.get(entityId)?.forEach(docId => documentsToKeep.add(docId));
-        }
-      });
-
-      // For each document we're keeping, check its one-hop mentions
-      documentsToKeep.forEach(docId => {
-        documentToMentions.get(docId)?.forEach(mentionId => {
-          if (oneHopMentions.has(mentionId)) {
-            // Only keep one-hop mentions that are connected to documents
-            // that are connected to remaining selected entities
-            mentionsToKeep.add(mentionId);
-          }
-        });
-      });
-
-      // Filter links
-      const updatedLinks = currentLinks.filter(link => {
-        const sourceId = link.source.id;
-        const targetId = link.target.id;
-        const sourceType = link.source.type;
-        const targetType = link.target.type;
-
-        if (sourceType === 'mention') {
-          if (!mentionsToKeep.has(sourceId)) return false;
-          return targetType === 'document' ? documentsToKeep.has(targetId) : true;
-        } else if (targetType === 'mention') {
-          if (!mentionsToKeep.has(targetId)) return false;
-          return sourceType === 'document' ? documentsToKeep.has(sourceId) : true;
-        }
-        return true;
-      });
-
-      // Filter nodes
-      const updatedNodes = currentNodes.filter(node => {
+      // 2. Filter nodes based on validity
+      const shouldKeepNode = (node: any): boolean => {
         if (node.type === 'mention') {
-          return mentionsToKeep.has(node.id);
-        } else if (node.type === 'document') {
-          return documentsToKeep.has(node.id);
+          return selectedEntities.has(node.id) || validOneHopMentions.has(node.id);
+        }
+        if (node.type === 'document') {
+          return validDocuments.has(node.id);
         }
         return false;
+      };
+
+      // 3. Filter and deduplicate nodes
+      const updatedNodes = getUniqueNodes(currentNodes.filter(shouldKeepNode));
+      const simulationNodeIds = new Set(updatedNodes.map(n => n.id));
+
+      // 4. Filter and deduplicate links
+      const validLinks = currentLinks.filter(link => {
+        if (!simulationNodeIds.has(link.source.id) || !simulationNodeIds.has(link.target.id)) {
+          return false;
+        }
+
+        const sourceNode = updatedNodes.find(n => n.id === link.source.id);
+        const targetNode = updatedNodes.find(n => n.id === link.target.id);
+        
+        if (!sourceNode || !targetNode) return false;
+
+        return isValidLink(
+          sourceNode,
+          targetNode,
+          validDocuments,
+          selectedEntities,
+          validOneHopMentions,
+          simulationNodeIds
+        );
       });
 
-      // Update simulation data
+      const uniqueLinks = new Map();
+      validLinks.forEach(link => {
+        const linkId = link.source.id < link.target.id ? 
+          `${link.source.id}-${link.target.id}` : 
+          `${link.target.id}-${link.source.id}`;
+        uniqueLinks.set(linkId, link);
+      });
+
+      return {
+        nodes: updatedNodes,
+        links: Array.from(uniqueLinks.values())
+      };
+    }
+
+    // Add this unified update function
+    function updateGraphWithMention(
+      simulation: d3.Simulation<any, undefined>,
+      graphRef: React.MutableRefObject<d3.Selection<SVGGElement, any, SVGGElement, unknown> | undefined>,
+      forceParams: any,
+      documents: DocumentNode[],
+      mentions: MentionNode[],
+      links: {source: string, target: string}[],
+      selectedEntities: Set<string>,
+      removedMentionId?: string
+    ) {
+      // 1. Build connection map from current and new links
+      const connectionMap = new Map<string, Set<string>>();
+      const currentLinks = simulation.force("link")?.links() || [];
+      [...currentLinks, ...links].forEach(link => {
+        const sourceId = link.source.id || link.source;
+        const targetId = link.target.id || link.target;
+        
+        if (!connectionMap.has(sourceId)) {
+          connectionMap.set(sourceId, new Set());
+        }
+        if (!connectionMap.has(targetId)) {
+          connectionMap.set(targetId, new Set());
+        }
+        
+        connectionMap.get(sourceId)!.add(targetId);
+        connectionMap.get(targetId)!.add(sourceId);
+      });
+
+      // 2. Identify valid documents (connected to selected mentions)
+      const validDocuments = new Set<string>();
+      const currentNodes = simulation.nodes();
+      [...currentNodes, ...documents].forEach(node => {
+        if (node.type === 'document') {
+          const connections = connectionMap.get(node.id) || new Set();
+          if (Array.from(connections).some(connectedId => 
+            selectedEntities.has(connectedId) && connectedId !== removedMentionId
+          )) {
+            validDocuments.add(node.id);
+          }
+        }
+      });
+
+      // 3. Process and validate graph data
+      const { nodes: updatedNodes, links: updatedLinks } = processGraphData(
+        [...currentNodes, ...documents, ...mentions],
+        [...currentLinks, ...links],
+        selectedEntities,
+        validDocuments,
+        connectionMap
+      );
+
+      // 4. Update simulation with new data
       simulation.nodes(updatedNodes);
       simulation.force("link", createForceLinks(updatedLinks, forceParams));
 
-      // Update adjacency list with remaining links
-      updateAdjacencyList(updatedLinks, mentionId);
+      // 5. Update DOM elements
+      if (graphRef.current) {
+        // Remove all existing nodes and links
+        graphRef.current.selectAll(".main-node").remove();
+        graphRef.current.selectAll(".main-link").remove();
 
-      // Update DOM
-      graphRef.current?.selectAll(".main-link")
-        .data(updatedLinks, (d: any) => `${d.source.id}-${d.target.id}`)
-        .exit()
-        .remove();
+        // Render new elements
+        renderLinks(graphRef.current, updatedLinks, "main-link", {
+          stroke: "#999",
+          strokeOpacity: 0.2
+        });
 
-      graphRef.current?.selectAll(".main-node")
-        .data(updatedNodes, (d: any) => d.id)
-        .exit()
-        .remove();
+        renderNodes(
+          graphRef.current,
+          updatedNodes,
+          "main-node",
+          {
+            radius: 3,
+            fill: (d: any) => d.type === "document" ? "steelblue" : "lightgreen",
+          },
+          selectedIdsRef,
+          {
+            mouseover: handleMouseOver,
+            mouseout: handleMouseOut,
+          }
+        );
+      }
 
-      simulation.alpha(0.1).restart();
-    };
+      // 6. Restart simulation
+      simulation.alpha(0.5).restart();
+
+      return updatedNodes;
+    }
+
+
+    // Replace addToSimulation with updateGraphWithMention
+    const addToSimulation = useCallback((
+      links: { source: string; target: string }[],
+      documents: any[],
+      mentions: any[],
+    ) => {
+      if (!simulationRef.current) return;
+      
+      updateGraphWithMention(
+        simulationRef.current,
+        graphRef,
+        forceParams,
+        documents,
+        mentions,
+        links,
+        selectedIdsRef.current
+      );
+    }, [forceParams]);
+
+    // Replace removeNodesAndLinks with updateGraphWithMention
+    const removeNodesAndLinks = useCallback((mentionId: string) => {
+      if (!simulationRef.current) return;
+
+      updateGraphWithMention(
+        simulationRef.current,
+        graphRef,
+        forceParams,
+        [], // No new documents
+        [], // No new mentions
+        [], // No new links
+        selectedIdsRef.current,
+        mentionId
+      );
+    }, [forceParams]);
 
     // Update useImperativeHandle
     React.useImperativeHandle(ref, () => ({
-      updateNodeSelected,
+      updateNodesSelected,
       addToSimulation,
       removeNodesAndLinks
     }));
@@ -709,74 +766,3 @@ function idToSuffix(id: string) {
     .replace(/[^a-z0-9]+/g, "-") // Replace non-alphanumeric characters with hyphens
     .replace(/^-+|-+$/g, ""); // Remove leading and trailing hyphens
 }
-
-/**
- * 
- * 
-        {/* <div style={{ padding: "20px" }}>
-          <div>
-            <label htmlFor="collision-radius-slider">Collision Radius</label>
-            <Slider
-              value={forceParams.collisionRadius}
-              onChange={handleForceParamChange("collisionRadius")}
-              min={5}
-              max={50}
-              step={1}
-              aria-labelledby="collision-radius-slider"
-              id="collision-radius-slider"
-            />
-          </div>
-          <div>
-            <label htmlFor="link-distance-slider">Link Distance</label>
-            <Slider
-              value={forceParams.linkDistance}
-              onChange={handleForceParamChange("linkDistance")}
-              min={10}
-              max={1000}
-              step={5}
-              aria-labelledby="link-distance-slider"
-              id="link-distance-slider"
-            />
-          </div>
-          <div>
-            <label htmlFor="link-strength-slider">Link Strength</label>
-            <Slider
-              value={forceParams.linkStrength}
-              onChange={handleForceParamChange("linkStrength")}
-              min={0}
-              max={1}
-              step={0.1}
-              aria-labelledby="link-strength-slider"
-              id="link-strength-slider"
-            />
-          </div>
-          <div>
-            <label htmlFor="mention-link-distance-ratio-slider">
-              Mention Link Distance Ratio
-            </label>
-            <Slider
-              value={forceParams.mentionLinkDistanceRatio}
-              onChange={handleForceParamChange("mentionLinkDistanceRatio")}
-              min={1}
-              max={5}
-              step={0.1}
-              aria-labelledby="mention-link-distance-ratio-slider"
-              id="mention-link-distance-ratio-slider"
-            />
-          </div>
-          <div>
-            <label htmlFor="mention-link-strength-ratio-slider">
-              Mention Link Strength Ratio
-            </label>
-            <Slider
-              value={forceParams.mentionLinkStrengthRatio}
-              onChange={handleForceParamChange("mentionLinkStrengthRatio")}
-              min={0.01}
-              max={1}
-              step={0.01}
-              aria-labelledby="mention-link-strength-ratio-slider"
-              id="mention-link-strength-ratio-slider"
-            />
-          </div>
-        </div>
- */
