@@ -239,6 +239,10 @@ export async function extractPatterns(
 
     const { frontmatter, contents } = fileContent;
 
+    // Augment the tags from frontmatter with the tags from the file contents
+    const fileTags = contents.match(/#[\w-\/]+/g) || [];
+    const augmentedTags = [...new Set([...(frontmatter.tags || []), ...fileTags])];
+
     // Skip empty files or files with only whitespace
     if (!contents || contents.trim().length === 0) {
       return undefined;
@@ -254,7 +258,7 @@ export async function extractPatterns(
     
     // Extract all unique contexts across all matches
     const extractedContexts = matches.flatMap(match => 
-      extractContentForMatch(processedContents, match, frontmatter, file)
+      extractContentForMatch(processedContents, match, frontmatter)
     );
 
     // Get unique contexts and skip if none found
@@ -270,7 +274,7 @@ export async function extractPatterns(
 
     return {
       file,
-      tags: frontmatter.tags || [],
+      tags: augmentedTags,
       extractedContents: uniqueContexts,
       lastModified: fileMetadata.lastModified,
       createdAt: await getFileCreationDate(frontmatter, file)

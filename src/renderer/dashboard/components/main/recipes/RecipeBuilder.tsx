@@ -58,7 +58,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const dragCountRef = useRef<number>(0);
   const wasRecentlyDragging = useRef(false);
 
-  const selectedIdsRef = useRef<Set<string>>(new Set());
+  const selectedMentionIdsRef = useRef<Set<string>>(new Set());
   const contextDocsRef = useRef<Map<string, {contents: string, extractedContents: string[]}>>(new Map());
 
 
@@ -71,10 +71,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           type: name.startsWith('#') ? 'tag' : 'link', 
           count: DEFAULT_COUNT 
         });
-        selectedIdsRef.current.add(name);
+        selectedMentionIdsRef.current.add(name);
       } else {
         next.delete(name);
-        selectedIdsRef.current.delete(name);
+        selectedMentionIdsRef.current.delete(name);
         // Remove the deselected node and its connections from the graph
         graphViewRef.current?.removeNodesAndLinks(name);
       }
@@ -101,8 +101,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       // Create document node
       const docNode: DocumentNode = {
         id: file,
-        summary: path.basename(file),
-        links: [],
+        name: path.basename(file),
         type: 'document'
       };
       documents.push(docNode);
@@ -140,8 +139,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     mentionsInDocs.forEach(mention => {
       mentions.push({
         id: mention,
-        text: mention,
-        type: 'mention'
+        type: 'mention',
+        name: mention
       });
     });
 
@@ -192,26 +191,39 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       const limitedContext = context.slice(0, 30);
 
       // Create graph data from context
-      const documents = limitedContext.map(({file, extractedContents}) => ({
+      const documents = limitedContext.map(({file}) => ({
         id: file,
-        summary: path.basename(file),
-        links: [],
-        type: 'document'
+        type: 'document',
+        name: path.basename(file)
       }));
 
-      const mentions = [{
-        id: name,
-        text: name,
-        type: 'mention'
-      }];
+      const mentions = limitedContext.flatMap(({tags}) => {
+        return tags.map(tag => ({
+            id: tag,
+            type: 'mention',
+            name: tag
+        }));
+      });
 
-      const links = limitedContext.map(({file}) => ({
-        source: name,
-        target: file
-      }));
 
+      const links = limitedContext.flatMap(({file, tags}) => {
+        const mentionLinks = tags.map(tag => ({
+          source: file,
+          target: tag
+        }));
+
+        return [{
+          source: name,
+          target: file
+        }, ...mentionLinks];
+      });
+      
       // Update graph with new data
-      graphViewRef.current?.addToSimulation(links, documents, mentions);
+      graphViewRef.current?.addToSimulation(
+        links, 
+        documents,
+        mentions
+      );
 
       // Update the count of the entity
       updateEntityCount(type, name, 30);
@@ -230,8 +242,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     });
     
     // Make sure the entity is in selectedIdsRef
-    if (!selectedIdsRef.current.has(name)) {
-      selectedIdsRef.current.add(name);
+    if (!selectedMentionIdsRef.current.has(name)) {
+      selectedMentionIdsRef.current.add(name);
     }
     
     // Update node visibility with the new count
@@ -248,12 +260,24 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     const limitedContext = context.slice(0, count);
 
     // Create graph data from context
-    const documents = limitedContext.map(({file, extractedContents}) => ({
-      id: file,
-      summary: path.basename(file),
-      links: [],
-      type: 'document'
-    }));
+    const documents = limitedContext.flatMap(({file, tags}) => {
+      const docNode: DocumentNode = {
+        id: file,
+        name: path.basename(file),
+        type: 'document'
+      };
+
+      const mentions = tags.map(tag => {
+        return {
+          id: tag,
+          type: 'mention',
+          name: tag
+        };
+      });
+
+      return [docNode, ...mentions];
+    });
+
 
     // Update graph with new data - no new mentions needed since they already exist
     const links = limitedContext.map(({file}) => ({
@@ -261,7 +285,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       target: file
     }));
 
-    graphViewRef.current?.addToSimulation(links, documents, []);
+    graphViewRef.current?.addToSimulation(
+      links,
+      documents.filter((d): d is DocumentNode => 'type' in d && d.type === 'document'),
+      [],
+    );
   };
 
   const updateSegmentPrompt = (id: number, prompt: string) => {
@@ -567,7 +595,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 ref={graphViewRef}
                 width={800}
                 height={800}
-                selectedIdsRef={selectedIdsRef}
+                selectedMentionIdsRef={selectedMentionIdsRef}
               />
             </div>
           </div>
