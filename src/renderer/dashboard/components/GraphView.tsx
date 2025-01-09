@@ -333,16 +333,12 @@ function renderNodes(
     .attr("class", className)
     .style("cursor", "pointer")
     .style("opacity", (d: any) => {
-      if (d.type === 'document') {
-        return 0.3; // Default document opacity
+      if (d.type === 'mention') {
+        return selectedMentionDocCounts.has(d.id) ? 1 : 0.3;
       }
-      // For mentions, high opacity if selected, low if one-hop
-      return selectedMentionDocCounts.has(d.id) ? 0.7 : 0.3;
-    })
-    .style(
-      "font-weight",
-      (d: any) => `var(--node-font-weight-${idToSuffix(d.id)}, 400)`
-    );
+      // For documents, start with low opacity - will be updated when connected to selected mentions
+      return 0.05;
+    });
 
   nodeEnter.append("circle").attr("r", style.radius).style("fill", style.fill);
 
@@ -355,16 +351,32 @@ function renderNodes(
         .style("fill", d => d.type === 'mention' ? 'rgba(144, 238, 144, 0.6)' : '#e4e6eb')
         .style("font-size", "12px")
         .style("opacity", d => {
-          return d.type === 'mention' && selectedMentionDocCounts.has(d.id) ? 1 : 0.3;
+          if (d.type === 'mention') {
+            return selectedMentionDocCounts.has(d.id) ? 1 : 0.3;
+          }
+          // Text opacity will be updated in updateDocCountForMention
+          return 0.05;
         })
         .text(d => d.name);
     });
   }
-  nodeEnter
-    .on("mouseover", eventHandlers.mouseover)
-    .on("mouseout", eventHandlers.mouseout)
 
-  return nodeSelection.merge(nodeEnter);
+  // Update existing nodes
+  const allNodes = nodeSelection.merge(nodeEnter);
+  
+  // Update opacity for all nodes (both new and existing)
+  allNodes
+    .style("opacity", (d: any) => {
+      if (d.type === 'mention') {
+        return selectedMentionDocCounts.has(d.id) ? 1 : 0.3;
+      }
+      return 0.05;
+    })
+    // Add back the event handlers
+    .on("mouseover", eventHandlers.mouseover)
+    .on("mouseout", eventHandlers.mouseout);
+
+  return allNodes;
 }
 
 function updatePositions(link: any, node: any) {
@@ -539,21 +551,63 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       });
     }, [selectedMentionDocCounts]);
 
-    const updateDocCountForMention = (mention: string, count: number) => {
+    const updateDocCountForMention = async (mention: string, count: number) => {
       if (!svgRef.current) return;
 
-      let allMentionDocs = graphState.mentionToDocuments.get(mention) || [];
-      let mentionDocIds = allMentionDocs.slice(0, count);
-      let darkerDocIds = allMentionDocs.slice(count);
+      // Get all selected mentions and their doc counts
+      const selectedMentions = Array.from(selectedMentionDocCounts.entries());
+      
+      // Get valid docs for each selected mention
+      const validDocsPerMention = new Map<string, string[]>();
+      selectedMentions.forEach(([mentionId, count]) => {
+        const mentionDocs = graphState.mentionToDocuments.get(mentionId) || [];
+        validDocsPerMention.set(mentionId, mentionDocs.slice(0, count));
+      });
 
-      // Update node and text opacity based on selections
+      // Update node and text opacity
       d3.select(svgRef.current)
-
         .selectAll(".main-node")
-        .filter((d: any) => mentionDocIds.includes(d.id) || darkerDocIds.includes(d.id))
         .each(function(d: any) {
-          const opacity = mentionDocIds.includes(d.id) ? 1 : 0.1;
-          d3.select(this).select("text").style("opacity", opacity);
+          const node = d3.select(this);
+          const nodeData = d;
+          
+          if (nodeData.type === 'mention') {
+            // Update mention opacity based on selection
+            const opacity = selectedMentionDocCounts.has(nodeData.id) ? 1 : 0.3;
+            node.style("opacity", opacity);
+            node.select("text").style("opacity", opacity);
+          } 
+          else if (nodeData.type === 'document') {
+            // Check if this doc is valid for any selected mention
+            let isValidForAnyMention = false;
+            for (const [mentionId, validDocs] of validDocsPerMention) {
+              if (validDocs.includes(nodeData.id)) {
+                isValidForAnyMention = true;
+                break;
+              }
+            }
+            
+            const opacity = isValidForAnyMention ? 0.8 : 0.05;
+            node.style("opacity", opacity);
+            node.select("text").style("opacity", opacity);
+          }
+        });
+
+      // Update edge opacity
+      d3.select(svgRef.current)
+        .selectAll(".main-link")
+        .style("stroke-opacity", (d: any) => {
+          const sourceId = d.source.id || d.source;
+          const targetId = d.target.id || d.target;
+          
+          // Check if this edge connects a selected mention to one of its valid docs
+          for (const [mentionId, validDocs] of validDocsPerMention) {
+            if ((sourceId === mentionId && validDocs.includes(targetId)) ||
+                (targetId === mentionId && validDocs.includes(sourceId))) {
+              return 0.4;
+            }
+          }
+          return 0.05;
         });
     };
 
@@ -603,7 +657,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       // Render links
       renderLinks(graphRef.current, simulationLinks, "main-link", {
         stroke: "#999",
-        strokeOpacity: 0.2
+        strokeOpacity: 0.05
       });
 
       // Render nodes
@@ -651,7 +705,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
 
       renderLinks(graphRef.current, links, "main-link", {
         stroke: "#999",
-        strokeOpacity: 0.2
+        strokeOpacity: 0.05
       });
 
       renderNodes(
