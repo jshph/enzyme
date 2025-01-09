@@ -6,7 +6,6 @@ import debounce from 'lodash/debounce';
 import { useAuth } from '../../../contexts/AuthContext';
 import { GraphView, GraphViewRef, DocumentNode, MentionNode } from "../../GraphView";
 import path from 'path';
-import * as d3 from 'd3';
 
 interface SelectedEntity {
   type: 'tag' | 'link';
@@ -43,9 +42,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       });
   }, []);
 
-
-  // TODO figure out how to get the entire contents of the editor and not just the selection
-
   const [trendingData, setTrendingData] = useState<any>(null);
   const [selectedEntities, setSelectedEntities] = useState<SelectedEntitiesMap>(new Map());
   const [awaitingFirstToken, setAwaitingFirstToken] = useState(false);
@@ -58,9 +54,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const dragCountRef = useRef<number>(0);
   const wasRecentlyDragging = useRef(false);
 
-  const selectedMentionIdsRef = useRef<Set<string>>(new Set());
-  const contextDocsRef = useRef<Map<string, {contents: string, extractedContents: string[]}>>(new Map());
-
+  const [selectedMentionDocCounts, setSelectedMentionDocCounts] = useState<Map<string, number>>(new Map());
 
   // Add this helper function to keep selectedIdsRef in sync
   const updateSelectedEntity = useCallback((name: string, doAdd: boolean) => {
@@ -71,83 +65,23 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           type: name.startsWith('#') ? 'tag' : 'link', 
           count: DEFAULT_COUNT 
         });
-        selectedMentionIdsRef.current.add(name);
+        setSelectedMentionDocCounts(prev => {
+          const next = new Map(prev);
+          next.set(name, DEFAULT_COUNT);
+          return next;
+        });
       } else {
         next.delete(name);
-        selectedMentionIdsRef.current.delete(name);
-        // Remove the deselected node and its connections from the graph
+        setSelectedMentionDocCounts(prev => {
+          const next = new Map(prev);
+          next.delete(name);
+          return next;
+        });
         graphViewRef.current?.removeNodesAndLinks(name);
       }
       return next;
     });
   }, []);
-
-  // Add this function to process context into graph data
-  const processContextForGraph = useCallback((context: any[], selectedEntities: SelectedEntitiesMap) => {
-    if (!graphViewRef.current) return;
-
-    const documents: DocumentNode[] = [];
-    const mentions: MentionNode[] = [];
-    const links: {source: string, target: string}[] = [];
-    
-    // Track all mentions found in docs
-    const mentionsInDocs = new Set<string>();
-
-    // Process each document from context
-    context.forEach(({file, extractedContents}) => {
-      // Store context for later reference
-      contextDocsRef.current.set(file, {contents: '', extractedContents});
-      
-      // Create document node
-      const docNode: DocumentNode = {
-        id: file,
-        name: path.basename(file),
-        type: 'document'
-      };
-      documents.push(docNode);
-
-      // Process extracted contents for mentions
-      extractedContents.forEach(content => {
-        // Find tags
-        const tagMatches = content.match(/#[\w-\/]+/g) || [];
-        tagMatches.forEach(tag => {
-          mentionsInDocs.add(tag);
-          links.push({source: file, target: tag});
-        });
-
-        // // Find links
-        // const linkMatches = content.match(/\[\[([^\]]+)\]\]/g) || [];
-        // linkMatches.forEach(link => {
-        //   const cleanLink = link.replace(/[\[\]]/g, '');
-        //   mentionsInDocs.add(`[[${cleanLink}]]`);
-        //   links.push({source: file, target: `[[${cleanLink}]]`});
-        // });
-      });
-    });
-
-    // Add nodes for selected entities that weren't found in docs
-    // selectedEntities.forEach((entity, name) => {
-    //   if (!mentionsInDocs.has(name)) {
-    //     mentions.push({
-    //       id: name,
-    //       text: name
-    //     });
-    //   }
-    // });
-
-    // Add nodes for mentions found in docs
-    mentionsInDocs.forEach(mention => {
-      mentions.push({
-        id: mention,
-        type: 'mention',
-        name: mention
-      });
-    });
-
-    // Update the graph
-    graphViewRef.current.addToSimulation(links, documents, mentions);
-  }, []);
-
 
   const fetchTrendingData = async () => {
     const result = await window.electron.ipcRenderer.invoke('trending-data-update');
@@ -226,7 +160,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       );
 
       // Update the count of the entity
-      updateEntityCount(type, name, 30);
+      updateDocCountForMention(name, DEFAULT_COUNT);
     } else {
       // If removing, use removeNodesAndLinks
       graphViewRef.current?.removeNodesAndLinks(name);
@@ -234,62 +168,22 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   }, [selectedEntities, updateSelectedEntity]);
 
   // Update updateEntityCount to handle graph updates
-  const updateEntityCount = async (type: 'tag' | 'link', name: string, count: number) => {
+  const updateDocCountForMention = async (mention: string, count: number) => {
     setSelectedEntities(prev => {
       const next = new Map(prev);
-      next.set(name, { type, count });
+      next.set(mention, { type: 'tag', count });
+      return next;
+    });
+
+    setSelectedMentionDocCounts(prev => {
+      const next = new Map(prev);
+      next.set(mention, count);
       return next;
     });
     
-    // Make sure the entity is in selectedIdsRef
-    if (!selectedMentionIdsRef.current.has(name)) {
-      selectedMentionIdsRef.current.add(name);
-    }
-    
-    // Update node visibility with the new count
-    graphViewRef.current?.updateNodesSelected([name], count);
-
-    // Fetch new context with updated count
-    const query = Array.from(selectedEntities.entries())
-      .map(([entityName, entity]) => 
-        `${entityName}<${entityName === name ? count : entity.count}`
-      )
-      .join(' ');
-
-    const context = await window.electron.ipcRenderer.invoke('get-context', query);
-    const limitedContext = context.slice(0, count);
-
-    // Create graph data from context
-    const documents = limitedContext.flatMap(({file, tags}) => {
-      const docNode: DocumentNode = {
-        id: file,
-        name: path.basename(file),
-        type: 'document'
-      };
-
-      const mentions = tags.map(tag => {
-        return {
-          id: tag,
-          type: 'mention',
-          name: tag
-        };
-      });
-
-      return [docNode, ...mentions];
-    });
-
-
-    // Update graph with new data - no new mentions needed since they already exist
-    const links = limitedContext.map(({file}) => ({
-      source: name,
-      target: file
-    }));
-
-    graphViewRef.current?.addToSimulation(
-      links,
-      documents.filter((d): d is DocumentNode => 'type' in d && d.type === 'document'),
-      [],
-    );
+    // TODO not neeeded?
+    // // Update node visibility with the new count
+    // graphViewRef.current?.updateDocCountForMention(mention, count);
   };
 
   const updateSegmentPrompt = (id: number, prompt: string) => {
@@ -331,9 +225,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     try {
       const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
-
-      // Process context for graph visualization
-      processContextForGraph(context, selectedEntities);
 
       // Set up listener for chunks
       const handleChunk = ({chunk, done}: {chunk: any, done: boolean}) => {
@@ -383,7 +274,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         body: "Failed to generate recipe. Please try again."
       });
     }
-  }, [selectedEntities, selectedProfile, processContextForGraph]);
+  }, [selectedEntities, selectedProfile]);
 
   const handleEmailRecipeOutput = async () => {
     await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
@@ -465,7 +356,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // Create a single handler for ending drags
   const handleDragEnd = useCallback(() => {
     if (draggedEntity && dragCountRef.current) {
-      updateEntityCount(draggedEntity.type, draggedEntity.name, dragCountRef.current);
+      updateDocCountForMention(draggedEntity.name, dragCountRef.current);
       wasRecentlyDragging.current = true;
       
       // Reset the flag after a short delay
@@ -595,7 +486,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 ref={graphViewRef}
                 width={800}
                 height={800}
-                selectedMentionIdsRef={selectedMentionIdsRef}
+                selectedMentionDocCounts={selectedMentionDocCounts}
               />
             </div>
           </div>

@@ -26,9 +26,9 @@ export interface MentionNode {
 interface GraphState {
   nodes: Map<string, DocumentNode | MentionNode>;
   edges: Set<string>; // Format: "sourceId->targetId"
-  mentionToDocuments: Map<string, Set<string>>; // Track which docs each mention connects to
+  mentionToDocuments: Map<string, string[]>; // Ordered list of docs each mention connects to (to preserve order in index)
   documentToMentions: Map<string, Set<string>>; // Track which mentions each doc contains
-  selectedMentionIds: Set<string>; // Track which nodes are selected
+  selectedMentionDocCounts: Map<string, number>; // Track which nodes are selected
 }
 
 function createEdgeId(sourceId: string, targetId: string): string {
@@ -43,7 +43,7 @@ function updateGraphState(
   documents: DocumentNode[],
   mentions: MentionNode[],
   links: {source: string, target: string}[],
-  selectedMentionIds: Set<string>,
+  selectedMentionDocCounts: Map<string, number>,
   removedMentionId?: string,
 ): GraphState {
   const newState = {
@@ -51,7 +51,7 @@ function updateGraphState(
     edges: new Set(state.edges),
     mentionToDocuments: new Map(state.mentionToDocuments),
     documentToMentions: new Map(state.documentToMentions),
-    selectedMentionIds: new Set(selectedMentionIds)
+    selectedMentionDocCounts: new Map(selectedMentionDocCounts)
   };
 
   // Handle removal first if specified
@@ -92,14 +92,14 @@ function updateGraphState(
     // Get all documents connected to selected mentions
     const validDocs = new Set<string>();
     for (const [mentionId, docs] of newState.mentionToDocuments.entries()) {
-      if (state.selectedMentionIds.has(mentionId)) {
+      if (state.selectedMentionDocCounts.has(mentionId)) {
         docs.forEach(doc => validDocs.add(doc));
       }
     }
 
     // Remove mentions that are no longer connected to valid docs
     for (const [mentionId, docs] of newState.mentionToDocuments.entries()) {
-      if (!state.selectedMentionIds.has(mentionId)) {
+      if (!state.selectedMentionDocCounts.has(mentionId)) {
         const hasValidDoc = Array.from(docs).some(doc => validDocs.has(doc));
         if (!hasValidDoc) {
           newState.nodes.delete(mentionId);
@@ -137,7 +137,7 @@ function updateGraphState(
   mentions.forEach(mention => {
     if (!newState.nodes.has(mention.id)) {
       newState.nodes.set(mention.id, mention);
-      newState.mentionToDocuments.set(mention.id, new Set());
+      newState.mentionToDocuments.set(mention.id, []);
     }
   });
 
@@ -151,18 +151,23 @@ function updateGraphState(
     const targetNode = newState.nodes.get(target);
 
     if (sourceNode?.type === 'mention' && targetNode?.type === 'document') {
-      const mentionDocs = newState.mentionToDocuments.get(source) || new Set();
-      mentionDocs.add(target);
-      newState.mentionToDocuments.set(source, mentionDocs);
+      const mentionDocs = newState.mentionToDocuments.get(source) || [];
+      if (!mentionDocs.includes(target)) {
+        mentionDocs.push(target);
+        newState.mentionToDocuments.set(source, mentionDocs);
+      }
 
       const docMentions = newState.documentToMentions.get(target) || new Set();
       docMentions.add(source);
       newState.documentToMentions.set(target, docMentions);
     } 
     else if (sourceNode?.type === 'document' && targetNode?.type === 'mention') {
-      const mentionDocs = newState.mentionToDocuments.get(target) || new Set();
-      mentionDocs.add(source);
-      newState.mentionToDocuments.set(target, mentionDocs);
+      const mentionDocs = newState.mentionToDocuments.get(target) || [];
+      if (!mentionDocs.includes(source)) {
+        mentionDocs.push(source);
+        newState.mentionToDocuments.set(target, mentionDocs);
+      }
+
 
       const docMentions = newState.documentToMentions.get(source) || new Set();
       docMentions.add(target);
@@ -248,18 +253,6 @@ function updateTextProperties(
     }
   });
 }
-function createNodes(
-  data: any[],
-  nodeType: string,
-  getNodeProps: (d: any) => any,
-  getNodeId: (d: any) => string
-) {
-  return data.map((d) => ({
-    id: getNodeId(d),
-    type: nodeType,
-    ...getNodeProps(d),
-  }));
-}
 
 function createForceLinks(links: any[], forceParams: any) {
   return d3
@@ -325,7 +318,7 @@ function renderNodes(
   nodes: any,
   className: string,
   style: any,
-  selectedMentionIdsRef: MutableRefObject<Set<string>>,
+  selectedMentionDocCounts: Map<string, number>,
   eventHandlers: { [key: string]: (event: d3.D3Event, d: any) => void },
   doRenderText = true
 ) {
@@ -344,7 +337,7 @@ function renderNodes(
         return 0.3; // Default document opacity
       }
       // For mentions, high opacity if selected, low if one-hop
-      return selectedMentionIdsRef.current.has(d.id) ? 0.7 : 0.3;
+      return selectedMentionDocCounts.has(d.id) ? 0.7 : 0.3;
     })
     .style(
       "font-weight",
@@ -362,7 +355,7 @@ function renderNodes(
         .style("fill", d => d.type === 'mention' ? 'rgba(144, 238, 144, 0.6)' : '#e4e6eb')
         .style("font-size", "12px")
         .style("opacity", d => {
-          return d.type === 'mention' && selectedMentionIdsRef.current.has(d.id) ? 1 : 0.3;
+          return d.type === 'mention' && selectedMentionDocCounts.has(d.id) ? 1 : 0.3;
         })
         .text(d => d.name);
     });
@@ -387,11 +380,11 @@ function updatePositions(link: any, node: any) {
 export type GraphViewProps = {
   width?: number;
   height?: number;
-  selectedMentionIdsRef: MutableRefObject<Set<string>>;
+  selectedMentionDocCounts: Map<string, number>;
 };
 
 export type GraphViewRef = {
-  updateNodesSelected: (nodeIds: string[], count: number) => void;
+  updateDocCountForMention: (mention: string, count: number) => void;
   addToSimulation: (
     links: { source: string; target: string }[],
     documents: any[],
@@ -406,7 +399,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
     const {
       width = 800,
       height = 600,
-      selectedMentionIdsRef
+      selectedMentionDocCounts
     } = props;
 
     const svgRef = useRef<SVGSVGElement | null>(null);
@@ -447,19 +440,12 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
     const opacityLayerRef = useRef<SVGRectElement | null>(null);
     const [highlights, setHighlights] = useState<any[]>([]);
 
-    // const entityDocumentsRef = useRef<Map<string, Set<string>>>(new Map());
-    const entityDocumentRankingsRef = useRef<Map<string, Map<string, number>>>(new Map());
-
-    // Track which entities are selecting each document and their rankings
-    const documentSelectionsRef = useRef<Map<string, Map<string, number>>>(new Map());
-
-    // Add new state
     const [graphState, setGraphState] = useState<GraphState>({
       nodes: new Map(),
       edges: new Set(),
       mentionToDocuments: new Map(),
       documentToMentions: new Map(),
-      selectedMentionIds: new Set()
+      selectedMentionDocCounts: new Map()
     });
 
     const handleMouseOver = (event: d3.D3Event, d: any) => {
@@ -547,56 +533,28 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       simulationRef.current.alpha(0.8).restart();
     }, [forceParams]);
 
-    const updateNodesSelected = (nodeIds: string[], count: number) => {
+    useEffect(() => {
+      selectedMentionDocCounts.forEach((count, mention) => {
+        updateDocCountForMention(mention, count);
+      });
+    }, [selectedMentionDocCounts]);
+
+    const updateDocCountForMention = (mention: string, count: number) => {
       if (!svgRef.current) return;
 
-      // Update document weights based on all active selections
-      documentSelectionsRef.current.forEach((entityRankings, docId) => {
-        let shouldBeBold = false;
-        
-        // Check if any selecting entity ranks this document within their count
-        entityRankings.forEach((rank, entityId) => {
-          if (selectedIdsRef.current.has(entityId)) {
-            const entityCount = count; // You might want to store individual counts per entity
-            if (rank <= entityCount) {
-              shouldBeBold = true;
-            }
-          }
-        });
-
-        // Update the font weight
-        document.documentElement.style.setProperty(
-          `--node-font-weight-${idToSuffix(docId)}`,
-          shouldBeBold ? "600" : "400"
-        );
-      });
+      let allMentionDocs = graphState.mentionToDocuments.get(mention) || [];
+      let mentionDocIds = allMentionDocs.slice(0, count);
+      let darkerDocIds = allMentionDocs.slice(count);
 
       // Update node and text opacity based on selections
-      const nodeSelection = d3.select(svgRef.current)
+      d3.select(svgRef.current)
+
         .selectAll(".main-node")
-        .filter((d: any) => {
-          if (d.type === 'mention') {
-            return nodeIds.includes(d.id);
-          } else if (d.type === 'document') {
-            return documentSelectionsRef.current.has(d.id);
-          }
-          return false;
+        .filter((d: any) => mentionDocIds.includes(d.id) || darkerDocIds.includes(d.id))
+        .each(function(d: any) {
+          const opacity = mentionDocIds.includes(d.id) ? 1 : 0.1;
+          d3.select(this).select("text").style("opacity", opacity);
         });
-      
-      nodeSelection.each(function(d: any) {
-        const node = d3.select(this);
-        let opacity;
-        
-        if (d.type === 'mention') {
-          opacity = 1;
-          node.select("text").style("opacity", 1);
-        } else if (d.type === 'document') {
-          // Document is highlighted if any entity is selecting it
-          opacity = documentSelectionsRef.current.has(d.id) ? 0.7 : 0.3;
-        }
-        
-        node.style("opacity", opacity);
-      });
     };
 
     // Update addToSimulation
@@ -613,7 +571,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
         documents,
         mentions,
         links,
-        selectedMentionIdsRef.current
+        selectedMentionDocCounts
       );
       setGraphState(newState);
 
@@ -657,7 +615,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
           radius: 3,
           fill: (d: any) => d.type === "document" ? "steelblue" : "lightgreen",
         },
-        selectedMentionIdsRef,
+        selectedMentionDocCounts,
         {
           mouseover: handleMouseOver,
           mouseout: handleMouseOut,
@@ -677,7 +635,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
         [],
         [],
         [],
-        selectedMentionIdsRef.current,
+        selectedMentionDocCounts,
         mentionId
       );
       setGraphState(newState);
@@ -704,7 +662,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
           radius: 3,
           fill: (d: any) => d.type === "document" ? "steelblue" : "lightgreen",
         },
-        selectedMentionIdsRef,
+        selectedMentionDocCounts,
         {
           mouseover: handleMouseOver,
           mouseout: handleMouseOut,
@@ -717,7 +675,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
 
     // Update useImperativeHandle
     React.useImperativeHandle(ref, () => ({
-      updateNodesSelected,
+      updateDocCountForMention,
       addToSimulation,
       removeNodesAndLinks
     }));
