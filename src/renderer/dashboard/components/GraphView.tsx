@@ -48,7 +48,7 @@ function updateGraphState(
 ): GraphState {
   const newState = {
     nodes: new Map(state.nodes),
-    edges: new Set(state.edges),
+    edges: new Set(state.edges), // Keep existing edges initially
     mentionToDocuments: new Map(state.mentionToDocuments),
     documentToMentions: new Map(state.documentToMentions),
     selectedMentionDocCounts: new Map(selectedMentionDocCounts)
@@ -77,7 +77,7 @@ function updateGraphState(
     newState.nodes.delete(removedMentionId);
     newState.mentionToDocuments.delete(removedMentionId);
 
-    // Remove affected edges
+    // Only remove edges connected to the removed mention
     newState.edges = new Set(
       Array.from(newState.edges).filter(edge => {
         const [source, target] = edge.split('->');
@@ -146,7 +146,6 @@ function updateGraphState(
     const edgeId = createEdgeId(source, target);
     newState.edges.add(edgeId);
 
-    // Update tracking maps based on node types
     const sourceNode = newState.nodes.get(source);
     const targetNode = newState.nodes.get(target);
 
@@ -167,7 +166,6 @@ function updateGraphState(
         mentionDocs.push(source);
         newState.mentionToDocuments.set(target, mentionDocs);
       }
-
 
       const docMentions = newState.documentToMentions.get(source) || new Set();
       docMentions.add(target);
@@ -277,7 +275,7 @@ function createSimulation(
 ) {
   const simulation = d3
     .forceSimulation([])
-    .force("charge", d3.forceManyBody().strength(-100))
+    .force("charge", d3.forceManyBody().strength(-20))
     .force("center", d3.forceCenter(width / 2, height / 2))
     .force("collision", d3.forceCollide().radius(forceParams.collisionRadius))
     .force("link", createForceLinks([], forceParams));
@@ -438,7 +436,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       collisionRadius: 15,
       linkDistance: 40,
       linkStrength: 0.8,
-      mentionLinkDistanceRatio: 2.25, // 90 / 40
+      mentionLinkDistanceRatio: 4, // 90 / 40
       mentionLinkStrengthRatio: 0.125, // 0.1 / 0.8
     });
     const simulationRef = useRef<d3.Simulation<any, undefined> | null>(null);
@@ -546,12 +544,10 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
     }, [forceParams]);
 
     useEffect(() => {
-      selectedMentionDocCounts.forEach((count, mention) => {
-        updateDocCountForMention(mention, count);
-      });
+      updateDocCountForMention();
     }, [selectedMentionDocCounts]);
 
-    const updateDocCountForMention = async (mention: string, count: number) => {
+    const updateDocCountForMention = async () => {
       if (!svgRef.current) return;
 
       // Get all selected mentions and their doc counts
@@ -629,16 +625,23 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       );
       setGraphState(newState);
 
-      // Convert to simulation data
-      const { nodes, links: simulationLinks } = prepareSimulationData(newState);
+      // Convert to simulation data, ensuring unique nodes
+      const uniqueNodes = Array.from(newState.nodes.values());
+      const simulationLinks = Array.from(newState.edges).map(edge => {
+        const [source, target] = edge.split('->');
+        return { 
+          source: newState.nodes.get(source),
+          target: newState.nodes.get(target)
+        };
+      });
 
       // Store current positions
       const nodePositions = new Map(
         simulationRef.current.nodes().map(d => [d.id, { x: d.x, y: d.y }])
       );
 
-      // Update simulation
-      simulationRef.current.nodes(nodes);
+      // Update simulation with unique nodes
+      simulationRef.current.nodes(uniqueNodes);
       simulationRef.current.force("link", createForceLinks(simulationLinks, forceParams));
 
       // Restore positions for existing nodes
@@ -654,7 +657,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       graphRef.current.selectAll(".main-node").remove();
       graphRef.current.selectAll(".main-link").remove();
 
-      // Render links
+      // Render links with unique nodes
       renderLinks(graphRef.current, simulationLinks, "main-link", {
         stroke: "#999",
         strokeOpacity: 0.05
@@ -663,7 +666,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
       // Render nodes
       renderNodes(
         graphRef.current,
-        nodes,
+        uniqueNodes,
         "main-node",
         {
           radius: 3,

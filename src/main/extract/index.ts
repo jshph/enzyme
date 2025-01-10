@@ -193,7 +193,7 @@ function extractContentForMatch(
   const extractedContents: string[] = [];
 
   if (match.type === MatchType.Tag) {
-    const frontMatterTags = frontmatter.tags || [];
+    const frontMatterTags = frontmatter.tags?.map(tag => tag.includes("#") ? tag : `#${tag}`) || [];
     if (frontMatterTags.some((tag: string) => tag.toLowerCase() === match.value.toLowerCase())) {
       extractedContents.push(contents);
     } else {
@@ -241,7 +241,7 @@ export async function extractPatterns(
 
     // Augment the tags from frontmatter with the tags from the file contents
     const fileTags = contents.match(/#[\w-\/]+/g) || [];
-    const augmentedTags = [...new Set([...(frontmatter.tags || []), ...fileTags])];
+    const augmentedTags = [...new Set([...(frontmatter.tags?.map(tag => tag.includes("#") ? tag : `#${tag}`) || []), ...fileTags])];
 
     // Skip empty files or files with only whitespace
     if (!contents || contents.trim().length === 0) {
