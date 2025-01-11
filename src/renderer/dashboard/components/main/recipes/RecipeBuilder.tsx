@@ -49,12 +49,18 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const [draggedEntity, setDraggedEntity] = useState<{type: 'tag' | 'link', name: string, element: HTMLElement} | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineItem[]>([]);
 
-  const DEFAULT_COUNT = 30;
+  const DEFAULT_COUNT = 10;
+  const DEFAULT_CONTEXT_RECALL = 30;
 
   const dragCountRef = useRef<number>(0);
   const wasRecentlyDragging = useRef(false);
 
   const [selectedMentionDocCounts, setSelectedMentionDocCounts] = useState<Map<string, number>>(new Map());
+
+  const [dragHaloProps, setDragHaloProps] = useState<{
+    intensity: number;
+    direction: 'left' | 'right' | null;
+  } | null>(null);
 
   // Add this helper function to keep selectedIdsRef in sync
   const updateSelectedEntity = useCallback((name: string, doAdd: boolean) => {
@@ -65,18 +71,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           type: name.startsWith('#') ? 'tag' : 'link', 
           count: DEFAULT_COUNT 
         });
-        setSelectedMentionDocCounts(prev => {
-          const next = new Map(prev);
-          next.set(name, DEFAULT_COUNT);
-          return next;
-        });
+        initializeDocCountForMention(name);
       } else {
         next.delete(name);
-        setSelectedMentionDocCounts(prev => {
-          const next = new Map(prev);
-          next.delete(name);
-          return next;
-        });
+        updateDocCountForMention(name, 0);
         graphViewRef.current?.removeNodesAndLinks(name);
       }
       return next;
@@ -117,30 +115,33 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       const updatedEntities = new Map(selectedEntities);
       updatedEntities.set(name, { type, count: DEFAULT_COUNT });
 
-      const query = Array.from(updatedEntities.entries())
-        .map(([name, { count }]) => `${name}<${count}`)
+      const query = Array.from(updatedEntities.keys())
+        .map(name => `${name}<${DEFAULT_CONTEXT_RECALL}`)
         .join(' ');
 
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
-      const limitedContext = context.slice(0, 30);
 
       // Create graph data from context
-      const documents = limitedContext.map(({file}) => ({
+      const documents = context.map(({file}) => ({
         id: file,
         type: 'document',
         name: path.basename(file)
       }));
 
-      const mentions = limitedContext.flatMap(({tags}) => {
-        return tags.map(tag => ({
-            id: tag,
-            type: 'mention',
-            name: tag
-        }));
-      });
+      // Add the current entity as a mention node first
+      const mentions = [{
+        id: `#${name}`,
+        type: 'mention',
+        name: `#${name}`
+      }, ...context.flatMap(({tags}) => 
+        tags.map(tag => ({
+          id: tag,
+          type: 'mention',
+          name: tag
+        }))
+      )];
 
-
-      const links = limitedContext.flatMap(({file, tags}) => {
+      const links = context.flatMap(({file, tags}) => {
         const mentionLinks = tags.map(tag => ({
           source: file,
           target: tag
@@ -160,21 +161,19 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       );
 
       // Update the count of the entity
-      updateDocCountForMention(name, DEFAULT_COUNT);
+      initializeDocCountForMention(name);
     } else {
       // If removing, use removeNodesAndLinks
       graphViewRef.current?.removeNodesAndLinks(name);
     }
   }, [selectedEntities, updateSelectedEntity]);
 
+  const initializeDocCountForMention = (mention: string) => {
+    updateDocCountForMention(mention, DEFAULT_COUNT);
+  }
+
   // Update updateEntityCount to handle graph updates
   const updateDocCountForMention = async (mention: string, count: number) => {
-    setSelectedEntities(prev => {
-      const next = new Map(prev);
-      next.set(mention, { type: 'tag', count });
-      return next;
-    });
-
     setSelectedMentionDocCounts(prev => {
       const next = new Map(prev);
       next.set(mention, count);
@@ -330,7 +329,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     e: React.MouseEvent,
     draggedEntity: {type: 'tag' | 'link', name: string, element: HTMLElement} | null
   ) => {
-    if (!isDragging || !draggedEntity) return;
+    if (!isDragging || !draggedEntity) {
+      setDragHaloProps(null);
+      return;
+    }
     
     const numberElement = draggedEntity.element;
     if (!numberElement) return;
@@ -346,6 +348,13 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     // Update ref for immediate visual feedback
     dragCountRef.current = newCount;
     numberElement.textContent = newCount.toString();
+
+    // Calculate halo properties
+    const intensity = Math.min(Math.abs(deltaX) / 100, 0.3);
+    setDragHaloProps({
+      intensity,
+      direction: deltaX < 0 ? 'left' : 'right'
+    });
     
     // Use debounced update instead
     const updatedEntities = new Map(selectedEntities);
@@ -359,7 +368,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       updateDocCountForMention(draggedEntity.name, dragCountRef.current);
       wasRecentlyDragging.current = true;
       
-      // Reset the flag after a short delay
       setTimeout(() => {
         wasRecentlyDragging.current = false;
       }, 100);
@@ -367,6 +375,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     setIsDragging(false);
     setDraggedEntity(null);
     dragCountRef.current = 0;
+    setDragHaloProps(null);
   }, [draggedEntity]);
 
   // Update timeline when entities change
@@ -393,7 +402,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   return (
     <>
       <div
-        className="space-y-6 py-4"
+        className="space-y-6 py-4 relative"
         onMouseMove={(e) => handleMouseMove(e, draggedEntity)}
         onMouseUp={handleDragEnd}
         onMouseLeave={handleDragEnd}
@@ -420,17 +429,33 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
               {[...trendingData.tags, ...trendingData.links].map((ingredient: Ingredient, index) => {
                 const selectedEntity = selectedEntities.get(ingredient.name);
                 const isSelected = !!selectedEntity;
+                const isBeingDragged = isDragging && draggedEntity?.name === ingredient.name;
+                
+                // Calculate gradient for halo effect
+                let gradientStyle = '';
+                if (isBeingDragged && dragHaloProps) {
+                  const { intensity, direction } = dragHaloProps;
+                  // const color = direction === 'left' ? '114, 137, 218' : '136, 158, 236'; // darker : lighter blue
+                  
+                  if (direction === 'right') {
+                    gradientStyle = `linear-gradient(90deg, rgb(54, 62, 89) 0%, rgb(112, 127, 179) ${intensity * 300}%)`;
+                  } else {
+                    gradientStyle = `linear-gradient(270deg, rgb(54, 62, 89) 0%, rgb(112, 127, 179) ${intensity * 300}%)`;
+                  }
+                }
                 
                 return (
                   <div 
                     key={index}
                     className={`ingredient-pill group relative px-5 py-2 rounded-full shadow-sm transition-all select-none bg-brand/30
                       ${isSelected ? 'pl-2 pr-8 bg-brand/60' : ''}
-                      ${isDragging && draggedEntity?.name === ingredient.name ? 'cursor-grabbing pl-2 pr-8' : ''}
-                      ${isDragging && draggedEntity?.name !== ingredient.name ? 'opacity-80' : ''}
+                      ${isBeingDragged ? 'cursor-grabbing pl-2 pr-8' : ''}
+                      ${isDragging && !isBeingDragged ? 'opacity-80' : ''}
                       ${!isDragging ? 'hover:bg-brand/50 cursor-pointer' : ''}
-                      `
-                    }
+                    `}
+                    style={{
+                      background: isBeingDragged && gradientStyle ? gradientStyle : undefined,
+                    }}
                     onMouseDown={(e) => {
                       // Prevent text selection during dragging
                       e.preventDefault();

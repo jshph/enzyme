@@ -342,10 +342,10 @@ function renderNodes(
 
   if (doRenderText) {
     nodeEnter.each(function (d: any) {
-      d3
+      const text = d3
         .select(this)
         .append("text")
-        .attr("dy", "0.35em")
+        .attr("dx", "0.6em")
         .style("fill", d => d.type === 'mention' ? 'rgba(144, 238, 144, 0.6)' : '#e4e6eb')
         .style("font-size", "12px")
         .style("opacity", d => {
@@ -354,8 +354,28 @@ function renderNodes(
           }
           // Text opacity will be updated in updateDocCountForMention
           return 0.05;
-        })
-        .text(d => d.name);
+        });
+
+      const words = d.name.split(' ');
+      if (words.length > 7) {
+        // Split into chunks of 5 words
+        const chunkSize = 7;
+        const chunks = [];
+        for (let i = 0; i < words.length; i += chunkSize) {
+          chunks.push(words.slice(i, i + chunkSize).join(' '));
+        }
+        
+        chunks.forEach((chunk, i) => {
+          text.append('tspan')
+            .attr('x', 0)
+            .attr('dy', i === 0 ? '-0.35em' : '1.2em')
+            .attr('dx', '0.6em')
+            .text(chunk);
+        });
+      } else {
+        text.attr("dy", "0.35em")
+            .text(d.name);
+      }
     });
   }
 
@@ -584,14 +604,20 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
             }
             
             const opacity = isValidForAnyMention ? 0.8 : 0.05;
-            node.style("opacity", opacity);
-            node.select("text").style("opacity", opacity);
+            node.transition()
+              .duration(200)
+              .style("opacity", opacity);
+            node.select("text").transition()
+              .duration(200)
+              .style("opacity", opacity);
           }
         });
 
       // Update edge opacity
       d3.select(svgRef.current)
         .selectAll(".main-link")
+        .transition()
+        .duration(200)
         .style("stroke-opacity", (d: any) => {
           const sourceId = d.source.id || d.source;
           const targetId = d.target.id || d.target;
