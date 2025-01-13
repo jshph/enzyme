@@ -25,6 +25,9 @@ type Ingredient = {
   name: string;
 };
 
+const GENERATION_TIMEOUT_MS = 30000; // 30 seconds
+const FIRST_TOKEN_TIMEOUT_MS = 30000; // 30 seconds for first token
+
 const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
@@ -115,9 +118,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       const updatedEntities = new Map(selectedEntities);
       updatedEntities.set(name, { type, count: DEFAULT_COUNT });
 
-      const query = Array.from(updatedEntities.keys())
-        .map(name => `${name}<${DEFAULT_CONTEXT_RECALL}`)
-        .join(' ');
+      // const query = Array.from(updatedEntities.keys())
+      //   .map(name => `${name}<${DEFAULT_CONTEXT_RECALL}`)
+      //   .join(' ');
+
+      const query = `${name}<${DEFAULT_CONTEXT_RECALL}`;
 
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
@@ -130,27 +135,40 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
       // Add the current entity as a mention node first
       const mentions = [{
-        id: `#${name}`,
+        id: name,
         type: 'mention',
-        name: `#${name}`
-      }, ...context.flatMap(({tags}) => 
-        tags.map(tag => ({
-          id: tag,
-          type: 'mention',
-          name: tag
-        }))
+        name: name
+      }, ...context.flatMap(({tags, links}) => 
+        [
+          ...tags.map(tag => ({
+            id: tag,
+            type: 'mention',
+            name: tag
+          })),
+          // ...links.map(link => ({
+          //   id: link,
+          //   type: 'mention',
+          //   name: link
+          // }))
+        ]
       )];
 
-      const links = context.flatMap(({file, tags}) => {
-        const mentionLinks = tags.map(tag => ({
+      const links = context.flatMap(({file, tags, links}) => {
+        const tagLinks = tags.map(tag => ({
           source: file,
           target: tag
         }));
 
+        // const linkLinks = links.map(link => ({
+        //   source: file,
+        //   target: link
+        // }));
+
         return [{
           source: name,
           target: file
-        }, ...mentionLinks];
+        }, ...tagLinks];
+        // ...linkLinks];
       });
       
       // Update graph with new data
@@ -165,6 +183,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     } else {
       // If removing, use removeNodesAndLinks
       graphViewRef.current?.removeNodesAndLinks(name);
+      // and remove it from selectedEntities
+      setSelectedEntities(prev => {
+        const next = new Map(prev);
+        next.delete(name);
+        return next;
+      });
+      setSelectedMentionDocCounts(prev => {
+        const next = new Map(prev);
+        next.delete(name);
+        return next;
+      });
     }
   }, [selectedEntities, updateSelectedEntity]);
 
@@ -216,23 +245,59 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       });
   }, [isAuthenticated]);
 
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
-    
+
+    // Reset states
     setAwaitingFirstToken(true);
+    setIsGenerating(true);
+    setGenerationError(null);
+    setSuggestedOutputs(undefined);
+
+    // Create new AbortController
+    abortControllerRef.current = new AbortController();
 
     try {
       const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
+      // Only set up first token timeout
+      const firstTokenTimeout = setTimeout(() => {
+        if (awaitingFirstToken) {
+          abortControllerRef.current?.abort('First token timeout');
+          setGenerationError('Generation failed to start after 30 seconds');
+          setIsGenerating(false);
+          console.warn('Recipe generation failed to produce first token after 30 seconds');
+        }
+      }, FIRST_TOKEN_TIMEOUT_MS);
+
       // Set up listener for chunks
-      const handleChunk = ({chunk, done}: {chunk: any, done: boolean}) => {
-        if (!chunk || !chunk.question || !chunk.segments) return;
-        setAwaitingFirstToken(false);
-        if (done) {
-          window.electron.ipcRenderer.removeListener('suggested-output-chunk', handleChunk);
+      const handleChunk = ({chunk, done, error}: {chunk: any, done: boolean, error?: string}) => {
+        if (error) {
+          setGenerationError(error);
+          setIsGenerating(false);
+          console.error('Generation error:', error);
+          cleanup();
+          return;
         }
 
+        if (!chunk || !chunk.question || !chunk.segments) return;
+        
+        // Clear first token timeout and awaitingFirstToken on first chunk
+        if (awaitingFirstToken) {
+          setAwaitingFirstToken(false);
+          clearTimeout(firstTokenTimeout);
+        }
+
+        if (done) {
+          setIsGenerating(false);
+          cleanup();
+          return;
+        }
 
         setSuggestedOutputs(_ => {
           const body: SuggestedOutputBody = {
@@ -255,25 +320,36 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
               }) || []
             })) || []
           };
-
           return [body];
         });
       };
 
+      // Cleanup function
+      const cleanup = () => {
+        window.electron.ipcRenderer.removeListener('suggested-output-chunk', handleChunk);
+        clearTimeout(firstTokenTimeout);
+        setAwaitingFirstToken(false);
+      };
+
       window.electron.ipcRenderer.on('suggested-output-chunk', handleChunk);
 
-      window.electron.ipcRenderer.invoke('generate-suggested-output', { 
+      // Make the generation request with abort signal
+      await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
         context, 
         query,
-        profileId: selectedProfile
+        profileId: selectedProfile,
+        signal: abortControllerRef.current.signal
       });
+
     } catch (error) {
       console.error('Error generating recipe:', error);
+      setGenerationError(error instanceof Error ? error.message : 'Unknown error');
+      setIsGenerating(false);
       new Notification('Error', {
         body: "Failed to generate recipe. Please try again."
       });
     }
-  }, [selectedEntities, selectedProfile]);
+  }, [selectedEntities, selectedProfile, awaitingFirstToken]);
 
   const handleEmailRecipeOutput = async () => {
     await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
@@ -338,7 +414,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     if (!numberElement) return;
     
     const numberRect = numberElement.getBoundingClientRect();
-    const pixelsPerUnit = 12;
+    const pixelsPerUnit = 5;
     const centerX = numberRect.left + (numberRect.width / 2);
     const deltaX = e.clientX - centerX;
     
@@ -399,6 +475,13 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     setSelectedProfileTypes(newProfile?.types || []);
   }, [profiles]);
 
+  // Add cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   return (
     <>
       <div
@@ -435,7 +518,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 let gradientStyle = '';
                 if (isBeingDragged && dragHaloProps) {
                   const { intensity, direction } = dragHaloProps;
-                  // const color = direction === 'left' ? '114, 137, 218' : '136, 158, 236'; // darker : lighter blue
                   
                   if (direction === 'right') {
                     gradientStyle = `linear-gradient(90deg, rgb(54, 62, 89) 0%, rgb(112, 127, 179) ${intensity * 300}%)`;
@@ -504,18 +586,20 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
         <NoteTimeline timelineData={timelineData} />
 
-        <div className="w-full h-full overflow-hidden relative">
-          <div className="flex items-center flex-col relative">
-            <div className="flex-grow relative h-[800px] w-[800px]">
+        {selectedEntities.size > 0 && (
+          <div className="w-full h-full overflow-hidden relative">
+            <div className="flex items-center flex-col relative">
+              <div className="flex-grow relative h-[800px] w-[800px]">
               <GraphView
                 ref={graphViewRef}
                 width={800}
-                height={800}
+                height={600}
                 selectedMentionDocCounts={selectedMentionDocCounts}
               />
             </div>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex justify-normal items-center space-y-2">
           {/* Add Profile selector */}
@@ -538,11 +622,16 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
 
           <button
-            disabled={!hasVaultInitialized || selectedEntities.size === 0 || awaitingFirstToken || generationsRemaining === 0}
-            className="bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md cursor-pointer hover:bg-brand/60 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ml-4"
+            disabled={!hasVaultInitialized || selectedEntities.size === 0 || isGenerating || generationsRemaining === 0}
+            className={`
+              bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md 
+              cursor-pointer hover:bg-brand/60 transition-colors font-medium 
+              disabled:opacity-50 disabled:cursor-not-allowed ml-4
+              ${isGenerating ? 'animate-pulse' : ''}
+            `}
             onClick={submitPrompt}
           >
-            {awaitingFirstToken ? 'Generating...' : 
+            {isGenerating ? 'Generating...' : 
               generationsRemaining !== null ? 
                 `Generate Recipe (${generationsRemaining} left ${isAuthenticated ? 'this week' : 'today'})` : 
                 'Generate Recipe'}
@@ -565,6 +654,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
               />
             </div>
           </div>
+        )}
+
+        {generationError && (
+          <p className="text-red-500 text-sm mt-2">{generationError}</p>
         )}
 
         {awaitingFirstToken && (

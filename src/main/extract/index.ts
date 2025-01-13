@@ -44,6 +44,10 @@ async function readFilesInBatch(files: string[]): Promise<Map<string, { frontmat
       const content = fileContents[i];
       try {
         const { data: frontmatter, content: fileContent } = matter.default(content);
+
+        // CHeck if its a list or string of csv's
+        frontmatter.tags = Array.isArray(frontmatter.tags) ? frontmatter.tags : frontmatter.tags.split(',').map(tag => tag.trim());
+
         const result = { frontmatter, contents: fileContent };
         cache.set(file, result);
         results.set(file, result);
@@ -72,6 +76,7 @@ export interface QueryPattern {
 export interface MatchResult {
   file: string;
   tags: string[];
+  links: string[];
   extractedContents: string[];
   lastModified: number;
   createdAt: Date;
@@ -176,15 +181,6 @@ async function applyPatternModifiers(
   return filteredFiles;
 }
 
-async function extractContentForFileMatch(
-  match: Match,
-  file: string  
-): Promise<string[]> {
-  const fileContents = await fs.readFile(file, 'utf-8');
-  const { data: frontmatter } = matter.default(fileContents);
-  return extractContentForMatch(fileContents, match, frontmatter);
-}
-
 function extractContentForMatch(
   contents: string,
   match: Match,
@@ -197,7 +193,7 @@ function extractContentForMatch(
     if (frontMatterTags.some((tag: string) => tag.toLowerCase() === match.value.toLowerCase())) {
       extractedContents.push(contents);
     } else {
-      extractedContents.push(...extractContentForTag(contents, match.value));
+      extractedContents.push(...getLassoContext(contents, match.value, 250));
     }
   } else {
     getLassoContext(contents, match.value, 250).forEach(context => {
@@ -241,7 +237,10 @@ export async function extractPatterns(
 
     // Augment the tags from frontmatter with the tags from the file contents
     const fileTags = contents.match(/#[\w-\/]+/g) || [];
-    const augmentedTags = [...new Set([...(frontmatter.tags?.map(tag => tag.includes("#") ? tag : `#${tag}`) || []), ...fileTags])];
+    const frontmatterTags = frontmatter.tags ? frontmatter.tags.map(tag => tag.includes("#") ? tag : `#${tag}`) : [];
+    const augmentedTags = [...new Set([...frontmatterTags, ...fileTags])];
+
+    const fileLinks = [...new Set(contents.match(/\[\[([^\]]+)\]\]/g) || [])];
 
     // Skip empty files or files with only whitespace
     if (!contents || contents.trim().length === 0) {
@@ -275,6 +274,7 @@ export async function extractPatterns(
     return {
       file,
       tags: augmentedTags,
+      links: fileLinks,
       extractedContents: uniqueContexts,
       lastModified: fileMetadata.lastModified,
       createdAt: await getFileCreationDate(frontmatter, file)
@@ -464,21 +464,4 @@ function getLassoContext(content: string, match: string, wordCount: number): str
     const end = Math.min(words.length, matchIndex + wordCount + 1);
     return words.slice(start, end).join(' ');
   });
-}
-
-function extractContentForTag(content: string, tag: string): string[] {
-  const lines = content.split('\n');
-  const results: string[] = [];
-  const tagRegex = new RegExp(`#${tag}\\b`, 'i'); // 'i' flag makes it case insensitive
-
-  for (let i = 0; i < lines.length; i++) {
-    if (tagRegex.test(lines[i])) {
-      // Get surrounding context (e.g., 2 lines before and after)
-      const start = Math.max(0, i - 2);
-      const end = Math.min(lines.length, i + 3);
-      results.push(lines.slice(start, end).join('\n'));
-    }
-  }
-
-  return results;
 }

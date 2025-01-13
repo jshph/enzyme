@@ -144,7 +144,9 @@ export function setupRecipeRoutes() {
     }
   });
 
-  ipcMain.handle('generate-suggested-output', async (event, { context, query, profileId }) => {
+  ipcMain.handle('generate-suggested-output', async (event, { context, query, profileId, signal }) => {
+    let abortController: AbortController | null = null;
+    
     try {
       const { token } = await getCurrentSession();
       
@@ -184,46 +186,115 @@ export function setupRecipeRoutes() {
         }
       }
 
-      // Make the API call with streaming
+      // Create AbortController for the fetch
+      abortController = new AbortController();
+
+      // Add signal listener
+      if (signal) {
+        signal.onabort = () => {
+          logger.debug('Generation aborted by client');
+          abortController?.abort();
+        };
+      }
+
       const response = await fetch(`${SERVER_URL}/digest/generate-suggested`, {
         method: 'POST',
         headers: {
           ...(token && { 'Authorization': `Bearer ${token}` }),
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ context, query, profileId })
+        body: JSON.stringify({ context, query, profileId }),
+        signal: abortController.signal
       });
 
-      // Set up streaming
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No response body');
 
-      // Stream the chunks back to renderer
+      // Process the stream line by line
+      const textDecoder = new TextDecoder();
+      let buffer = '';
+
       while (true) {
+        if (signal?.aborted || abortController.signal.aborted) {
+          logger.debug('Aborting generation stream');
+          reader.cancel();
+          event.sender.send('suggested-output-chunk', { 
+            error: 'Generation cancelled', 
+            done: true 
+          });
+          break;
+        }
+
         const { done, value } = await reader.read();
-        if (done) break;
         
-        // Convert the chunk to text and parse as JSON
-        try {
-          const chunk = new TextDecoder().decode(value);
-          const partialResult = JSON.parse(chunk);
-          // Send the partial result to renderer
-          event.sender.send('suggested-output-chunk', { chunk: partialResult, done: false });
-        } catch (error) {
-          continue;
+        if (done) {
+          // Process any remaining buffer
+          if (buffer.trim()) {
+            try {
+              const chunk = JSON.parse(buffer);
+              event.sender.send('suggested-output-chunk', { 
+                chunk, 
+                done: false 
+              });
+            } catch (e) {
+              logger.error('Error parsing final chunk:', e);
+            }
+          }
+          event.sender.send('suggested-output-chunk', { chunk: null, done: true });
+          break;
+        }
+
+        // Append new data to buffer and process complete lines
+        buffer += textDecoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const chunk = JSON.parse(line);
+              event.sender.send('suggested-output-chunk', { 
+                chunk, 
+                done: false 
+              });
+            } catch (error) {
+              logger.error('Error parsing chunk:', error);
+              continue;
+            }
+          }
         }
       }
 
-      event.sender.send('suggested-output-chunk', { chunk: null, done: true });
-
       return { success: true };
     } catch (error) {
-      logger.error('Failed to generate suggested output:', error);
+      logger.error('Generation error:', error);
+      
+      if (error.name === 'AbortError') {
+        event.sender.send('suggested-output-chunk', { 
+          error: 'Generation cancelled', 
+          done: true 
+        });
+        return { 
+          success: false, 
+          error: 'Generation cancelled'
+        };
+      }
+
+      event.sender.send('suggested-output-chunk', { 
+        error: error instanceof Error ? error.message : 'Unknown error', 
+        done: true 
+      });
+
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        remaining: 0
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
+    } finally {
+      abortController = null;
     }
   });
 

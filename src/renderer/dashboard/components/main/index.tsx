@@ -8,12 +8,10 @@ import { useAuth } from '@renderer/dashboard/contexts/AuthContext'
 
 interface MainProps {
   currentView: string;
-  init: () => Promise<void>;
   setCurrentView: (view: string) => void;
-  isVaultInitialized: boolean;
 }
 
-const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView }) => {
+const Main: React.FC<MainProps> = ({ currentView, setCurrentView }) => {
 
   // const hiddenFeatures = hiddenFeaturesEnabled ? (
   //   <>
@@ -39,7 +37,7 @@ const Main: React.FC<MainProps> = ({ currentView, init, setCurrentView }) => {
         
         {/* {hiddenFeatures} */}
         <div style={{ display: currentView === 'login' ? 'block' : 'none' }}>
-          <Login init={init} setCurrentView={setCurrentView}/>
+          <Login setCurrentView={setCurrentView}/>
         </div>
       </div>
     </div>

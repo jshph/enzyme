@@ -82,6 +82,10 @@ export const SuggestedOutput = React.forwardRef<
       try {
         const newSections: OutputSection[] = [];
 
+        if (!body) {
+          return;
+        }
+
         // Recipe Question - Persistent
         newSections.push({
           type: 'question',

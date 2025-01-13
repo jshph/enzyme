@@ -752,7 +752,7 @@ export const GraphView = forwardRef<GraphViewRef, GraphViewProps>(
         }
       );
 
-      simulationRef.current.alpha(0.1).restart();
+      simulationRef.current.alpha(0.5).restart();
 
     }, [graphState, forceParams, handleMouseOver, handleMouseOut]);
 

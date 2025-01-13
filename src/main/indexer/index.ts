@@ -10,7 +10,7 @@ export interface FileMetadata {
   path: string;
   createdAt: Date;
   tags: string[];
-  markdownLinks: string[];
+  links: string[];
   lastModified: number;
 }
 
@@ -319,22 +319,24 @@ export class FileIndexer {
     return this.linkToFileMap.get(cleanLink) || null;
   }
 
-  private async getFileData(filePath: string): Promise<{content: string, stats: any, frontmatter: any, tags: string[]}> {
+  private async getFileData(filePath: string): Promise<{content: string, stats: any, frontmatter: any, tags: string[], links: string[]}> {
     return fs.readFile(filePath, 'utf-8').then(async content => {
       const stats = await fs.stat(filePath);
       let frontmatter: any = {};
       let tags: string[] = [];
+      let links: string[] = [];
 
       try {
         const { data: frontmatter } = matter.default(content);
         tags = this.extractTags(frontmatter, content);
+        links = this.extractMarkdownLinks(content);
       } catch (error) {
         // console.error(`Error parsing frontmatter for file ${filePath}:`, error);
       }
 
       frontmatter.creationDate = await getFileCreationDate(frontmatter, filePath);
 
-      return { content, stats, frontmatter, tags };
+      return { content, stats, frontmatter, tags, links };
     });
   }
 
@@ -367,7 +369,7 @@ export class FileIndexer {
   } 
 
   private async indexFileByPath(filePath: string): Promise<void> {
-    const { content, stats, frontmatter, tags } = await this.getFileData(filePath);
+    const { content, stats, frontmatter, tags, links } = await this.getFileData(filePath);
 
     if (!this.isIncluded(filePath, tags)) {
       return;
@@ -377,10 +379,10 @@ export class FileIndexer {
       return;
     }
 
-    await this.indexFile(content, stats, frontmatter, tags, filePath);
+    await this.indexFile(content, stats, frontmatter, tags, links, filePath);
   }
 
-  private async indexFile(content: string, stats: any, frontmatter: any, tags: string[], filePath: string): Promise<void> {
+  private async indexFile(content: string, stats: any, frontmatter: any, tags: string[], links: string[], filePath: string): Promise<void> {
     try {
       // Create variations of the file path for links
       const basePath = filePath.replace(/\.md$/, '');
@@ -404,8 +406,8 @@ export class FileIndexer {
       const metadata: FileMetadata = {
         path: filePath,
         createdAt: frontmatter.creationDate,
-        tags: tags,
-        markdownLinks: this.extractMarkdownLinks(content),
+        tags: tags, 
+        links: links,
         lastModified: stats.mtimeMs
       };
 
@@ -466,7 +468,7 @@ export class FileIndexer {
   }
 
   private updateLinkIndex(metadata: FileMetadata): void {
-    metadata.markdownLinks.forEach(link => {
+    metadata.links.forEach(link => {
       const path = this.getFileFromLink(link);
       if (!path) return;
       if (this.excludedPatterns.some(regex => this.matchPattern(path, regex))) {
@@ -852,7 +854,7 @@ export class FileIndexer {
     entities.forEach(([name, { type, count }]) => {
       const index = type === 'tag' ? this.tagIndex : this.linkIndex;
       
-      // Clean the name - remove # for tags and [[ ]] for links
+      // // Clean the name - remove # for tags and [[ ]] for links
       const cleanName = type === 'tag' ? 
         name.replace(/^#/, '') : 
         name.replace(/^\[\[|\]\]$/g, '');

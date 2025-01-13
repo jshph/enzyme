@@ -3,7 +3,6 @@ import { useAuth } from '../../contexts/AuthContext';
 
 type LoginProps = {
   setCurrentView: (view: string) => void,
-  init: () => Promise<void>,
 }
 
 const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
@@ -15,8 +14,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
     error, 
     showOtpForm,
     handleLogin,
-    handleOtpVerification,
-    isAuthenticated
+    handleOtpVerification
   } = useAuth();
 
   const onSubmitEmail = async (e: React.FormEvent) => {
@@ -28,9 +26,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
     e.preventDefault();
     const success = await handleOtpVerification(email, otpCode);
     if (success) {
-      console.log('isAuthenticated', isAuthenticated)
       setCurrentView('settings');
-      await init();
     }
   };
 
@@ -39,10 +35,10 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
       <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
-            <h2 className="mt-6 text-center text-3xl font-bold text-primary/90">
-              Welcome to Enzyme
+            <h2 className="mt-6 text-center text-3xl font-bold text-primary/90 mb-4">
+              Enzyme is your playground for digesting what inspires you
             </h2>
-            <p className="mt-2 text-center text-sm text-secondary/70">
+            <p className="text-center text-xl text-secondary/70">
               Sign in with your email to get started
             </p>
           </div>
