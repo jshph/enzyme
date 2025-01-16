@@ -78,17 +78,17 @@ export function setupVaultIPCRoutes() {
   
   ipcMain.handle('trending-data-update', (_) => {
     const indexer = getFileIndexer();
-    const trendingItems = indexer.getTrendingItems();
+    const { items: trendingItems, timeline } = indexer.getTrendingData();
     
-    // Get timeline data for each trending item
+    // Format the data for the frontend
     const enrichedData: TrendingDataWithTimeline = {
       tags: trendingItems.tags.map(tag => ({
         ...tag,
-        timeline: indexer.getEntityTimeline([[tag.name, { type: 'tag', count: tag.count }]])
+        timeline: timeline.tags.get(tag.name) || []
       })),
       links: trendingItems.links.map(link => ({
         ...link,
-        timeline: indexer.getEntityTimeline([[link.name, { type: 'link', count: link.count }]])
+        timeline: timeline.links.get(link.name) || []
       }))
     };
 

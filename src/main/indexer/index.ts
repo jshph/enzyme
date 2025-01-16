@@ -53,6 +53,15 @@ interface TimelineItem {
   extractedContents?: string[];
 }
 
+interface TrendingDataCache {
+  items: TrendingItems;
+  timeline: {
+    tags: Map<string, TimelineItem[]>;
+    links: Map<string, TimelineItem[]>;
+  };
+  lastUpdated: number;
+}
+
 export class FileIndexer {
   private tagIndex: Map<string, IndexEntry> = new Map();
   private tagSet: Set<string> = new Set();
@@ -83,6 +92,7 @@ export class FileIndexer {
   private readonly CACHE_TTL = 5000; // Cache results for 5 seconds
   private readonly MIN_SEARCH_LENGTH = 2; // Only search for terms 2+ chars
   private serverContext: ServerContext = new ServerContext();
+  private trendingCache: TrendingDataCache | null = null;
 
 
   constructor() {
@@ -105,7 +115,7 @@ export class FileIndexer {
     });
   }
 
-  async initialize(vaultPath: string, includedPatterns: string[], excludedPatterns: string[], excludedTags: string[], doCache: boolean = false, spacesPath: string | null = null, port: number = 3779, defaultPatternLimit: number = 10): Promise<void> {
+  async initialize(vaultPath: string, includedPatterns: string[], excludedPatterns: string[], excludedTags: string[], doCache: boolean = false, spacesPath: string | null = null, port: number = 3779, defaultPatternLimit: number = 10): Promise<boolean> {
     // Clear any existing timeout
     if (this.initializeTimeout) {
       clearTimeout(this.initializeTimeout);
@@ -114,7 +124,7 @@ export class FileIndexer {
 
     if (!vaultPath || vaultPath.length === 0) {
       this.notify('Indexing Error', 'No vault path provided');
-      return;
+      return false;
     }
 
     // Verify the path exists and is accessible
@@ -122,6 +132,7 @@ export class FileIndexer {
       await fs.access(vaultPath, fs.constants.R_OK);
     } catch (error) {
       this.notify('Indexing Error', `Cannot access vault path: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
     }
 
     // Quick check for at least one markdown file
@@ -148,6 +159,14 @@ export class FileIndexer {
     this.excludedPatterns = excludedPatterns.map(pattern => pattern.toLowerCase());
     this.includedPatterns = includedPatterns.map(pattern => pattern.toLowerCase());
 
+    // Add .obsidian to excluded patterns if not already present
+    const updatedExcludedPatterns = [
+      ...excludedPatterns,
+      '.obsidian/**/*'  // Exclude all files in .obsidian folder
+    ].map(pattern => pattern.toLowerCase());
+    
+    this.excludedPatterns = updatedExcludedPatterns;
+
     // Start indexing with a timeout
     this.initializeTimeout = setTimeout(() => {
       this.logger.error('Indexing timed out');
@@ -156,16 +175,23 @@ export class FileIndexer {
 
     try {
       await this.indexDirectory(vaultPath);
+
       if (this.initializeTimeout) {
         clearTimeout(this.initializeTimeout);
         this.initializeTimeout = null;
       }
       
+      // Compute trending data cache after indexing is complete
+      await this.computeTrendingDataCache();
+      
       await this.serverContext.startServer(this, port);
+
+      return true; // Return success
 
     } catch (error) {
       this.clearIndex();
       this.notify('Indexing Error', error instanceof Error ? error.message : 'Unknown error');
+      return false; // Return failure
     }
   }
 
@@ -260,14 +286,14 @@ export class FileIndexer {
       await Promise.all(files.map(async (file) => {
         const relativePath = path.relative(this.vaultPath!, file);
 
-        const { content, stats, frontmatter, tags } = await this.getFileData(file);
+        const { content, stats, frontmatter, tags, links } = await this.getFileData(file);
         
         this.linkToFileMap.set(path.basename(file), file);
         
         const isIncluded = this.isIncluded(relativePath, tags);
 
         if (isIncluded) {
-          await this.indexFile(content, stats, frontmatter, tags, file);
+          await this.indexFile(content, stats, frontmatter, tags, links, file);
         }
         this.processedFiles++;
         this.logger.info(`Processed ${this.processedFiles} of ${this.totalFiles} files`);
@@ -288,7 +314,11 @@ export class FileIndexer {
       if (this.vaultPath) {
         this.logger.info('Reinitializing the file watcher');
         this.watcher = chokidar.watch(this.includedPatterns.map(pattern => path.join(this.vaultPath!, pattern)), {
-          ignored: this.excludedPatterns,
+          ignored: [
+            ...this.excludedPatterns,
+            '**/\\.obsidian*/**',  // Explicitly ignore .obsidian folder
+            '**/\\.obsidian*'      // Ignore the folder itself
+          ],
           persistent: true
         });
 
@@ -350,13 +380,23 @@ export class FileIndexer {
 
   private async getAllFiles(dir: string): Promise<string[]> {
     const entries = await fs.readdir(dir, { withFileTypes: true });
-    const files = await Promise.all(entries.map((entry) => {
+    const files = await Promise.all(entries.map(async (entry) => {
+      // Skip .obsidian folder entirely
+      if (entry.name === '.obsidian') {
+        return [];
+      }
+      
       const res = path.join(dir, entry.name);
       return entry.isDirectory() ? this.getAllFiles(res) : res;
     }));
     return files.flat().filter(file => file.toLowerCase().endsWith('.md'));
   }
   private isIncluded(path: string, tags: string[]): boolean {
+    // Add check for .obsidian folder
+    if (path.includes('.obsidian')) {
+      return false;
+    }
+
     const isExcludedByTag = tags.some((tag: string) => {
       tag = tag.toLowerCase();
       return this.excludedTags.includes(tag) || 
@@ -520,39 +560,37 @@ export class FileIndexer {
   }
 
   private async handleFileChange(filePath: string): Promise<void> {
-    // Add the file to pending changes
     this.pendingChanges.add(filePath);
 
-    // Clear existing timeout if there is one
     if (this.batchTimeout) {
-        clearTimeout(this.batchTimeout);
+      clearTimeout(this.batchTimeout);
     }
 
-    // Set new timeout to process batch
     this.batchTimeout = setTimeout(async () => {
-        const filesToProcess = Array.from(this.pendingChanges);
-        this.pendingChanges.clear();
-        
-        if (filesToProcess.length === 0) return;
+      const filesToProcess = Array.from(this.pendingChanges);
+      this.pendingChanges.clear();
+      
+      if (filesToProcess.length === 0) return;
 
-        try {
-            this.isIndexing = true;
-            this.batchTotalFiles = filesToProcess.length;
-            this.batchProcessedFiles = 0;
+      try {
+        this.isIndexing = true;
+        this.batchTotalFiles = filesToProcess.length;
+        this.batchProcessedFiles = 0;
 
-            // Process all files in batch
-            await Promise.all(filesToProcess.map(async (file) => {
-                await this.indexFileByPath(file);
-                this.batchProcessedFiles++;
-            }));
+        // Process all files in batch
+        await Promise.all(filesToProcess.map(async (file) => {
+          await this.indexFileByPath(file);
+          this.batchProcessedFiles++;
+        }));
 
-            // Update total processed files after batch is complete
-            this.processedFiles += this.batchProcessedFiles;
-        } finally {
-            this.isIndexing = false;
-            this.emitIndexingStatus();
-            this.processQueue();
-        }
+        this.processedFiles += this.batchProcessedFiles;
+
+        await this.computeTrendingDataCache();
+      } finally {
+        this.isIndexing = false;
+        this.emitIndexingStatus();
+        this.processQueue();
+      }
     }, this.BATCH_DELAY);
   }
 
@@ -583,7 +621,7 @@ export class FileIndexer {
     this.logger.info(`Event: ${event} (${JSON.stringify(data)})`);
   }
 
-  public getTrendingItems(): TrendingItems {
+  private computeTrendingItems(): TrendingItems {
     const now = new Date();
     const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     
@@ -879,6 +917,47 @@ export class FileIndexer {
     });
     
     return timeline.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
+
+  private async computeTrendingDataCache(): Promise<void> {
+    this.isIndexing = true;
+    const trendingItems = this.computeTrendingItems();
+    const timeline = {
+      tags: new Map<string, TimelineItem[]>(),
+      links: new Map<string, TimelineItem[]>()
+    };
+
+    // Pre-compute timeline for trending tags
+    for (const tag of trendingItems.tags) {
+      timeline.tags.set(tag.name, 
+        this.getEntityTimeline([[tag.name, { type: 'tag', count: tag.count }]])
+      );
+    }
+
+    // Pre-compute timeline for trending links
+    for (const link of trendingItems.links) {
+      timeline.links.set(link.name,
+        this.getEntityTimeline([[link.name, { type: 'link', count: link.count }]])
+      );
+    }
+
+    this.trendingCache = {
+      items: trendingItems,
+      timeline,
+      lastUpdated: Date.now()
+    };
+
+    this.isIndexing = false;
+  }
+
+  public getTrendingData(): { items: TrendingItems; timeline: { tags: Map<string, TimelineItem[]>; links: Map<string, TimelineItem[]>; } } {
+    if (!this.trendingCache) {
+      throw new Error('Trending data cache not initialized');
+    }
+    return {
+      items: this.trendingCache.items,
+      timeline: this.trendingCache.timeline
+    };
   }
 }
 
