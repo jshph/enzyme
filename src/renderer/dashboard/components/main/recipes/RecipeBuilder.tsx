@@ -28,6 +28,13 @@ type Ingredient = {
 const GENERATION_TIMEOUT_MS = 30000; // 30 seconds
 const FIRST_TOKEN_TIMEOUT_MS = 30000; // 30 seconds for first token
 
+type GenerationState = 
+  | { status: 'idle' }
+  | { status: 'awaiting_first_token' }
+  | { status: 'generating' }
+  | { status: 'error'; error: string }
+  | { status: 'completed' };
+
 const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
@@ -47,7 +54,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   const [trendingData, setTrendingData] = useState<any>(null);
   const [selectedEntities, setSelectedEntities] = useState<SelectedEntitiesMap>(new Map());
-  const [awaitingFirstToken, setAwaitingFirstToken] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedEntity, setDraggedEntity] = useState<{type: 'tag' | 'link', name: string, element: HTMLElement} | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineItem[]>([]);
@@ -234,7 +240,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const [generationsRemaining, setGenerationsRemaining] = useState(0);
 
   // Check generation limits on mount and auth change
-  useEffect(() => {
+  const checkGenerationLimits = useCallback(() => {
     window.electron.ipcRenderer.invoke('check-generation-limits')
       .then(({ remaining }) => {
         setGenerationsRemaining(Math.max(0, remaining));
@@ -245,18 +251,67 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       });
   }, [isAuthenticated]);
 
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
+  useEffect(() => {
+    checkGenerationLimits();
+  }, [checkGenerationLimits]);
+
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const [generationState, setGenerationState] = useState<GenerationState>({ status: 'idle' });
+
+  // Add new state for context
+  const [generationContext, setGenerationContext] = useState<any[]>([]);
+
+  // Update handleGenerationChunk to use generationContext from state
+  const handleGenerationChunk = useCallback(({chunk, done, error}: {chunk: any, done: boolean, error?: string}) => {
+    if (error) {
+      setGenerationState({ status: 'error', error });
+      console.error('Generation error:', error);
+      return;
+    }
+
+    if (!chunk || !chunk.question || !chunk.segments || done) {
+      setGenerationState({ status: 'completed' });
+      return;
+    }
+
+    // Clear first token timeout and update state on first chunk
+    if (generationState.status === 'awaiting_first_token') {
+      setGenerationState({ status: 'generating' });
+    }
+
+    setSuggestedOutputs(_ => {
+      const body: SuggestedOutputBody = {
+        question: chunk.question,
+        segments: chunk.segments?.map((segment, index) => ({
+          theme: segment.theme,
+          synthesis: {
+            id: index,
+            prompt: segment.prompt,
+            type: segment.type,
+            analysis: segment.analysis
+          },
+          docs: segment.docs?.map(doc => {
+            const contextItem = generationContext.find(result => result.file === doc);
+            const adjoinedContents = contextItem ? contextItem.extractedContents.join('\n') : '';
+            return {
+              file: doc,
+              content: adjoinedContents
+            }
+          }) || []
+        })) || []
+      };
+      return [body];
+    });
+  }, [generationState, generationContext]); // Update dependencies to use generationContext
 
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
 
     // Reset states
-    setAwaitingFirstToken(true);
-    setIsGenerating(true);
-    setGenerationError(null);
+    setGenerationState({ status: 'awaiting_first_token' });
     setSuggestedOutputs(undefined);
+    setGenerationContext([]); // Reset context
 
     // Create new AbortController
     abortControllerRef.current = new AbortController();
@@ -264,74 +319,29 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     try {
       const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
+      setGenerationContext(context); // Store context in state
 
       // Only set up first token timeout
       const firstTokenTimeout = setTimeout(() => {
-        if (awaitingFirstToken) {
+        if (generationState.status === 'awaiting_first_token') {
           abortControllerRef.current?.abort('First token timeout');
-          setGenerationError('Generation failed to start after 30 seconds');
-          setIsGenerating(false);
+          setGenerationState({ 
+            status: 'error', 
+            error: 'Generation failed to start after 30 seconds' 
+          });
+          cleanup();
           console.warn('Recipe generation failed to produce first token after 30 seconds');
         }
       }, FIRST_TOKEN_TIMEOUT_MS);
 
-      // Set up listener for chunks
-      const handleChunk = ({chunk, done, error}: {chunk: any, done: boolean, error?: string}) => {
-        if (error) {
-          setGenerationError(error);
-          setIsGenerating(false);
-          console.error('Generation error:', error);
-          cleanup();
-          return;
-        }
-
-        if (!chunk || !chunk.question || !chunk.segments) return;
-        
-        // Clear first token timeout and awaitingFirstToken on first chunk
-        if (awaitingFirstToken) {
-          setAwaitingFirstToken(false);
-          clearTimeout(firstTokenTimeout);
-        }
-
-        if (done) {
-          setIsGenerating(false);
-          cleanup();
-          return;
-        }
-
-        setSuggestedOutputs(_ => {
-          const body: SuggestedOutputBody = {
-            question: chunk.question,
-            segments: chunk.segments?.map((segment, index) => ({
-              theme: segment.theme,
-              synthesis: {
-                id: index,
-                prompt: segment.prompt,
-                type: segment.type,
-                analysis: segment.analysis
-              },
-              docs: segment.docs?.map(doc => {
-                const contextItem = context.find(result => result.file === doc);
-                const adjoinedContents = contextItem ? contextItem.extractedContents.join('\n') : '';
-                return {
-                  file: doc,
-                  content: adjoinedContents
-                }
-              }) || []
-            })) || []
-          };
-          return [body];
-        });
-      };
-
       // Cleanup function
       const cleanup = () => {
-        window.electron.ipcRenderer.removeListener('suggested-output-chunk', handleChunk);
+        window.electron.ipcRenderer.removeAllListeners('suggested-output-chunk');
         clearTimeout(firstTokenTimeout);
-        setAwaitingFirstToken(false);
+        setGenerationState({ status: 'idle' });
       };
 
-      window.electron.ipcRenderer.on('suggested-output-chunk', handleChunk);
+      window.electron.ipcRenderer.on('suggested-output-chunk', handleGenerationChunk);
 
       // Make the generation request with abort signal
       await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
@@ -343,13 +353,15 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
     } catch (error) {
       console.error('Error generating recipe:', error);
-      setGenerationError(error instanceof Error ? error.message : 'Unknown error');
-      setIsGenerating(false);
+      setGenerationState({ 
+        status: 'error', 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
       new Notification('Error', {
         body: "Failed to generate recipe. Please try again."
       });
     }
-  }, [selectedEntities, selectedProfile, awaitingFirstToken]);
+  }, [selectedEntities, selectedProfile, generationState, handleGenerationChunk, makeQuery]);
 
   const handleEmailRecipeOutput = async () => {
     await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
@@ -622,16 +634,20 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
 
           <button
-            disabled={!hasVaultInitialized || selectedEntities.size === 0 || isGenerating || generationsRemaining === 0}
+            disabled={!hasVaultInitialized || 
+              selectedEntities.size === 0 || 
+              generationState.status === 'generating' || 
+              generationState.status === 'awaiting_first_token' || 
+              generationsRemaining === 0}
             className={`
               bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md 
               cursor-pointer hover:bg-brand/60 transition-colors font-medium 
               disabled:opacity-50 disabled:cursor-not-allowed ml-4
-              ${isGenerating ? 'animate-pulse' : ''}
+              ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
             `}
             onClick={submitPrompt}
           >
-            {isGenerating ? 'Generating...' : 
+            {generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'Generating...' : 
               generationsRemaining !== null ? 
                 `Generate Recipe (${generationsRemaining} left ${isAuthenticated ? 'this week' : 'today'})` : 
                 'Generate Recipe'}
@@ -641,7 +657,9 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
 
         {/* Output section */}
-        {(suggestedOutputs?.[0]?.segments?.length || 0 > 0 || awaitingFirstToken) && (
+        {((suggestedOutputs?.[0]?.segments?.length || 0 > 0 || 
+           generationState.status === 'generating') && 
+           generationState.status !== 'awaiting_first_token') && (
           <div className="mt-8 space-y-4">
             <div className="gap-4">
               <SuggestedOutput
@@ -656,11 +674,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
         )}
 
-        {generationError && (
-          <p className="text-red-500 text-sm mt-2">{generationError}</p>
+        {generationState.status === 'error' && (
+          <p className="text-red-500 text-sm mt-2">{generationState.error}</p>
         )}
 
-        {awaitingFirstToken && (
+        {generationState.status === 'awaiting_first_token' && (
           <div className="space-y-4 animate-pulse">
             <div className="h-8 bg-brand/20 rounded-lg w-3/4"></div>
             <div className="space-y-3">

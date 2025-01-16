@@ -194,6 +194,10 @@ export function setupRecipeRoutes() {
         signal.onabort = () => {
           logger.debug('Generation aborted by client');
           abortController?.abort();
+          event.sender.send('suggested-output-chunk', { 
+            error: 'Generation aborted by client', 
+            done: true 
+          });
         };
       }
 
@@ -284,14 +288,16 @@ export function setupRecipeRoutes() {
         };
       }
 
+      // Type assertion for error handling
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       event.sender.send('suggested-output-chunk', { 
-        error: error instanceof Error ? error.message : 'Unknown error', 
+        error: errorMessage, 
         done: true 
       });
 
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       };
     } finally {
       abortController = null;
