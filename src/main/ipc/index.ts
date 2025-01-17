@@ -13,7 +13,8 @@ import { setupUserIPCRoutes } from "./user";
 
 interface Auth {
   email: string;
-  token: string;
+  access_token: string;
+  refresh_token: string;
 }
 
 export interface LocalSettings {

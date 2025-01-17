@@ -8,7 +8,6 @@ import { SpaceInfo } from '../main/ipc/space.js';
 const api = {
   // Auth
   login: (email: string, password: string) => ipcRenderer.invoke('login', email, password),
-  getAuth: () => ipcRenderer.invoke('get-auth'),
   verifyOtp: (email: string, token: string) => ipcRenderer.invoke('verify-otp', email, token),
   authSendVerificationCode: (email: string) => ipcRenderer.invoke('auth:send-verification-code', email),
   authVerifySession: () => ipcRenderer.invoke('auth:verify-session'),

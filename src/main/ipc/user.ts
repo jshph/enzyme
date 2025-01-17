@@ -22,9 +22,9 @@ const DEFAULT_SETTINGS: Settings = {
 const SERVER_URL = getServerUrl();
 
 // Add a helper function to get the current session token
-export async function getCurrentSession() {
+export async function getCurrentSession(): Promise<{ access_token: string; email: string; refresh_token: string }> {
   const auth = store.get('auth');
-  return { token: auth?.token, email: auth?.email };
+  return { access_token: auth?.access_token, email: auth?.email, refresh_token: auth?.refresh_token };
 }
   
 export function validateSettings(settings: any) {

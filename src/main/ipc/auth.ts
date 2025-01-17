@@ -10,29 +10,26 @@ export function setupAuthIPCRoutes() {
     return token;
   });
 
-  ipcMain.handle('get-auth', async () => {
-    return store.get('auth');
-  });
-
   const SERVER_URL = getServerUrl();
 
 
-  ipcMain.handle('auth:verify-otp', async (_, email: string, token: string) => {
+  ipcMain.handle('auth:verify-otp', async (_, email: string, otpCode: string) => {
     try {
       const response = await fetch(`${SERVER_URL}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, token })
+        body: JSON.stringify({ email, otpCode })
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       
-      // Store the session if verification was successful
+      // Store both access token and refresh token if verification was successful
       if (data.success && data.session?.access_token) {
         store.set('auth', {
           email,
-          token: data.session.access_token
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token
         });
       }
       
@@ -67,13 +64,18 @@ export function setupAuthIPCRoutes() {
 
   ipcMain.handle('auth:verify-session', async (_) => {
     try {
-      const { token } = await getCurrentSession();
+      const session = await getCurrentSession();
+      const { access_token, refresh_token } = session;
+
       const response = await fetch(`${SERVER_URL}/auth/verify-session`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        }
+          ...(access_token && { 'Authorization': `Bearer ${access_token}` })
+        },
+        body: JSON.stringify({
+          refresh_token: refresh_token
+        })
       });
 
       const data = await response.json();
@@ -87,11 +89,12 @@ export function setupAuthIPCRoutes() {
         return { isAuthenticated: false };
       }
       
-      // Update stored auth if we get a new token
+      // Update stored auth with new tokens if provided
       if (data.access_token) {
         store.set('auth', { 
           email: data.user.email, 
-          token: data.access_token 
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || refresh_token // Keep old refresh token if new one not provided
         });
       }
       
