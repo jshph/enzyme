@@ -131,9 +131,13 @@ function createWindow(): void {
     return;
   }
 
-  // Add more diagnostic information
   app.whenReady().then(async () => {
     await handleDock('show');
+
+    // Determine preload path based on whether app is packaged
+    const preloadPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'out', 'preload', 'index.mjs')
+      : path.join(app.getAppPath(), 'out', 'preload', 'index.mjs');
 
     mainWindow = new BrowserWindow({
       width: 1400,
@@ -144,7 +148,7 @@ function createWindow(): void {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: `/Users/joshuapham/Hacks/enzyme/out/preload/index.mjs`
+        preload: preloadPath
       },
       titleBarStyle: 'hiddenInset',
       trafficLightPosition: { x: 15, y: 15 },

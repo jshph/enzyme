@@ -264,7 +264,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   // Update handleGenerationChunk to use generationContext from state
   const handleGenerationChunk = useCallback(({chunk, done, error}: {chunk: any, done: boolean, error?: string}) => {
-    if (error) {
+    if (error && generationState.status === 'generating') {
       setGenerationState({ status: 'error', error });
       console.error('Generation error:', error);
       return;
