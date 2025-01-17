@@ -33,10 +33,10 @@ export function setupRecipeRoutes() {
 
   ipcMain.handle('get-pending-recipes', async () => {
     try {
-      const { token } = await getCurrentSession();
+      const { access_token } = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/recipe_schedules/pending`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${access_token}`
         }
       });
 
@@ -50,11 +50,11 @@ export function setupRecipeRoutes() {
 
   ipcMain.handle('delete-recipe', async (event, id: string) => {
     try {
-      const { token } = await getCurrentSession();
+      const { access_token } = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/recipe_schedules/delete/${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${access_token}`
         }
       });
       return response.json();
@@ -66,17 +66,17 @@ export function setupRecipeRoutes() {
 
   ipcMain.handle('create-recipe', async (event, { frequency, startDate, entities, recipe, profile }) => {
     try {
-      const { token } = await getCurrentSession();
+      const { access_token } = await getCurrentSession();
       
       // Only allow creation if authenticated
-      if (!token) {
+      if (!access_token) {
         return { success: false, error: 'Authentication required to save recipes' };
       }
 
       const response = await fetch(`${SERVER_URL}/recipe_schedules/create`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -97,12 +97,12 @@ export function setupRecipeRoutes() {
 
   ipcMain.handle('check-generation-limits', async () => {
     try {
-      const { token, email } = await getCurrentSession();
+      const { access_token, email } = await getCurrentSession();
       
       // If authenticated, check weekly server-side limit
-      if (token) {
+      if (access_token) {
         const response = await fetch(`${SERVER_URL}/digest/usage?email=${encodeURIComponent(email)}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${access_token}` }
         });
         const data = await response.json();
         return {
@@ -148,10 +148,10 @@ export function setupRecipeRoutes() {
     let abortController: AbortController | null = null;
     
     try {
-      const { token } = await getCurrentSession();
+      const { access_token } = await getCurrentSession();
       
       // Handle unauthenticated state
-      if (!token) {
+      if (!access_token) {
         const stored = generationStore.get(UNAUTHENTICATED_STORE_KEY) as {
           count: number;
           lastResetDate: string;
@@ -204,7 +204,7 @@ export function setupRecipeRoutes() {
       const response = await fetch(`${SERVER_URL}/digest/generate-suggested`, {
         method: 'POST',
         headers: {
-          ...(token && { 'Authorization': `Bearer ${token}` }),
+          'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ context, query, profileId }),
@@ -306,11 +306,11 @@ export function setupRecipeRoutes() {
 
   ipcMain.handle('execute-recipe', async (event, recipeId: string) => {
     try {
-      const { token } = await getCurrentSession();
+      const { access_token } = await getCurrentSession();
       // Get the recipe schedule
       const scheduleResponse = await fetch(`${SERVER_URL}/recipe_schedules/get/${recipeId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${access_token}`
         }
       });
       const { schedule } = await scheduleResponse.json();
@@ -323,7 +323,7 @@ export function setupRecipeRoutes() {
       const response = await fetch(`${SERVER_URL}/recipe_schedules/execute`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -350,11 +350,11 @@ export function setupRecipeRoutes() {
 
   ipcMain.handle('email-recipe-output', async (event, suggestedOutputs) => {
     try {
-      const { token } = await getCurrentSession();
+      const { access_token } = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/recipe_schedules/email-recipe-output`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ suggestedOutputs })
@@ -375,10 +375,10 @@ export function setupRecipeRoutes() {
 
   ipcMain.handle('get-all-recipes', async () => {
     try {
-      const { token } = await getCurrentSession();
+      const { access_token } = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/recipe_schedules/all`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${access_token}`
         }
       });
       const { schedules } = await response.json();
@@ -391,11 +391,11 @@ export function setupRecipeRoutes() {
 
   ipcMain.handle('update-recipe', async (_, { id, next_run }) => {
     try {
-      const { token } = await getCurrentSession();
+      const { access_token } = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/recipe_schedules/update/${id}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ next_run })

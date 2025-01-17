@@ -21,10 +21,49 @@ const DEFAULT_SETTINGS: Settings = {
 
 const SERVER_URL = getServerUrl();
 
-// Add a helper function to get the current session token
+// Modify getCurrentSession to handle token refresh
 export async function getCurrentSession(): Promise<{ access_token: string; email: string; refresh_token: string }> {
   const auth = store.get('auth');
-  return { access_token: auth?.access_token, email: auth?.email, refresh_token: auth?.refresh_token };
+  if (!auth) return { access_token: '', email: '', refresh_token: '' };
+
+  try {
+    // Try to verify/refresh the session
+    const response = await fetch(`${SERVER_URL}/auth/verify-session`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(auth.access_token && { 'Authorization': `Bearer ${auth.access_token}` })
+      },
+      body: JSON.stringify({
+        refresh_token: auth.refresh_token
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.isAuthenticated) {
+      // Update stored tokens if we got new ones
+      if (data.access_token) {
+        store.set('auth', {
+          email: data.user.email,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || auth.refresh_token
+        });
+        return {
+          email: data.user.email,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || auth.refresh_token
+        };
+      }
+    }
+    
+    // If verification failed, clear auth
+    store.delete('auth');
+    return { access_token: '', email: '', refresh_token: '' };
+  } catch (error) {
+    console.error('Error refreshing session:', error);
+    return { access_token: '', email: '', refresh_token: '' };
+  }
 }
   
 export function validateSettings(settings: any) {
@@ -56,14 +95,18 @@ export function validateSettings(settings: any) {
 
 export async function getSettings() {
   try {
-    const { token, email } = await getCurrentSession();
+    const { access_token, email } = await getCurrentSession();
+    if (!access_token || !email) {
+      throw new Error('No authenticated session');
+    }
+
     const localSettings = store.get('localSettings') || { vaultPath: '' };
 
-    // Get settings from server
-    const response = await fetch(`${SERVER_URL}/user/config?email=${email || ''}`, {
+    // Get settings from server using the fresh access token
+    const response = await fetch(`${SERVER_URL}/user/config?email=${email}`, {
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` })
+        'Authorization': `Bearer ${access_token}`
       }
     });
 
@@ -105,18 +148,18 @@ export function setupUserIPCRoutes() {
 
   ipcMain.handle('update-settings', async (_, newSettings) => {
     try {
-      const { token, email } = await getCurrentSession();
+      const { access_token, email } = await getCurrentSession();
       
-      if (!token || !email) {
+      if (!access_token || !email) {
         throw new Error('No authenticated session');
       }
 
       // Update settings on server
-      const response = await fetch(`${SERVER_URL}/user/update-config?email=${auth.email}`, {
+      const response = await fetch(`${SERVER_URL}/user/update-config?email=${email}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${access_token}`
         },
         body: JSON.stringify(newSettings)
       });

@@ -238,6 +238,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   }
 
   const [generationsRemaining, setGenerationsRemaining] = useState(0);
+  const [generationState, setGenerationState] = useState<GenerationState>({ status: 'idle' });
+
 
   // Check generation limits on mount and auth change
   const checkGenerationLimits = useCallback(() => {
@@ -253,11 +255,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   useEffect(() => {
     checkGenerationLimits();
-  }, [checkGenerationLimits]);
+  }, [checkGenerationLimits, isAuthenticated, generationState]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const [generationState, setGenerationState] = useState<GenerationState>({ status: 'idle' });
 
   // Add new state for context
   const [generationContext, setGenerationContext] = useState<any[]>([]);
@@ -270,16 +271,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       return;
     }
 
-    if (!chunk || !chunk.question || !chunk.segments || done) {
+    if (done) {
       setGenerationState({ status: 'completed' });
+      console.log('Generation completed');
       return;
     }
 
-    // Clear first token timeout and update state on first chunk
-    if (generationState.status === 'awaiting_first_token') {
-      setGenerationState({ status: 'generating' });
+    if (!chunk || !chunk.question || !chunk.segments) {
+      return;
     }
 
+    setGenerationState({ status: 'generating' });
     setSuggestedOutputs(_ => {
       const body: SuggestedOutputBody = {
         question: chunk.question,

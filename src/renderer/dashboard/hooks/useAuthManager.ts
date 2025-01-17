@@ -9,18 +9,42 @@ export const useAuthManager = () => {
   const [error, setError] = useState(false);
   const [showOtpForm, setShowOtpForm] = useState(false);
   
-  const verifySession = async () => {
-    const response = await window.electron.ipcRenderer.invoke('auth:verify-session');
-    if (response.isAuthenticated) {
-      setIsAuthenticated(true);
-      setEmail(response.user.email);
+  const verifySession = useCallback(async () => {
+    try {
+      const response = await window.electron.ipcRenderer.invoke('auth:verify-session');
+      
+      if (response.isAuthenticated) {
+        setIsAuthenticated(true);
+        setEmail(response.user.email);
+        return true;
+      } else {
+        // Clear auth state if verification fails
+        setIsAuthenticated(false);
+        setEmail('');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error verifying session:', error);
+      setIsAuthenticated(false);
+      setEmail('');
+      return false;
+    } finally {
+      setIsAuthReady(true);
     }
-    setIsAuthReady(true);
-  };
-  // Set initial auth state
+  }, []);
+
+  // Initial verification
   useEffect(() => {
     verifySession();
-  }, []);
+  }, [verifySession]);
+
+  // Periodic verification
+  useEffect(() => {
+    if (isAuthenticated) {
+      const interval = setInterval(verifySession, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, verifySession]);
 
   const clearMessage = useCallback(() => {
     setMessage('');
