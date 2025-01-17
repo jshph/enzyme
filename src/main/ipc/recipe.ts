@@ -233,10 +233,10 @@ export function setupRecipeRoutes() {
           break;
         }
 
-        const { done, value } = await reader.read();
+        const { done: streamDone, value } = await reader.read();
         
-        if (done) {
-          // Process any remaining buffer
+        if (streamDone) {
+          // Process any remaining buffer immediately
           if (buffer.trim()) {
             try {
               const chunk = JSON.parse(buffer);
@@ -248,11 +248,12 @@ export function setupRecipeRoutes() {
               logger.error('Error parsing final chunk:', e);
             }
           }
+          // Send done signal immediately
           event.sender.send('suggested-output-chunk', { chunk: null, done: true });
           break;
         }
 
-        // Append new data to buffer and process complete lines
+        // Process incoming chunks immediately
         buffer += textDecoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
@@ -261,6 +262,14 @@ export function setupRecipeRoutes() {
           if (line.trim()) {
             try {
               const chunk = JSON.parse(line);
+              // Check if this is a done signal from the server
+              if (chunk.done) {
+                event.sender.send('suggested-output-chunk', { 
+                  chunk: null, 
+                  done: true 
+                });
+                continue;
+              }
               event.sender.send('suggested-output-chunk', { 
                 chunk, 
                 done: false 
@@ -277,7 +286,8 @@ export function setupRecipeRoutes() {
     } catch (error) {
       logger.error('Generation error:', error);
       
-      if (error.name === 'AbortError') {
+      // Type guard the error before accessing name property
+      if (error instanceof Error && error.name === 'AbortError') {
         event.sender.send('suggested-output-chunk', { 
           error: 'Generation cancelled', 
           done: true 
@@ -288,11 +298,11 @@ export function setupRecipeRoutes() {
         };
       }
 
-      // Type assertion for error handling
+      // Ensure we always send a done signal with any error
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       event.sender.send('suggested-output-chunk', { 
         error: errorMessage, 
-        done: true 
+        done: true  // Make sure done:true is sent with errors
       });
 
       return { 

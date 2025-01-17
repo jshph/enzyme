@@ -263,49 +263,68 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // Add new state for context
   const [generationContext, setGenerationContext] = useState<any[]>([]);
 
-  // Update handleGenerationChunk to use generationContext from state
-  const handleGenerationChunk = useCallback(({chunk, done, error}: {chunk: any, done: boolean, error?: string}) => {
-    if (error && generationState.status === 'generating') {
-      setGenerationState({ status: 'error', error });
+  // Add a timeout effect to reset stuck states
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    if (generationState.status === 'generating' || generationState.status === 'awaiting_first_token') {
+      timeoutId = setTimeout(() => {
+        setGenerationState({ 
+          status: 'error', 
+          error: 'Generation timed out. Please try again.' 
+        });
+      }, GENERATION_TIMEOUT_MS);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [generationState.status]);
+
+  // Update handleGenerationChunk to be more defensive and immediate with state changes
+  const handleGenerationChunk = useCallback(({chunk, done, error}: {chunk: any, done?: boolean, error?: string}) => {
+    if (error) {
       console.error('Generation error:', error);
+      setGenerationState({ status: 'error', error });
       return;
     }
 
+    // Explicitly handle done case first and immediately
     if (done) {
-      setGenerationState({ status: 'completed' });
       console.log('Generation completed');
+      // Immediately set completed state
+      setGenerationState({ status: 'completed' });
       return;
     }
 
-    if (!chunk || !chunk.question || !chunk.segments) {
-      return;
+    // Only process chunk if we have valid data
+    if (chunk?.question || chunk?.segments) {
+      // Set generating state before processing chunk
+      setGenerationState({ status: 'generating' });
+      setSuggestedOutputs(prev => {
+        const body: SuggestedOutputBody = {
+          question: chunk.question,
+          segments: chunk.segments?.map((segment, index) => ({
+            theme: segment.theme,
+            synthesis: {
+              id: index,
+              prompt: segment.prompt,
+              type: segment.type,
+              analysis: segment.analysis
+            },
+            docs: segment.docs?.map(doc => {
+              const contextItem = generationContext.find(result => result.file === doc);
+              return {
+                file: doc,
+                content: contextItem ? contextItem.extractedContents.join('\n') : ''
+              }
+            }) || []
+          })) || []
+        };
+        return [body];
+      });
     }
-
-    setGenerationState({ status: 'generating' });
-    setSuggestedOutputs(_ => {
-      const body: SuggestedOutputBody = {
-        question: chunk.question,
-        segments: chunk.segments?.map((segment, index) => ({
-          theme: segment.theme,
-          synthesis: {
-            id: index,
-            prompt: segment.prompt,
-            type: segment.type,
-            analysis: segment.analysis
-          },
-          docs: segment.docs?.map(doc => {
-            const contextItem = generationContext.find(result => result.file === doc);
-            const adjoinedContents = contextItem ? contextItem.extractedContents.join('\n') : '';
-            return {
-              file: doc,
-              content: adjoinedContents
-            }
-          }) || []
-        })) || []
-      };
-      return [body];
-    });
-  }, [generationState, generationContext]); // Update dependencies to use generationContext
+  }, [generationState, generationContext]);
 
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
