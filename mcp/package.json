@@ -1,13 +1,17 @@
 {
   "name": "enzyme-mcp",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Model Context Protocol implementation for Enzyme",
   "main": "dist/server.bundle.cjs",
   "type": "module",
   "scripts": {
     "build": "node esbuild.js",
+    "postbuild": "chmod +x dist/server.bundle.cjs",
     "watch": "tsc -w",
     "test": "jest"
+  },
+  "bin": {
+    "enzyme-mcp": "./dist/server.bundle.cjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0"

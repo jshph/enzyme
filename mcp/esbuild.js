@@ -22,6 +22,9 @@ async function build() {
     define: {
       'process.env.NODE_ENV': '"production"'
     },
+    banner: {
+      js: '#!/usr/bin/env node'
+    },
     mainFields: ['module', 'main'],
     resolveExtensions: ['.ts', '.js', '.json'],
   });
