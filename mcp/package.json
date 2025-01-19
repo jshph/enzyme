@@ -1,6 +1,6 @@
 {
   "name": "enzyme-mcp",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Model Context Protocol implementation for Enzyme",
   "main": "dist-minified/server.bundle.js",
   "type": "module",

@@ -1,6 +1,4 @@
 import * as esbuild from 'esbuild';
-import JavaScriptObfuscator from 'javascript-obfuscator';
-import { readFile, writeFile } from 'fs/promises';
 
 async function build() {
   // First, bundle with esbuild

@@ -2,7 +2,7 @@ import express, { Express } from 'express';
 import { Server } from 'http';
 import { extractPatterns, MatchResult, QueryPattern } from './extract/index';
 import { parseQueryString } from './extract/queryParser';
-import { getFileIndexer, ElectronFileIndexer } from './indexer/electron';
+import { ElectronFileIndexer } from './indexer/electron';
 import * as winston from 'winston';
 import path from 'path';
 import { app as electronApp, Notification } from 'electron';
@@ -77,12 +77,6 @@ export class ServerContext {
     return formattedResults as string[] | MatchResult[];
   }
 
-  public async getDocContent(path: string): Promise<string> {
-    const content = await this.indexer?.getDocContent(path);
-    return content;
-  }
-
-
   async startServer(indexer: ElectronFileIndexer, port: number) {
     if (server) {
       await this.stopServer();
@@ -105,7 +99,6 @@ export class ServerContext {
   
       try {
         const formattedResults = await this.getContext(decodedQuery);
-
         res.json({
           content: formattedResults.map((result: string) => ({
             type: "text",
