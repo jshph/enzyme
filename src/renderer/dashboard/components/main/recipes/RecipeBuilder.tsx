@@ -303,9 +303,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       setGenerationState({ status: 'generating' });
       setSuggestedOutputs(prev => {
         const body: SuggestedOutputBody = {
+          title: chunk.title,
           question: chunk.question,
           segments: chunk.segments?.map((segment, index) => ({
             theme: segment.theme,
+            emoji: segment.emoji,
             synthesis: {
               id: index,
               prompt: segment.prompt,

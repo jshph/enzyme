@@ -23,6 +23,19 @@
       "presentation": {
         "hidden": true
       }
+    },
+    {
+      "name": "Debug Standalone Server",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceRoot}/../enzyme-standalone-server/node_modules/.bin/ts-node-dev",
+      "runtimeArgs": ["--respawn", "--transpile-only"],
+      "program": "${workspaceRoot}/../enzyme-standalone-server/src/digestServer.ts",
+      "cwd": "${workspaceRoot}/../enzyme-standalone-server",
+      "restart": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "sourceMaps": true
     }
   ],
   "compounds": [

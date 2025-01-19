@@ -21,6 +21,7 @@ interface OutputSection {
 }
 
 export interface BaseSegment {
+  emoji: string;
   theme: string;
   synthesis: {
     type: string;
@@ -34,6 +35,7 @@ export interface BaseSegment {
 }
 
 export interface SuggestedOutputBody {
+  title: string;
   question: string;
   segments: BaseSegment[];
 }
@@ -116,7 +118,7 @@ export const SuggestedOutput = React.forwardRef<
                 </button>
                 <span className="text-md font-bold">
                   Topic: 
-                  <span className="ml-2 px-3 py-1.5 rounded-full bg-brand/10 text-white">{segment.theme}</span>
+                  <span className="ml-2 px-3 py-1.5 rounded-full bg-brand/10 text-white">{segment.emoji} {segment.theme}</span>
                 </span>
               </div>
             ),
