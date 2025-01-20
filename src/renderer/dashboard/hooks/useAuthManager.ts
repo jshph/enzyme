@@ -36,7 +36,7 @@ export const useAuthManager = () => {
   // Initial verification
   useEffect(() => {
     verifySession();
-  }, [verifySession]);
+  }, []);
 
   // Periodic verification
   useEffect(() => {
@@ -44,7 +44,7 @@ export const useAuthManager = () => {
       const interval = setInterval(verifySession, 5 * 60 * 1000);
       return () => clearInterval(interval);
     }
-  }, [isAuthenticated, verifySession]);
+  }, [isAuthenticated]);
 
   const clearMessage = useCallback(() => {
     setMessage('');

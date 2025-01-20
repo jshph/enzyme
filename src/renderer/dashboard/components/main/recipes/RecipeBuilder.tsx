@@ -132,6 +132,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
+      if (context.length === 0) {
+        console.error('No context found');
+        return;
+      }
+
       // Create graph data from context
       const documents = context.map(({file}) => ({
         id: file,
@@ -259,9 +264,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-
-  // Add new state for context
-  const [generationContext, setGenerationContext] = useState<any[]>([]);
+  const generationContextRef = useRef<any[]>([]);
 
   // Add a timeout effect to reset stuck states
   useEffect(() => {
@@ -289,17 +292,14 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       return;
     }
 
-    // Explicitly handle done case first and immediately
     if (done) {
       console.log('Generation completed');
-      // Immediately set completed state
       setGenerationState({ status: 'completed' });
       return;
     }
 
-    // Only process chunk if we have valid data
+    // Only process chunk if we have valid data and context
     if (chunk?.question || chunk?.segments) {
-      // Set generating state before processing chunk
       setGenerationState({ status: 'generating' });
       setSuggestedOutputs(prev => {
         const body: SuggestedOutputBody = {
@@ -315,18 +315,25 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
               analysis: segment.analysis
             },
             docs: segment.docs?.map(doc => {
-              const contextItem = generationContext.find(result => result.file === doc);
+              const contextItem = generationContextRef.current.find(result => result.file === doc);
+              if (!contextItem) {
+                console.warn(`No context found for file: ${doc}`);
+                return {
+                  file: doc,
+                  content: ''
+                };
+              }
               return {
                 file: doc,
-                content: contextItem ? contextItem.extractedContents.join('\n') : ''
-              }
+                content: contextItem.extractedContents.join('\n')
+              };
             }) || []
           })) || []
         };
         return [body];
       });
     }
-  }, [generationState, generationContext]);
+  }, []);
 
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
@@ -334,7 +341,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     // Reset states
     setGenerationState({ status: 'awaiting_first_token' });
     setSuggestedOutputs(undefined);
-    setGenerationContext([]); // Reset context
+    generationContextRef.current = [];
 
     // Create new AbortController
     abortControllerRef.current = new AbortController();
@@ -342,7 +349,13 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     try {
       const query = makeQuery();
       const context = await window.electron.ipcRenderer.invoke('get-context', query);
-      setGenerationContext(context); // Store context in state
+
+      if (context.length === 0) {
+        console.error('No context found');
+        return;
+      }
+
+      generationContextRef.current = context;
 
       // Only set up first token timeout
       const firstTokenTimeout = setTimeout(() => {
@@ -624,7 +637,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         {selectedEntities.size > 0 && (
           <div className="w-full h-full overflow-hidden relative">
             <div className="flex items-center flex-col relative">
-              <div className="flex-grow relative h-[800px] w-[800px]">
+              <div className="flex-grow relative h-[650px] w-[800px]">
               <GraphView
                 ref={graphViewRef}
                 width={800}

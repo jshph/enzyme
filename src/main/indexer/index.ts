@@ -195,6 +195,7 @@ export class FileIndexer {
     }
   }
 
+
   async stop(): Promise<void> {
     if (this.watcher) {
       await this.watcher.close();
@@ -441,11 +442,11 @@ export class FileIndexer {
 
       // Emit indexing status
       this.emitIndexingStatus();
-      
+
       // Extract metadata
-      const metadata: FileMetadata = {
+      const metadata: FileMetadata = {  
         path: filePath,
-        createdAt: frontmatter.creationDate,
+        createdAt: frontmatter.creationDate,  
         tags: tags, 
         links: links,
         lastModified: stats.mtimeMs
@@ -757,7 +758,7 @@ export class FileIndexer {
       // Index the new file
       const stats = await fs.stat(filePath);
       const { frontmatter, tags } = await this.getFileData(filePath);
-      await this.indexFile(content, stats, frontmatter, tags, filePath);
+      await this.indexFile(content, stats, frontmatter, tags, [], filePath);
 
       this.logger.info(`Created and indexed new submission file: ${filePath}`);
     } catch (error) {

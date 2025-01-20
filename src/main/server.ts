@@ -59,7 +59,7 @@ export class ServerContext {
     const results = await extractPatterns(queryPatterns, this.config?.defaultPatternLimit);
     
     const combinedResults = [...results];
-
+    
     const formattedResults = combinedResults.map(result => {
       const folder = result.file.split(path.sep).slice(0, -1).join(path.sep);
       if (format === 'md') {

@@ -41,17 +41,24 @@ export async function getDigestUsage(): Promise<DigestUsage | null> {
 export function setupDigestIPCRoutes() {
   ipcMain.handle('get-context', async (event: any, query: string) => {
     const context: MatchResult[] = await contextServer.getContext(query, 'json') as MatchResult[];
+    
+    // Check for empty context
+    if (context.length === 0) {
+      throw new Error('No context found');
+    }
+
     return context;
+    
   });
 
   ipcMain.handle('open-in-obsidian', async (event: any, filePath: string) => {
     try {
       const localSettings = store.get('localSettings') || { vaultPath: '' };
-      const fullPath = path.join(localSettings.vaultPath, filePath);
+      const relativePath = filePath.split(localSettings.vaultPath!)[1].split(path.sep).slice(1).join(path.sep);
       
       // Using Obsidian URI protocol to open the file
-      const encodedPath = encodeURIComponent(fullPath);
-      const obsidianUri = `obsidian://open?path=${encodedPath}`;
+      const encodedPath = encodeURIComponent(relativePath);
+      const obsidianUri = `obsidian://open?file=${encodedPath}`;
       
       // Open the URI using the system's default handler
       shell.openExternal(obsidianUri);

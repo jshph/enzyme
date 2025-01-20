@@ -30,13 +30,7 @@ const Settings: React.FC = () => {
 
           // Initialize vault
           await initializeVault();
-          const isStillAuthenticated = await verifySession();
-          
-          if (!isStillAuthenticated) {
-            setMessage('Session expired during vault initialization. Please log in again.');
-            setError(true);
-            return;
-          }
+          await verifySession();
           
           setError(false);
           
