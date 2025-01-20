@@ -2,6 +2,7 @@ import { Settings, app, ipcMain, BrowserWindow } from "electron";
 import Store from "electron-store";
 import dotenv from 'dotenv';
 import path from 'path';
+import os from 'os';
 import winston from 'winston';
 import { SpaceInfo } from "./space";
 import { setupAuthIPCRoutes } from './auth';
@@ -56,7 +57,12 @@ function loadEnvironment() {
 
     if (app.isPackaged) {
       // In packaged app, env files should be in resources directory
-      envPath = path.join(process.resourcesPath, envFile);
+      // macOS: Contents/Resources
+      // Windows/Linux: resources
+      const resourcesPath = os.platform() === 'darwin'
+        ? path.join(app.getAppPath(), '..', '..', 'Resources')
+        : path.join(path.dirname(app.getPath('exe')), '..', 'resources');
+      envPath = path.join(resourcesPath, envFile);
     } else {
       // In development, use the app directory
       envPath = path.resolve(app.getAppPath(), envFile);
@@ -88,7 +94,7 @@ function loadEnvironment() {
 }
 
 // Load environment variables first, do any process.env loading after this
-loadEnvironment();
+// loadEnvironment();
 
 function createLogger() {
   // Now initialize logger with environment variables available
@@ -106,11 +112,11 @@ function createLogger() {
   });
   
   // Log important environment variables (but not sensitive ones)
-  logger.info('Environment configuration:', {
-    NODE_ENV: import.meta.env.VITE_NODE_ENV,
-    SERVER_URL: getServerUrl(),
-    // Add other non-sensitive variables as needed
-  });
+  // logger.info('Environment configuration:', {
+  //   NODE_ENV: import.meta.env.VITE_NODE_ENV,
+  //   SERVER_URL: getServerUrl(),
+  //   // Add other non-sensitive variables as needed
+  // });
 
   return logger;
 }
@@ -118,7 +124,7 @@ function createLogger() {
 export const logger = createLogger();
 
 export function getServerUrl() {
-  return import.meta.env.VITE_SERVER_URL as string;
+  return "https://enzyme-server-production.up.railway.app/";
 }
 
 // Add a new function to check if vault is configured

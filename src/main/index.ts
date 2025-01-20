@@ -165,11 +165,10 @@ function createWindow(): void {
     // HMR for renderer base on electron-vite cli.
     // Load the remote URL for development or the local html file for production.
     // if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
-    if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
-      mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
-    } else {
-      mainWindow.loadFile(join(__dirname, '../renderer/dashboard.html'))
-    }
+    // if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
+    //   mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
+    // } else {
+    mainWindow.loadFile(join(__dirname, '../renderer/dashboard.html'))
 
     // Add this event handler
     mainWindow.on('closed', async () => {

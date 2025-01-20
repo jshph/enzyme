@@ -6,6 +6,7 @@ import autoprefixer from 'autoprefixer'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import { fileURLToPath } from 'url'
 import path from 'path'
+import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -50,8 +51,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          dashboard: resolve(__dirname, 'src/renderer/dashboard/dashboard.html'),
-          menubar: resolve(__dirname, 'src/renderer/menubar/menubar.html')
+          dashboard: resolve(__dirname, 'src/renderer/dashboard.html'),
         },
         output: {
           format: 'es'

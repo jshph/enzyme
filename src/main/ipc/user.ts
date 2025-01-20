@@ -61,7 +61,7 @@ export async function getCurrentSession(): Promise<{ access_token: string; email
     store.delete('auth');
     return { access_token: '', email: '', refresh_token: '' };
   } catch (error) {
-    console.error('Error refreshing session:', error);
+    // console.error('Error refreshing session:', error);
     return { access_token: '', email: '', refresh_token: '' };
   }
 }
@@ -123,7 +123,7 @@ export async function getSettings() {
       vaultPath: localSettings.vaultPath
     };
   } catch (error) {
-    console.error('Error fetching settings:', error);
+    // console.error('Error fetching settings:', error);
     const localSettings = store.get('localSettings') || { vaultPath: '' };
     return { ...DEFAULT_SETTINGS, vaultPath: localSettings.vaultPath };
   }
