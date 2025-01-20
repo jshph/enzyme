@@ -1,8 +1,10 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useAuthManager } from '../hooks/useAuthManager';
+import { useAuthManager } from '../hooks/useAuthManager.js';
 
 interface AuthContextType {
   isAuthenticated: boolean;
+  setIsAuthenticated: (isAuthenticated: boolean) => void;
+  setEmail: (email: string) => void;
   email: string;
   loading: boolean;
   message: string;
@@ -13,7 +15,7 @@ interface AuthContextType {
   handleLogout: () => Promise<void>;
   clearMessage: () => void;
   isSessionValid: () => Promise<boolean>;
-  verifySession: () => Promise<void>;
+  verifySession: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

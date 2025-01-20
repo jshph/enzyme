@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { LocalSettings, store, logger, getServerUrl } from "./index";
+import { LocalSettings, store, logger, getServerUrl } from "./index.js";
 
 export interface Settings {
   port: number;

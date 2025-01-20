@@ -1,5 +1,5 @@
 import React, { createContext, ReactNode, useContext } from 'react';
-import { useSettingsManager, Settings } from '../hooks/useSettingsManager';
+import { useSettingsManager, Settings } from '../hooks/useSettingsManager.js';
 
 
 interface SettingsContextType {

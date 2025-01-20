@@ -1,10 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import App from './App'
-import { AuthProvider } from './contexts/AuthContext'
+import App from './App.js'
+import { AuthProvider } from './contexts/AuthContext.js'
 import '../styles/dashboard.css'
-import { SettingsProvider } from './contexts/SettingsContext'
+import { SettingsProvider } from './contexts/SettingsContext.js'
 
 const Component: React.FC = () => {
   return (

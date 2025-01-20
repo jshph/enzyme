@@ -1,4 +1,4 @@
-import { MatchType } from './extract/index';
+import { MatchType } from './extract/index.js';
 
 export interface Match {
   type: MatchType;

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { useSettingsContext } from './contexts/SettingsContext'
-import Sidebar from './components/Sidebar'
-import Main from './components/main'
-import { useAuth } from './contexts/AuthContext'
-import { RecipeExecutor } from './components/RecipeExecutor'
+import { useSettingsContext } from './contexts/SettingsContext.js'
+import Sidebar from './components/Sidebar.js'
+import Main from './components/main/index.js'
+import { useAuth } from './contexts/AuthContext.js'
+import { RecipeExecutor } from './components/RecipeExecutor.js'
 
 interface AppState {
   isAppReady: boolean;

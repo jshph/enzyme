@@ -1,7 +1,7 @@
 import React from "react";
-import { useAuth } from '../../contexts/AuthContext';
-import RecipeBuilder from "./recipes/RecipeBuilder";
-import ScheduledRecipes from "./recipes/ScheduledRecipes";
+import { useAuth } from '../../contexts/AuthContext.js';
+import RecipeBuilder from "./recipes/RecipeBuilder.js";
+import ScheduledRecipes from "./recipes/ScheduledRecipes.js";
 
 const Recipes: React.FC<{ currentView: string }> = ({ currentView }) => {
   const { isAuthenticated } = useAuth();

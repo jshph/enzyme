@@ -4,7 +4,7 @@ import * as matter from 'gray-matter';
 import * as chokidar from 'chokidar';
 import { getFileCreationDate } from '../utils.js';
 import * as winston from 'winston';
-import { ServerContext } from '../server';
+import { ServerContext } from '../server.js';
 
 export interface FileMetadata {
   path: string;

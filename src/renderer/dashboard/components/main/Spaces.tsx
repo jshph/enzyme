@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Space, NewSpace } from '../../types';
-import { useSettingsContext } from '../../contexts/SettingsContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { Space, NewSpace } from '../../types.js';
+import { useSettingsContext } from '../../contexts/SettingsContext.js';
+import { useAuth } from '../../contexts/AuthContext.js';
 
 interface SpacesProps {
   currentView: string;

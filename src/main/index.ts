@@ -1,8 +1,10 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import path, { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { ServerContext } from './server';
-import { store, logger, setupIPC } from './ipc/index';
+import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { ServerContext } from './server.js';
+import { store, logger, setupIPC } from './ipc/index.js';
+// import os from 'os';
+import { fileURLToPath } from 'url'
 
 declare global {
   interface ImportMetaEnv {
@@ -16,6 +18,13 @@ const serverContext = new ServerContext();
 
 // Add this helper at the top of your file
 const getPlatform = () => {
+  logger.debug('Detecting platform...', {
+    processPlat: process?.platform,
+    navPlat: typeof navigator !== 'undefined' ? navigator.platform : 'undefined',
+    hasDock: Boolean(app.dock),
+    hasWindowsFeatures: Boolean(app.setAppUserModelId)
+  });
+
   // Try multiple ways to detect platform
   const platform = {
     // Primary checks
@@ -34,22 +43,27 @@ const getPlatform = () => {
   // Determine platform using multiple signals
   if (platform.hasDock || platform.fromProcess === 'darwin' || 
       platform.fromNavigator?.includes('Mac')) {
+    logger.debug(`Platform detected as: darwin`);
     return 'darwin';
   }
   if (platform.hasWindowsFeatures || platform.fromProcess === 'win32' || 
       platform.isWindowsLike) {
+    logger.debug(`Platform detected as: win32`);
     return 'win32';
   }
   if (platform.isUnixLike || platform.fromProcess === 'linux') {
+    logger.debug(`Platform detected as: linux`);
     return 'linux';
   }
   
   // Default to the most restrictive platform
+  logger.debug(`Platform detected as: unknown`);
   return 'unknown';
 };
 
 // Helper function for dock operations using the robust platform detection
 function handleDock(action: 'show' | 'hide'): Promise<void> {
+  logger.debug(`Handling dock action: ${action}`);
   return new Promise<void>((resolve) => {
     const platform = getPlatform();
     
@@ -64,26 +78,42 @@ function handleDock(action: 'show' | 'hide'): Promise<void> {
   });
 }
 
-console.log('Starting app in mode:', process.defaultApp ? 'development' : 'production');
+// Add startup logging
+logger.info('Application starting', {
+  defaultApp: process.defaultApp,
+  mode: process.defaultApp ? 'development' : 'production',
+  argv: process.argv
+});
+
 const gotTheLock = app.requestSingleInstanceLock();
+logger.debug(`Single instance lock acquired: ${gotTheLock}`);
 
 if (!gotTheLock) {
-  console.log('App already running');
+  logger.info('Another instance is running, quitting');
   app.quit();
 } else {
+  logger.info('Initializing main process');
   initializeMain();
 }
 
 function initializeMain() {
+  logger.info('Main initialization started', {
+    mode: process.defaultApp ? 'development' : 'production',
+    argv: process.argv
+  });
+
   logger.info('App starting in mode:', process.defaultApp ? 'development' : 'production');
   logger.info('Command line arguments:', process.argv);
 
   
   app.on('before-quit', async () => {
+    logger.info('Application preparing to quit');
     await serverContext.stopServer();
+    logger.info('Server stopped successfully');
   });
   
   ipcMain.handle('select-directory', async () => {
+    logger.debug('Directory selection dialog requested');
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openDirectory', 'createDirectory'],
@@ -91,14 +121,18 @@ function initializeMain() {
         buttonLabel: 'Open'
       });
       
+      logger.debug('Directory selection result', { 
+        canceled: result.canceled,
+        paths: result.filePaths 
+      });
+      
       if (!result.canceled) {
-        // Save the selected path to local settings
         store.set('localSettings', { vaultPath: result.filePaths[0] });
         return result.filePaths[0];
       }
       return null;
     } catch (error) {
-      console.error('Error selecting directory:', error);
+      logger.error('Error in directory selection:', error);
       throw error;
     }
   });
@@ -114,30 +148,38 @@ function initializeMain() {
 
   setupDashboard();
   setupIPC();
-
-  if (!app.isPackaged) {
-    try {
-      require('electron-debug')({ showDevTools: true });
-    } catch (err) {
-      logger.error('Failed to load electron-debug:', err);
-    }
-  }
+  logger.info('Main initialization completed');
 }
 
 
 function createWindow(): void {
+  logger.debug('Creating main window', { 
+    exists: Boolean(mainWindow) 
+  });
+  
   if (mainWindow) {
+    logger.debug('Main window exists, focusing');
     mainWindow.focus();
     return;
   }
 
   app.whenReady().then(async () => {
+    logger.debug('App ready, showing dock');
     await handleDock('show');
 
+    // const resourcesPath = os.platform() === 'darwin'
+    //     ? path.join(app.getAppPath(), '..', '..', 'Resources')
+    //     : path.join(path.dirname(app.getPath('exe')), '..', 'resources');
+
     // Determine preload path based on whether app is packaged
-    const preloadPath = app.isPackaged
-      ? path.join(process.resourcesPath, 'out', 'preload', 'index.mjs')
-      : path.join(app.getAppPath(), 'out', 'preload', 'index.mjs');
+    // const preloadPath = app.isPackaged
+    //   ? path.join(resourcesPath, 'out', 'preload', 'index.mjs')
+    //   : path.join(app.getAppPath(), 'out', 'preload', 'index.mjs');
+
+    // logger.debug('Creating browser window', { 
+    //   preloadPath,
+    //   isPackaged: app.isPackaged 
+    // });
 
     mainWindow = new BrowserWindow({
       width: 1400,
@@ -148,7 +190,7 @@ function createWindow(): void {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: preloadPath
+        preload: fileURLToPath(new URL("../preload/index.mjs", import.meta.url))
       },
       titleBarStyle: 'hiddenInset',
       trafficLightPosition: { x: 15, y: 15 },
@@ -168,46 +210,68 @@ function createWindow(): void {
     // if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
     //   mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
     // } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/dashboard.html'))
+    // mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
+    logger.debug('Loading main window content');
+    try {
+      mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
+      logger.debug('Main window content loaded successfully');
+    } catch (error) {
+      logger.error('Error loading main window content:', error);
+    }
 
     // Add this event handler
     mainWindow.on('closed', async () => {
+      logger.debug('Main window closed');
       mainWindow = null;
       await handleDock('hide');
     });
+  }).catch(error => {
+    logger.error('Error in window creation:', error);
   });
 }
 
 
 function setupDashboard() {
+  logger.debug('Setting up dashboard');
+  
   // This method will be called when Electron has finished
   // initialization and is ready to create browser windows.
   // Some APIs can only be used after this event occurs.
   app.whenReady().then(() => {
+    logger.info('App ready event triggered');
 
     // Set app user model id for windows
     electronApp.setAppUserModelId('com.electron')
+    logger.debug('App user model ID set');
 
     // Default open or close DevTools by F12 in development
     // and ignore CommandOrControl + R in production.
     // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
     app.on('browser-window-created', (_, window) => {
+      logger.debug('New browser window created');
       optimizer.watchWindowShortcuts(window)
     })
 
     createWindow()
 
     app.on('activate', function () {
+      logger.debug('App activated', { 
+        windowCount: BrowserWindow.getAllWindows().length 
+      });
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
-  })
+  }).catch(error => {
+    logger.error('Error in dashboard setup:', error);
+  });
   // Quit when all windows are closed, except on macOS. There, it's common
   // for applications and their menu bar to stay active until the user quits
   // explicitly with Cmd + Q.
   app.on('window-all-closed', () => {
+    logger.debug('All windows closed');
     if (process.platform !== 'darwin') {
+      logger.info('Quitting app (non-macOS platform)');
       app.quit()
     }
   })

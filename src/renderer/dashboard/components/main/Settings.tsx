@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useSettingsContext } from '../../contexts/SettingsContext';
+import { useAuth } from '../../contexts/AuthContext.js';
+import { useSettingsContext } from '../../contexts/SettingsContext.js';
 const Settings: React.FC = () => {
   const { 
     settings,
@@ -31,7 +31,7 @@ const Settings: React.FC = () => {
           // Initialize vault
           await initializeVault();
           await verifySession();
-          
+
           setError(false);
           
           setTimeout(() => {

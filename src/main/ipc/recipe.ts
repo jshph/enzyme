@@ -1,8 +1,8 @@
 import { ipcMain } from "electron";
-import { getServerUrl, store as configStore, logger } from "./index";
-import { getCurrentSession } from "./user";
-import { useContextServer } from "../server";
-import { getFileIndexer } from "../indexer/electron";
+import { getServerUrl, store as configStore, logger } from "./index.js";
+import { getCurrentSession } from "./user.js";
+import { useContextServer } from "../server.js";
+import { getFileIndexer } from "../indexer/electron.js";
 import Store from 'electron-store';
 
 const SERVER_URL = getServerUrl();

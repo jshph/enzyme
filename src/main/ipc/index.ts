@@ -4,13 +4,13 @@ import dotenv from 'dotenv';
 import path from 'path';
 import os from 'os';
 import winston from 'winston';
-import { SpaceInfo } from "./space";
-import { setupAuthIPCRoutes } from './auth';
-import { setupDigestIPCRoutes } from './digest';
-import { setupVaultIPCRoutes } from './vault';
-import { setupSpaceRoutes } from './space';
-import { setupRecipeRoutes } from './recipe';
-import { setupUserIPCRoutes } from "./user";
+import { SpaceInfo } from "./space.js";
+import { setupAuthIPCRoutes } from './auth.js';
+import { setupDigestIPCRoutes } from './digest.js';
+import { setupVaultIPCRoutes } from './vault.js';
+import { setupSpaceRoutes } from './space.js';
+import { setupRecipeRoutes } from './recipe.js';
+import { setupUserIPCRoutes } from "./user.js";
 
 interface Auth {
   email: string;

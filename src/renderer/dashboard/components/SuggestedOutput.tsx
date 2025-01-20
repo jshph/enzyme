@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Calendar, Mail, RefreshCw, ChevronRight, Check } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext.js';
 
 interface SuggestedOutputProps {
   body: SuggestedOutputBody;

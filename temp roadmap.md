@@ -83,32 +83,58 @@ implementation notes:
 - revise copy of the recipe view so it's easier to understand and onboard
 - graph view:
   - width of window to 1400, graph ratio to 4/3
-
-TODO before launch
-
-- login view needs to have more info 
-
-- figure out onboarding - revisit obsidian notes (things like auto tagging, etc)
-
-- look into interactive graph view
-- "remove recipe" button which forwards to enzyme.garden success page
-
-- think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
-
-
-- graph view remaining tasks
   - make sure the count is reflected properly, it's too few right now
   - reduce font size to 10pt
   - highlight the mentioned node but not all of the one hops from its docs
   - ensure that selected ids which are 1 hops are highlighted, not just because they are 1-hops
   - make sure edge highlighting is valid - maybe lower opacity overlay
-  - adjust colors to theme colors not lightgreen
+  - adjust colors to theme colors not lightgree
+  - fix bugs with one hop mentions not being connected to one hop mentions of other docs
+  - play around with forces for mentions and  docs
+  - drag extents should be clearer or feel more seamless (have a halo that expands, and have a snap animation or something)
+- graph should work with links, not just tags. Folders should be selectable but they should not appear as one hops
+- debug the node remainder logic
+- login view needs to have more info 
+- there is a delay in between finishing indexing and seeing the tags. There might have been some new work that indexing has to do that is slow. Could be timeline logic
+- when changing vaults, the tags should be updated
+- generation termination states; might need cleaner reset logic
+- tokens should be cleaner tracked + figure out lifetime of a token
+- see if i can develop tools for the context server protocol so that the query language is not so manual
+  - having it work with zed, claude, obsidian, and on its own would be great
+- email icons should display properly
+
+TODO before launch
+
+- verify the behavior of scheduled recipes
+- scheduled recipes shoudl update when scheduled
+
+- email otp
+- don't hallucinate, error out when there aren't any files so we aren't synthesizing just a few
+
+
+graph
+
+
+- figure out onboarding - revisit obsidian notes (things like auto tagging, etc)
+  - should consider doing 30 mins or so of an auto tagging and titling workflow by building an obsidian plugin
+  - might need a notebook to prototype / prompt engineer the titles that were generated. Using a repl might be easier than having an obsidian plugin.
+
+- "remove recipe" button which forwards to enzyme.garden success page
+
+- think more about a "sharable" version of the email... one that doesn't expose your raw notes, makes it possible for you to share with others.
+
+
+- think through pitching an autotagging version and propose a survey for people who don't have tagging so i can gather their use cases for needing tags
 
 LATER
-- ui selecting a recipe
 - editable "prompt" for each segment
 
-- nice to have would be to build in the graph visualization stuff that i had before
+- think about how autotagging workflow can help reorganize content from drive and then surface it to claude desktop as a personal assistant -- can paste as project notes
+
+- promote on claudeai, pkm, obsidian subreddit
+- import step -- take a scrivener etc and then auto tag it and create a vault
+- self organizing workspace: tool use can retrieve metadata about top folders and tags etc and then use that to determine which notes to retrieve and how to treat them
+  - "now that tiktok is banned, do you have more time to noodle on an idea?"
 
 
 <!-- 

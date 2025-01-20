@@ -9,6 +9,7 @@
     "paths": {
       "@/*": ["./src/main/renderer/dashboard/*"],
       "@main/*": ["./src/main/*"]
-    }
+    },
+    "types": ["node"]
   }
 }

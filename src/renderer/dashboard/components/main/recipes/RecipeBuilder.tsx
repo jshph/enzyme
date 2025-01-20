@@ -1,11 +1,11 @@
-import { useCallback, useRef, useState, useEffect } from "react";
-import { SuggestedOutput, SuggestedOutputBody } from "../../SuggestedOutput";
-import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext";
-import NoteTimeline from './NoteTimeline';
+import { SuggestedOutput, SuggestedOutputBody } from "../../SuggestedOutput.js";
+import { useSettingsContext } from "@renderer/dashboard/contexts/SettingsContext.js";
+import NoteTimeline from './NoteTimeline.js';
 import debounce from 'lodash/debounce';
-import { useAuth } from '../../../contexts/AuthContext';
-import { GraphView, GraphViewRef, DocumentNode, MentionNode } from "../../GraphView";
+import { useAuth } from '../../../contexts/AuthContext.js';
+import { GraphView, GraphViewRef } from "../../GraphView.js";
 import path from 'path';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface SelectedEntity {
   type: 'tag' | 'link';

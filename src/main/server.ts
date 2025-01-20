@@ -1,8 +1,8 @@
 import express, { Express } from 'express';
 import { Server } from 'http';
-import { extractPatterns, MatchResult, QueryPattern } from './extract/index';
-import { parseQueryString } from './extract/queryParser';
-import { ElectronFileIndexer } from './indexer/electron';
+import { extractPatterns, MatchResult, QueryPattern } from './extract/index.js';
+import { parseQueryString } from './extract/queryParser.js';
+import { ElectronFileIndexer } from './indexer/electron.js';
 import * as winston from 'winston';
 import path from 'path';
 import { app as electronApp, Notification } from 'electron';

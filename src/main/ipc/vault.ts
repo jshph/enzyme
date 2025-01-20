@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
-import { store, logger } from "./index";
-import { getFileIndexer } from "../indexer/electron";
-import { Settings } from "./user";
+import { store, logger } from "./index.js";
+import { getFileIndexer } from "../indexer/electron.js";
+import { Settings } from "./user.js";
 
 interface InitializeResult {
   success: boolean;
