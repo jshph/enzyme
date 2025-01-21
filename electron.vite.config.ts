@@ -57,7 +57,10 @@ export default defineConfig({
           format: 'es'
         },
         external: ['electron']
-      }
+      },
+      // Copy resources folder
+      assetsDir: 'resources',
+      copyPublicDir: true
     },
     server: {
       hmr: {

@@ -1,10 +1,11 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
 import path, { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { ServerContext } from './server.js';
 import { store, logger, setupIPC } from './ipc/index.js';
 // import os from 'os';
 import { fileURLToPath } from 'url'
+import appIcon from '../../resources/icon.png?asset'
 
 declare global {
   interface ImportMetaEnv {
@@ -262,9 +263,17 @@ function setupDashboard() {
       // dock icon is clicked and there are no other windows open.
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
+
+    app.dock.setIcon(nativeImage.createFromPath(appIcon))
   }).catch(error => {
     logger.error('Error in dashboard setup:', error);
   });
+
+  // Add cleanup when app quits
+  app.on('before-quit', () => {
+
+  });
+
   // Quit when all windows are closed, except on macOS. There, it's common
   // for applications and their menu bar to stay active until the user quits
   // explicitly with Cmd + Q.

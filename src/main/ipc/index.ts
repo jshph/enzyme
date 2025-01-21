@@ -124,7 +124,7 @@ function createLogger() {
 export const logger = createLogger();
 
 export function getServerUrl() {
-  return "https://enzyme-server-production.up.railway.app/";
+  return "https://enzyme-server-production.up.railway.app";
 }
 
 // Add a new function to check if vault is configured

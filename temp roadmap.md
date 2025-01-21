@@ -102,17 +102,21 @@ implementation notes:
 - see if i can develop tools for the context server protocol so that the query language is not so manual
   - having it work with zed, claude, obsidian, and on its own would be great
 - email icons should display properly
+- email otp
 
 TODO before launch
+
+- graph should clear when changing vaults
+- counts shoudl decrease correctly
+- tag count should be over the last 3 months, not just the last 30 days
+- logo should be copied as resource and be used
+
 
 - verify the behavior of scheduled recipes
 - scheduled recipes shoudl update when scheduled
 
-- email otp
 - don't hallucinate, error out when there aren't any files so we aren't synthesizing just a few
 
-
-graph
 
 
 - figure out onboarding - revisit obsidian notes (things like auto tagging, etc)
