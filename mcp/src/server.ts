@@ -140,7 +140,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
 });
 
 const retrieveByQuery = async (query: string, limit: number) => {
-  const response = await fetch(`http://localhost:3779/context?query=${encodeURIComponent(query)}<${limit}>`);
+  const response = await fetch(`http://localhost:3779/context?query=${encodeURIComponent(query)}<${limit}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch context: ${response.statusText} ${await response.text()}`);
   }
