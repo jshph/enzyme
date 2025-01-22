@@ -52,9 +52,5 @@ publish:
   provider: github
   owner: jshph 
   repo: enzyme
-  private: false
-  token: ${GH_TOKEN}
-  releaseType: release
-  channel: latest
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
