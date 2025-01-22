@@ -1,6 +1,7 @@
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
-import { dialog } from 'electron';
+import { dialog, app } from 'electron';
+import semver from 'semver';
 import { logger } from './ipc/index.js';
 
 export function setupIpcUpdater() {
@@ -18,13 +19,19 @@ export function setupIpcUpdater() {
 
   autoUpdater.on('update-available', (info) => {
     logger.info('Update available:', info);
-    dialog.showMessageBox({
-      type: 'info',
-      title: 'Update Available',
-      message: `Version ${info.version} is available.`,
-      detail: 'The update will be downloaded in the background.',
-      buttons: ['OK']
-    });
+    const currentVersion = app.getVersion();
+    
+    if (semver.gt(info.version, currentVersion)) {
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Update Available',
+        message: `Version ${info.version} is available (current: ${currentVersion}).`,
+        detail: 'The update will be downloaded in the background.',
+        buttons: ['OK']
+      });
+    } else {
+      logger.debug('Update version is not newer than current version');
+    }
   });
 
   autoUpdater.on('download-progress', (progressObj) => {
