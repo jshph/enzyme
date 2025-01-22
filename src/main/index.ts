@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, Notification } from 'electron'
 import path, { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { ServerContext } from './server.js';
@@ -6,6 +6,8 @@ import { store, logger, setupIPC } from './ipc/index.js';
 // import os from 'os';
 import { fileURLToPath } from 'url'
 import appIcon from '../../resources/icon.png?asset'
+import { autoUpdater } from 'electron-updater'
+import { setupIpcUpdater } from './updater.js';
 
 declare global {
   interface ImportMetaEnv {
@@ -96,7 +98,6 @@ if (!gotTheLock) {
   logger.info('Initializing main process');
   initializeMain();
 }
-
 function initializeMain() {
   logger.info('Main initialization started', {
     mode: process.defaultApp ? 'development' : 'production',
@@ -105,7 +106,6 @@ function initializeMain() {
 
   logger.info('App starting in mode:', process.defaultApp ? 'development' : 'production');
   logger.info('Command line arguments:', process.argv);
-
   
   app.on('before-quit', async () => {
     logger.info('Application preparing to quit');
@@ -265,6 +265,11 @@ function setupDashboard() {
     })
 
     app.dock.setIcon(nativeImage.createFromPath(appIcon))
+
+    // Add update setup
+    if (!process.defaultApp) {
+      setupIpcUpdater();
+    }
   }).catch(error => {
     logger.error('Error in dashboard setup:', error);
   });

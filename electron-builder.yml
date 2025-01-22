@@ -1,8 +1,11 @@
 appId: com.enzyme.app
 productName: Enzyme
 directories:
-  buildResources: build
+  output: dist
+  buildResources: resources
 files:
+  - 'out/**/*'
+  - 'resources/**/*'
   - '!**/.vscode/*'
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
@@ -19,15 +22,20 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  category: "public.app-category.productivity"
   hardenedRuntime: true
   gatekeeperAssess: false
   icon: resources/IconTemplateBig.png
   entitlementsInherit: build/entitlements.mac.plist
+  entitlements: build/entitlements.mac.plist
   appId: com.enzyme.app
   notarize: false
-    # teamId: 6R848HTCYQ
+  target:
+    - dmg
+    - zip
 dmg:
   artifactName: ${name}-${version}.${ext}
+  sign: false
 linux:
   target:
     - AppImage
@@ -41,7 +49,7 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  releaseType: release
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
