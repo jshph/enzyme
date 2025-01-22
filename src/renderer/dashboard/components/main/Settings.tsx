@@ -89,6 +89,38 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleCollectDebugLogs = async () => {
+    try {
+      setMessage('Collecting debug logs...');
+      setError(false);
+      
+      const debugInfo = await window.electron.ipcRenderer.invoke('collect-debug-logs');
+      
+      // Format the debug info as text
+      const formattedDebugInfo = JSON.stringify(debugInfo, null, 2);
+      
+      // Create a blob and download link
+      const blob = new Blob([formattedDebugInfo], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `enzyme-debug-logs-${new Date().toISOString()}.json`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setMessage('Debug logs collected and downloaded successfully');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      setError(true);
+      setMessage('Failed to collect debug logs. Please try again.');
+      console.error('Error collecting debug logs:', err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Status Messages */}
@@ -230,6 +262,23 @@ const Settings: React.FC = () => {
             </button>
           </div>
           </div>
+      </div>
+
+      <div className="card space-y-4 bg-surface/50 p-8 rounded-sm">
+        <h3 className="text-lg font-medium text-primary/90">Troubleshooting</h3>
+        <div className="space-y-4">
+          <div>
+            <button
+              onClick={handleCollectDebugLogs}
+              className="bg-brand/80 text-primary/90 px-4 py-2 rounded-md hover:bg-brand/90 transition-colors duration-200"
+            >
+              Download Debug Logs
+            </button>
+            <p className="mt-2 text-sm text-secondary/70">
+              Download debug logs to help troubleshoot issues. These logs contain technical information about the app's operation.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

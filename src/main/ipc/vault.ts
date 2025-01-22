@@ -2,6 +2,9 @@ import { ipcMain } from "electron";
 import { store, logger } from "./index.js";
 import { getFileIndexer } from "../indexer/electron.js";
 import { Settings } from "./user.js";
+import path from 'path';
+import fs from 'fs/promises';
+import { app } from 'electron';
 
 interface InitializeResult {
   success: boolean;
@@ -97,5 +100,47 @@ export function setupVaultIPCRoutes() {
 
   ipcMain.handle('query-for-links-and-tags', (_, query: string) => {
     return indexer.queryForTagsAndLinks(query)
+  });
+
+  ipcMain.handle('collect-debug-logs', async () => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const logsPath = path.join(userDataPath, 'logs');
+      
+      // Read all files in the logs directory
+      const files = await fs.readdir(logsPath);
+      const logContents: { [filename: string]: string } = {};
+      
+      // Collect contents of each log file
+      for (const file of files) {
+        if (file.endsWith('.log')) {
+          const content = await fs.readFile(path.join(logsPath, file), 'utf-8');
+          logContents[file] = content;
+        }
+      }
+
+      // Get app version and other relevant info
+      const appInfo = {
+        version: app.getVersion(),
+        platform: process.platform,
+        arch: process.arch,
+        electronVersion: process.versions.electron,
+        chromeVersion: process.versions.chrome,
+        nodeVersion: process.versions.node,
+      };
+
+      // Format the debug information
+      const debugInfo = {
+        timestamp: new Date().toISOString(),
+        appInfo,
+        logs: logContents,
+      };
+
+      return debugInfo;
+
+    } catch (error) {
+      logger.error('Error collecting debug logs:', error);
+      throw new Error('Failed to collect debug logs');
+    }
   });
 }

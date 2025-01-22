@@ -11,22 +11,7 @@ export function setupIpcUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowDowngrade = false;
   autoUpdater.logger = logger;
-
-  // Handle update errors
-  autoUpdater.on('error', (err) => {
-    const errorMessage = err.stack || err.message || String(err);
-    logger.error('AutoUpdater error:', errorMessage);
-    
-    // More detailed error dialog
-    dialog.showMessageBox({
-      type: 'error',
-      title: 'Update Error',
-      message: 'An error occurred while updating the application.',
-      detail: `Error details: ${errorMessage}\n\nPlease check your internet connection and try again later.`,
-      buttons: ['OK']
-    });
-  });
-
+  
   autoUpdater.on('checking-for-update', () => {
     logger.debug('Checking for updates...');
   });
@@ -73,18 +58,32 @@ export async function checkForUpdates(ghToken?: string) {
   try {
     // Set up auth headers if token is provided
     if (ghToken) {
-      autoUpdater.requestHeaders = {
-        'Authorization': `token ${ghToken}`
-      };
+      logger.debug("Setting up Github updater with authentication")
+      autoUpdater.setFeedURL({
+        provider: 'github',
+        owner: 'jshph',
+        repo: 'enzyme',
+        private: true,
+        token: ghToken,
+        releaseType: 'release'
+      });
     }
 
-    logger.debug('Checking for updates...');
+    // Add configuration for update preferences
+    autoUpdater.channel = 'latest';
+    autoUpdater.allowPrerelease = false;
+    // Specify which file format to look for
+    autoUpdater.forceDevUpdateConfig = false;
+    
+    logger.info('Checking for update');
     const result = await autoUpdater.checkForUpdatesAndNotify({
       title: 'Update Available',
       body: 'A new version of Enzyme is available. Click to download.'
     });
     logger.debug('Update check result:', result);
+    return result;
   } catch (error) {
-    logger.error('Error checking for updates:', error);
+    logger.error('Error:', error);
+    throw error;
   }
 } 

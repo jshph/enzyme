@@ -2,9 +2,10 @@ appId: com.enzyme.app
 productName: Enzyme
 directories:
   output: dist
-  buildResources: resources
+  buildResources: build
 files:
-  - 'out/**/*'
+  - out/**/*
+  - node_modules/**/*
   - 'resources/**/*'
   - '!**/.vscode/*'
   - '!src/*'
@@ -22,17 +23,19 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
-  category: "public.app-category.productivity"
+  category: public.app-category.developer-tools
   hardenedRuntime: true
   gatekeeperAssess: false
   icon: resources/IconTemplateBig.png
   entitlementsInherit: build/entitlements.mac.plist
   entitlements: build/entitlements.mac.plist
   appId: com.enzyme.app
-  notarize: false
+  notarize:
+    teamId: 6R848HTCYQ
   target:
     - dmg
     - zip
+  artifactName: "${productName}-${version}-${arch}.${ext}"
 dmg:
   artifactName: ${name}-${version}.${ext}
   sign: false
