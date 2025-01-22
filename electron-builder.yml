@@ -24,8 +24,8 @@ mac:
   icon: resources/IconTemplateBig.png
   entitlementsInherit: build/entitlements.mac.plist
   appId: com.enzyme.app
-  notarize:
-    teamId: 6R848HTCYQ
+  notarize: false
+    # teamId: 6R848HTCYQ
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:

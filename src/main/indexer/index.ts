@@ -70,7 +70,7 @@ export class FileIndexer {
   private folderIndex: Map<string, IndexEntry> = new Map();
   private folderSet: Set<string> = new Set();
   private watcher: chokidar.FSWatcher | null = null;
-  private vaultPath: string | null = null;
+  public vaultPath: string | null = null;
   private spacesPath: string = "enzyme-spaces";
   private isIndexing: boolean = false;
   private indexQueue: Array<() => Promise<void>> = [];
@@ -528,15 +528,16 @@ export class FileIndexer {
 
   private updateFolderIndex(metadata: FileMetadata): void {
     const folder = path.dirname(metadata.path);
-    const entry = this.folderIndex.get(folder) || { files: [] };
+    const folderSuffix = folder.replace(this.vaultPath || '', '').replace(/^\/+/, '');
+    const entry = this.folderIndex.get(folderSuffix) || { files: [] };
     entry.files = entry.files.filter(f => f.path !== metadata.path);
     entry.files.push(metadata);
     entry.files.sort((a, b) => {
       if (!a.createdAt || !b.createdAt) return 0;
       return b.createdAt.getTime() - a.createdAt.getTime();
     });
-    this.folderIndex.set(folder, entry);
-    this.folderSet.add(folder);
+    this.folderIndex.set(folderSuffix, entry);
+    this.folderSet.add(folderSuffix);
   }
 
   getFilesForTag(tag: string): FileMetadata[] {
@@ -557,7 +558,9 @@ export class FileIndexer {
     if (this.isIndexing) {
       throw new Error('Indexing in progress');
     }
-    return this.folderIndex.get(folderPath)?.files || [];
+    // Normalize the path to remove trailing slashes but keep the full path
+    const normalizedPath = path.normalize(folderPath).replace(/\/$/, '');
+    return this.folderIndex.get(normalizedPath)?.files || [];
   }
 
   private async handleFileChange(filePath: string): Promise<void> {

@@ -132,7 +132,7 @@ function collectFilesForPattern(pattern: QueryPattern, useElectronFileIndexer: b
   }
 
   return files.map(f => ({
-    path: f.path,
+    path: path.isAbsolute(f.path) ? f.path : path.join(fileIndexer.vaultPath || '', f.path),
     matches: [{ type: pattern.type, value: pattern.value }],
     createdAt: getFileCreationDate({}, f.path)
   }));
@@ -256,9 +256,14 @@ export async function extractPatterns(
     }
     
     // Extract all unique contexts across all matches
-    const extractedContexts = matches.flatMap(match => 
-      extractContentForMatch(processedContents, match, frontmatter)
-    );
+    const extractedContexts = matches.flatMap(match => {
+      if (match.type === MatchType.Tag || match.type === MatchType.MarkdownLink) {
+        return extractContentForMatch(processedContents, match, frontmatter);
+      } else {
+        // Lasso extraction doesn't apply to folders
+        return [processedContents];
+      }
+    });
 
     // Get unique contexts and skip if none found
     const uniqueContexts = [...new Set(extractedContexts)].filter(context => 
