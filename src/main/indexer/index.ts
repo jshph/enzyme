@@ -5,6 +5,7 @@ import * as chokidar from 'chokidar';
 import { getFileCreationDate } from '../utils.js';
 import * as winston from 'winston';
 import { ServerContext } from '../server.js';
+import { app } from 'electron';
 
 export interface FileMetadata {
   path: string;
@@ -97,6 +98,7 @@ export class FileIndexer {
 
   constructor() {
     // Initialize logger
+    this.logPath = path.join(app.getPath('userData'), 'logs');
     this.logger = winston.createLogger({
       level: 'debug',
       format: winston.format.combine(
@@ -261,21 +263,30 @@ export class FileIndexer {
       return;
     }
 
-    const files = await this.getAllFiles(vaultPath);
-    this.logger.info(`Found ${files.length} files in directory: ${vaultPath}`);
-
-    // Validate that there are more than 0 files
-    if (files.length === 0) {
-      this.emitIndexingStatus();
-      return;
-    }
-
-    this.processedFiles = 0;
-    this.totalFiles = files.length;
-    this.batchTotalFiles = 0;  // Reset batch counters
-    this.batchProcessedFiles = 0;
-
     try {
+      const files = await this.getAllFiles(vaultPath);
+      const totalFilesFound = files.length;
+      
+      this.logger.info(`Found ${totalFilesFound} markdown files in directory: ${vaultPath}`);
+
+      // Log first 5 files that will be indexed
+      if (totalFilesFound > 0) {
+        const firstFiveFiles = files.slice(0, 5);
+        this.logger.info('First 5 markdown files to be indexed:');
+        firstFiveFiles.forEach((file, index) => {
+          this.logger.info(`${index + 1}. ${path.relative(vaultPath, file)}`);
+        });
+      } else {
+        this.logger.warn('No markdown files found in the directory');
+        this.emitIndexingStatus();
+        return;
+      }
+
+      this.processedFiles = 0;
+      this.totalFiles = totalFilesFound;
+      this.batchTotalFiles = 0;  // Reset batch counters
+      this.batchProcessedFiles = 0;
+
       // Disable the watcher temporarily during initial indexing
       if (this.watcher) {
         this.logger.info('Closing the file watcher temporarily');
@@ -284,21 +295,48 @@ export class FileIndexer {
       }
 
       this.logger.info('Starting to process files...');
+      let indexedFiles = 0;
+      let skippedFiles = 0;
+
       await Promise.all(files.map(async (file) => {
-        const relativePath = path.relative(this.vaultPath!, file);
+        try {
+          const relativePath = path.relative(this.vaultPath!, file);
+          
+          if (!file.toLowerCase().endsWith('.md')) {
+            skippedFiles++;
+            return;
+          }
 
-        const { content, stats, frontmatter, tags, links } = await this.getFileData(file);
-        
-        this.linkToFileMap.set(path.basename(file), file);
-        
-        const isIncluded = this.isIncluded(relativePath, tags);
+          const { content, stats, frontmatter, tags, links } = await this.getFileData(file);
+          
+          this.linkToFileMap.set(path.basename(file), file);
+          
+          const isIncluded = this.isIncluded(relativePath, tags);
 
-        if (isIncluded) {
-          await this.indexFile(content, stats, frontmatter, tags, links, file);
+          if (isIncluded) {
+            await this.indexFile(content, stats, frontmatter, tags, links, file);
+            // Log details of first 5 successfully indexed files
+            if (indexedFiles < 5) {
+              this.logger.info(`Successfully indexed file ${indexedFiles + 1}: ${relativePath}
+                Tags: ${tags.length > 0 ? tags.join(', ') : 'none'}
+                Links: ${links.length > 0 ? links.join(', ') : 'none'}`);
+              indexedFiles++;
+            }
+          } else {
+            skippedFiles++;
+            this.logger.debug(`Skipped excluded file: ${relativePath}`);
+          }
+          this.processedFiles++;
+        } catch (error) {
+          this.logger.error(`Error processing file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          skippedFiles++;
         }
-        this.processedFiles++;
-        this.logger.info(`Processed ${this.processedFiles} of ${this.totalFiles} files`);
       }));
+
+      if (skippedFiles > 0) {
+        this.logger.info(`Skipped ${skippedFiles} files during indexing`);
+      }
+
     } catch (error) {
       this.logger.error(`Error during indexing: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
@@ -380,17 +418,36 @@ export class FileIndexer {
   };
 
   private async getAllFiles(dir: string): Promise<string[]> {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    const files = await Promise.all(entries.map(async (entry) => {
-      // Skip .obsidian folder entirely
-      if (entry.name === '.obsidian') {
-        return [];
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      const files = await Promise.all(entries.map(async (entry) => {
+        // Skip .obsidian folder entirely
+        if (entry.name === '.obsidian') {
+          return [];
+        }
+        
+        const res = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          return this.getAllFiles(res);
+        } else {
+          // Only include markdown files
+          return res.toLowerCase().endsWith('.md') ? res : [];
+        }
+      }));
+
+      const allFiles = files.flat();
+      const markdownFiles = allFiles.filter(file => file.toLowerCase().endsWith('.md'));
+      const skippedFiles = allFiles.length - markdownFiles.length;
+      
+      if (skippedFiles > 0) {
+        this.logger.debug(`Skipped ${skippedFiles} non-markdown files in directory: ${dir}`);
       }
       
-      const res = path.join(dir, entry.name);
-      return entry.isDirectory() ? this.getAllFiles(res) : res;
-    }));
-    return files.flat().filter(file => file.toLowerCase().endsWith('.md'));
+      return markdownFiles;
+    } catch (error) {
+      this.logger.error(`Error reading directory ${dir}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return [];
+    }
   }
   private isIncluded(path: string, tags: string[]): boolean {
     // Add check for .obsidian folder
@@ -924,25 +981,36 @@ export class FileIndexer {
   }
 
   private async computeTrendingDataCache(): Promise<void> {
+    this.logger.info('Starting to compute trending data cache...');
     this.isIndexing = true;
+
+    // Log the current state
+    this.logger.info(`Current index state: ${this.tagIndex.size} tags, ${this.linkIndex.size} links`);
+
     const trendingItems = this.computeTrendingItems();
+
+    // Log trending items stats
+    this.logger.info(`Computed trending items: ${trendingItems.tags.length} tags, ${trendingItems.links.length} links`);
+
     const timeline = {
       tags: new Map<string, TimelineItem[]>(),
       links: new Map<string, TimelineItem[]>()
     };
 
     // Pre-compute timeline for trending tags
+    this.logger.info('Computing timeline for trending tags...');
     for (const tag of trendingItems.tags) {
-      timeline.tags.set(tag.name, 
-        this.getEntityTimeline([[tag.name, { type: 'tag', count: tag.count }]])
-      );
+      const timelineItems = this.getEntityTimeline([[tag.name, { type: 'tag', count: tag.count }]]);
+      timeline.tags.set(tag.name, timelineItems);
+      this.logger.debug(`Tag "${tag.name}": ${timelineItems.length} timeline items, ${tag.count} total occurrences`);
     }
 
     // Pre-compute timeline for trending links
+    this.logger.info('Computing timeline for trending links...');
     for (const link of trendingItems.links) {
-      timeline.links.set(link.name,
-        this.getEntityTimeline([[link.name, { type: 'link', count: link.count }]])
-      );
+      const timelineItems = this.getEntityTimeline([[link.name, { type: 'link', count: link.count }]]);
+      timeline.links.set(link.name, timelineItems);
+      this.logger.debug(`Link "${link.name}": ${timelineItems.length} timeline items, ${link.count} total occurrences`);
     }
 
     this.trendingCache = {
@@ -950,6 +1018,14 @@ export class FileIndexer {
       timeline,
       lastUpdated: Date.now()
     };
+
+    // Log final stats
+    this.logger.info(`Trending cache update complete. Cache contains:
+      - ${trendingItems.tags.length} trending tags
+      - ${trendingItems.links.length} trending links
+      - ${Array.from(timeline.tags.values()).reduce((sum, items) => sum + items.length, 0)} total tag timeline items
+      - ${Array.from(timeline.links.values()).reduce((sum, items) => sum + items.length, 0)} total link timeline items
+      - Last updated: ${new Date(this.trendingCache.lastUpdated).toISOString()}`);
 
     this.isIndexing = false;
   }
