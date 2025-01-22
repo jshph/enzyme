@@ -4,6 +4,12 @@ on:
     tags:
       - 'v*'
 
+# Add permissions block
+permissions:
+  contents: write
+  discussions: write
+  packages: write
+
 jobs:
   release:
     runs-on: macos-latest
@@ -63,7 +69,7 @@ jobs:
       # Build and release
       - name: Build and release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.P12_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
