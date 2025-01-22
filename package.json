@@ -1,6 +1,6 @@
 {
   "name": "enzyme",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "type": "module",
@@ -49,6 +49,7 @@
     "ai": "^4.0.20",
     "ajv": "^8.17.1",
     "axios": "^1.7.9",
+    "builder-util-runtime": "^9.2.10",
     "chokidar": "^3.6.0",
     "class-variance-authority": "^0.7.1",
     "cors": "^2.8.5",

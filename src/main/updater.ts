@@ -72,8 +72,22 @@ export async function checkForUpdates(ghToken?: string) {
     // Add configuration for update preferences
     autoUpdater.channel = 'latest';
     autoUpdater.allowPrerelease = false;
-    // Specify which file format to look for
     autoUpdater.forceDevUpdateConfig = false;
+    
+    // Add error handling for download failures
+    autoUpdater.on('error', (error) => {
+      logger.error('Update error:', error);
+      // Attempt to restart the download if it fails
+      if (error.message.includes('retry')) {
+        logger.info('Retrying update download...');
+        setTimeout(() => {
+          autoUpdater.checkForUpdatesAndNotify({
+            title: 'Update Available',
+            body: 'A new version of Enzyme is available. Click to download.'
+          });
+        }, 5000); // Wait 5 seconds before retrying
+      }
+    });
     
     logger.info('Checking for update');
     const result = await autoUpdater.checkForUpdatesAndNotify({
