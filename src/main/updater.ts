@@ -1,15 +1,30 @@
-import { autoUpdater } from 'electron-updater';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 import { dialog } from 'electron';
 import { logger } from './ipc/index.js';
 
 export function setupIpcUpdater() {
   logger.debug('Setting up auto-updater');
 
+  // Configure auto updater
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.logger = logger;
 
+  // Handle update errors
   autoUpdater.on('error', (err) => {
-    logger.error('AutoUpdater error:', err);
+    const errorMessage = err.stack || err.message || String(err);
+    logger.error('AutoUpdater error:', errorMessage);
+    
+    // More detailed error dialog
+    dialog.showMessageBox({
+      type: 'error',
+      title: 'Update Error',
+      message: 'An error occurred while updating the application.',
+      detail: `Error details: ${errorMessage}\n\nPlease check your internet connection and try again later.`,
+      buttons: ['OK']
+    });
   });
 
   autoUpdater.on('checking-for-update', () => {
@@ -18,6 +33,13 @@ export function setupIpcUpdater() {
 
   autoUpdater.on('update-available', (info) => {
     logger.info('Update available:', info);
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Available',
+      message: `Version ${info.version} is available.`,
+      detail: 'The update will be downloaded in the background.',
+      buttons: ['OK']
+    });
   });
 
   autoUpdater.on('download-progress', (progressObj) => {
@@ -34,31 +56,35 @@ export function setupIpcUpdater() {
     dialog.showMessageBox({
       type: 'info',
       title: 'Update Ready',
-      message: `Version ${info.version} has been downloaded and will be installed on quit. Install now?`,
-      buttons: ['Install and Restart', 'Later']
+      message: `Version ${info.version} has been downloaded and will be installed on quit.`,
+      detail: 'Would you like to install the update now?',
+      buttons: ['Install and Restart', 'Later'],
+      defaultId: 0,
+      cancelId: 1
     }).then((buttonIndex) => {
       if (buttonIndex.response === 0) {
-        autoUpdater.quitAndInstall(false, true);
+        setImmediate(() => autoUpdater.quitAndInstall(false, true));
       }
     });
   });
+}
 
-  // Check for updates immediately
+export async function checkForUpdates(ghToken?: string) {
   try {
-    autoUpdater.checkForUpdatesAndNotify({
+    // Set up auth headers if token is provided
+    if (ghToken) {
+      autoUpdater.requestHeaders = {
+        'Authorization': `token ${ghToken}`
+      };
+    }
+
+    logger.debug('Checking for updates...');
+    const result = await autoUpdater.checkForUpdatesAndNotify({
       title: 'Update Available',
       body: 'A new version of Enzyme is available. Click to download.'
     });
+    logger.debug('Update check result:', result);
   } catch (error) {
     logger.error('Error checking for updates:', error);
   }
-
-  // Check for updates every hour
-  setInterval(() => {
-    try {
-      autoUpdater.checkForUpdatesAndNotify();
-    } catch (error) {
-      logger.error('Error in periodic update check:', error);
-    }
-  }, 60 * 60 * 1000);
 } 

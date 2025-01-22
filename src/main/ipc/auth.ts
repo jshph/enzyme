@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { TokenManager } from "../auth.js";
 import { getServerUrl, logger, store } from "./index.js";
 import { clearSession, getCurrentSession } from "./user.js";
+import { checkForUpdates } from '../updater.js';
 
 export function setupAuthIPCRoutes() {
   ipcMain.handle('login', async (event, email: string, password: string) => {
@@ -12,6 +13,26 @@ export function setupAuthIPCRoutes() {
 
   const SERVER_URL = getServerUrl();
 
+  async function fetchGithubToken(accessToken: string): Promise<string | null> {
+    try {
+      const response = await fetch(`${SERVER_URL}/auth/github-token`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      return data.token;
+    } catch (error) {
+      logger.error('Error fetching GitHub token:', error);
+      return null;
+    }
+  }
 
   ipcMain.handle('auth:verify-otp', async (_, email: string, otpCode: string) => {
     try {
@@ -31,6 +52,12 @@ export function setupAuthIPCRoutes() {
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token
         });
+
+        // Initial update check after login
+        const ghToken = await fetchGithubToken(data.session.access_token);
+        if (ghToken) {
+          await checkForUpdates(ghToken);
+        }
       }
       
       return { success: true, message: data.message };
@@ -96,6 +123,12 @@ export function setupAuthIPCRoutes() {
           access_token: data.access_token,
           refresh_token: data.refresh_token || refresh_token // Keep old refresh token if new one not provided
         });
+
+        // Check for updates when session is verified
+        const ghToken = await fetchGithubToken(data.access_token);
+        if (ghToken) {
+          await checkForUpdates(ghToken);
+        }
       }
       
       return { isAuthenticated: true, user: data.user };
@@ -110,12 +143,12 @@ export function setupAuthIPCRoutes() {
 
   ipcMain.handle('auth:logout', async () => {
     try {
-      const { token } = await getCurrentSession();
+      const session = await getCurrentSession();
       const response = await fetch(`${SERVER_URL}/auth/logout`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          ...(session.access_token && { 'Authorization': `Bearer ${session.access_token}` })
         }
       });
 
