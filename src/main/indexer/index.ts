@@ -684,38 +684,62 @@ export class FileIndexer {
 
   private computeTrendingItems(): TrendingItems {
     const now = new Date();
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     
+    // First check files from last 3 months
+    const recentUniqueFiles = new Set<string>();
+    
+    // Count recent files first
+    this.tagIndex.forEach(entry => {
+        entry.files
+            .filter(f => f.createdAt >= threeMonthsAgo)
+            .forEach(f => recentUniqueFiles.add(f.path));
+    });
+    this.linkIndex.forEach(entry => {
+        entry.files
+            .filter(f => f.createdAt >= threeMonthsAgo)
+            .forEach(f => recentUniqueFiles.add(f.path));
+    });
+
+    // If we have fewer than 50 recent files, use all files without time filter
+    const useTimeFilter = recentUniqueFiles.size >= 50;
     const tagCounts = new Map<string, number>();
     const linkCounts = new Map<string, number>();
 
     // Process tag index
     this.tagIndex.forEach((entry, tag) => {
-      const recentFiles = entry.files.filter(f => f.createdAt >= oneMonthAgo);
-      if (recentFiles.length > 0) {
-        tagCounts.set(tag, recentFiles.length);
-      }
+        const relevantFiles = useTimeFilter ? 
+            entry.files.filter(f => f.createdAt >= threeMonthsAgo) :
+            entry.files;
+        if (relevantFiles.length > 0) {
+            tagCounts.set(tag, relevantFiles.length);
+        }
     });
 
     // Process link index
     this.linkIndex.forEach((entry, link) => {
-      const recentFiles = entry.files.filter(f => f.createdAt >= oneMonthAgo);
-      if (recentFiles.length > 0) {
-        linkCounts.set(link, recentFiles.length);
-      }
+        const relevantFiles = useTimeFilter ? 
+            entry.files.filter(f => f.createdAt >= threeMonthsAgo) :
+            entry.files;
+        if (relevantFiles.length > 0) {
+            linkCounts.set(link, relevantFiles.length);
+        }
     });
 
     const sortByCount = (a: [string, number], b: [string, number]) => b[1] - a[1];
     
-    const topTags = Array.from(tagCounts.entries())
-      .sort(sortByCount)
-      .slice(0, 25)
-      .map(([name, count]) => ({ name, count }));
+    // Get all items sorted by count
+    const sortedTags = Array.from(tagCounts.entries()).sort(sortByCount);
+    const sortedLinks = Array.from(linkCounts.entries()).sort(sortByCount);
 
-    const topLinks = Array.from(linkCounts.entries())
-      .sort(sortByCount)
-      .slice(0, 25)
-      .map(([name, count]) => ({ name, count }));
+    // Always limit to 40 of each type
+    const topTags = sortedTags
+        .slice(0, 40)
+        .map(([name, count]) => ({ name, count }));
+
+    const topLinks = sortedLinks
+        .slice(0, 40)
+        .map(([name, count]) => ({ name, count }));
 
     return { tags: topTags, links: topLinks };
   }
@@ -946,35 +970,37 @@ export class FileIndexer {
 
   public getEntityTimeline(entities: Array<[string, { type: 'tag' | 'link'; count: number }]>): TimelineItem[] {
     const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3); // Changed to 3 months
     
     const timeline: TimelineItem[] = [];
     
     entities.forEach(([name, { type, count }]) => {
-      const index = type === 'tag' ? this.tagIndex : this.linkIndex;
-      
-      // // Clean the name - remove # for tags and [[ ]] for links
-      const cleanName = type === 'tag' ? 
-        name.replace(/^#/, '') : 
-        name.replace(/^\[\[|\]\]$/g, '');
-      
-      const entry = index.get(cleanName);
-      
-      if (entry) {
-        const filteredFiles = entry.files
-          .filter(file => file.createdAt >= threeMonthsAgo);
+        const index = type === 'tag' ? this.tagIndex : this.linkIndex;
         
-        filteredFiles
-          .slice(0, count)
-          .forEach(file => {
-            timeline.push({
-              date: file.createdAt,
-              type,
-              name,  // Keep the original name with prefix in the timeline
-              file: file.path // Add the file path to timeline items
-            });
-          });
-      }
+        const cleanName = type === 'tag' ? 
+            name.replace(/^#/, '') : 
+            name.replace(/^\[\[|\]\]$/g, '');
+        
+        const entry = index.get(cleanName);
+        
+        if (entry) {
+            const filteredFiles = entry.files
+                .filter(file => file.createdAt >= threeMonthsAgo);
+            
+            // If we have fewer than 50 total items, include all files
+            const fileLimit = filteredFiles.length < 50 ? filteredFiles.length : count;
+            
+            filteredFiles
+                .slice(0, fileLimit)
+                .forEach(file => {
+                    timeline.push({
+                        date: file.createdAt,
+                        type,
+                        name,
+                        file: file.path
+                    });
+                });
+        }
     });
     
     return timeline.sort((a, b) => a.date.getTime() - b.date.getTime());
