@@ -169,11 +169,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             type: 'mention',
             name: tag
           })),
-          // ...links.map(link => ({
-          //   id: link,
-          //   type: 'mention',
-          //   name: link
-          // }))
+          ...links.map(link => ({
+            id: link,
+            type: 'mention',
+            name: link
+          }))
         ]
       )];
 
@@ -183,16 +183,15 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           target: tag
         }));
 
-        // const linkLinks = links.map(link => ({
-        //   source: file,
-        //   target: link
-        // }));
+        const linkLinks = links.map(link => ({
+          source: file,
+          target: link
+        }));
 
         return [{
           source: name,
           target: file
-        }, ...tagLinks];
-        // ...linkLinks];
+        }, ...tagLinks, ...linkLinks];
       });
       
       // Update graph with new data
