@@ -111,9 +111,8 @@ export const SuggestedOutput = React.forwardRef<
           if (segment.theme && segment.emoji) {
             newSections.push({
               type: 'theme',
-              title: `Topic: ${segment.emoji} ${segment.theme}`,
-              content: (
-                <div className="space-y-2">
+              title: (
+                <div className="flex items-center gap-2">
                   <button 
                     onClick={() => togglePrompt(index)}
                     className="p-1 rounded hover:bg-secondary/10"
@@ -129,6 +128,18 @@ export const SuggestedOutput = React.forwardRef<
                     Topic: 
                     <span className="ml-2 px-3 py-1.5 rounded-full bg-brand/10 text-white">{segment.emoji} {segment.theme}</span>
                   </span>
+                </div>
+              ),
+              content: (
+                <div className="space-y-2">
+                  {expandedPrompts.includes(index) && (
+                    <div className="mt-2 border-l-2 ml-3 border-secondary/20 pl-4">
+                      <div className="bg-secondary/5 p-4 rounded-md">
+                        <h4 className="text-xs font-medium mb-2 text-secondary">Analysis Recipe</h4>
+                        <p className="text-sm text-secondary/80">{segment.synthesis.prompt}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             });
