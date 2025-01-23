@@ -10,6 +10,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 interface SelectedEntity {
   type: 'tag' | 'link';
   count: number;
+  maxCount: number;
 }
 
 type SelectedEntitiesMap = Map<string, SelectedEntity>;
@@ -78,7 +79,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       if (doAdd) {
         next.set(name, { 
           type: name.startsWith('#') ? 'tag' : 'link', 
-          count: DEFAULT_COUNT 
+          count: DEFAULT_COUNT,
+          maxCount: DEFAULT_COUNT
         });
         initializeDocCountForMention(name);
       } else {
@@ -122,7 +124,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     // Only fetch new context if we're adding an entity
     if (isAdding) {
       const updatedEntities = new Map(selectedEntities);
-      updatedEntities.set(name, { type, count: DEFAULT_COUNT });
+      updatedEntities.set(name, { type, count: DEFAULT_COUNT, maxCount: DEFAULT_COUNT });
 
       // const query = Array.from(updatedEntities.keys())
       //   .map(name => `${name}<${DEFAULT_CONTEXT_RECALL}`)
@@ -136,6 +138,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         console.error('No context found');
         return;
       }
+
+      // Count occurrences of this entity in context
+      const maxCount = context.length;
+      const initialCount = Math.min(DEFAULT_COUNT, maxCount);
+
+      // Update selectedEntities with maxCount
+      updatedEntities.set(name, { type, count: initialCount, maxCount });
+      setSelectedEntities(updatedEntities);
+
+      // Initialize doc count with the calculated initial count
+      updateDocCountForMention(name, initialCount);
 
       // Create graph data from context
       const documents = context.map(({file}) => ({
@@ -461,13 +474,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     const numberElement = draggedEntity.element;
     if (!numberElement) return;
     
-    const numberRect = numberElement.getBoundingClientRect();
+    const entity = selectedEntities.get(draggedEntity.name);
+    if (!entity) return;
+
+    const { maxCount } = entity;
     const pixelsPerUnit = 5;
+    const numberRect = numberElement.getBoundingClientRect();
     const centerX = numberRect.left + (numberRect.width / 2);
     const deltaX = e.clientX - centerX;
     
     const countDelta = Math.floor(deltaX / pixelsPerUnit);
-    const newCount = Math.max(1, Math.min(30, DEFAULT_COUNT + countDelta));
+    const newCount = Math.max(1, Math.min(maxCount, DEFAULT_COUNT + countDelta));
     
     // Update ref for immediate visual feedback
     dragCountRef.current = newCount;
@@ -480,9 +497,9 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       direction: deltaX < 0 ? 'left' : 'right'
     });
     
-    // Use debounced update instead
+    // Use debounced update
     const updatedEntities = new Map(selectedEntities);
-    updatedEntities.set(draggedEntity.name, { type: draggedEntity.type, count: newCount });
+    updatedEntities.set(draggedEntity.name, { ...entity, count: newCount });
     updateTimelineDebounced(Array.from(updatedEntities.entries()));
   };
 
