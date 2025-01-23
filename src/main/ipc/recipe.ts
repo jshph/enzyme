@@ -148,10 +148,17 @@ export function setupRecipeRoutes() {
     let abortController: AbortController | null = null;
     
     try {
+      logger.debug('Starting generation with:', {
+        contextLength: context?.length,
+        query,
+        profileId
+      });
+
       const { access_token } = await getCurrentSession();
       
       // Handle unauthenticated state
       if (!access_token) {
+        logger.debug('No access token found, handling unauthenticated generation');
         const stored = generationStore.get(UNAUTHENTICATED_STORE_KEY) as {
           count: number;
           lastResetDate: string;
@@ -201,6 +208,7 @@ export function setupRecipeRoutes() {
         };
       }
 
+      logger.debug('Making generation request to server');
       const response = await fetch(`${SERVER_URL}/digest/generate-suggested`, {
         method: 'POST',
         headers: {
@@ -212,15 +220,23 @@ export function setupRecipeRoutes() {
       });
 
       if (!response.ok) {
+        logger.error('Server error during generation:', {
+          status: response.status,
+          statusText: response.statusText
+        });
         throw new Error(`Server responded with ${response.status}`);
       }
 
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response body');
+      if (!reader) {
+        logger.error('No response body received from server');
+        throw new Error('No response body');
+      }
 
       // Process the stream line by line
       const textDecoder = new TextDecoder();
       let buffer = '';
+      let chunkCount = 0;
 
       while (true) {
         if (signal?.aborted || abortController.signal.aborted) {
@@ -236,16 +252,18 @@ export function setupRecipeRoutes() {
         const { done: streamDone, value } = await reader.read();
         
         if (streamDone) {
+          logger.debug(`Stream complete. Processed ${chunkCount} chunks`);
           // Process any remaining buffer immediately
           if (buffer.trim()) {
             try {
               const chunk = JSON.parse(buffer);
+              logger.debug('Processing final chunk from buffer');
               event.sender.send('suggested-output-chunk', { 
                 chunk, 
                 done: false 
               });
             } catch (e) {
-              logger.error('Error parsing final chunk:', e);
+              logger.error('Error parsing final chunk:', e, 'Buffer content:', buffer);
             }
           }
           // Send done signal immediately
@@ -262,8 +280,17 @@ export function setupRecipeRoutes() {
           if (line.trim()) {
             try {
               const chunk = JSON.parse(line);
+              chunkCount++;
+              
+              // Log chunk details for debugging
+              logger.debug(`Processing chunk ${chunkCount}:`, {
+                hasContent: !!chunk,
+                chunkTypes: chunk ? Object.keys(chunk) : 'empty chunk'
+              });
+
               // Check if this is a done signal from the server
               if (chunk.done) {
+                logger.debug('Received done signal from server');
                 event.sender.send('suggested-output-chunk', { 
                   chunk: null, 
                   done: true 
@@ -275,16 +302,20 @@ export function setupRecipeRoutes() {
                 done: false 
               });
             } catch (error) {
-              logger.error('Error parsing chunk:', error);
+              logger.error('Error parsing chunk:', error, 'Line content:', line);
               continue;
             }
           }
         }
       }
 
+      logger.debug('Generation completed successfully');
       return { success: true };
     } catch (error) {
-      logger.error('Generation error:', error);
+      logger.error('Generation error:', error, {
+        errorType: error instanceof Error ? error.name : 'Unknown',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
       
       // Type guard the error before accessing name property
       if (error instanceof Error && error.name === 'AbortError') {
@@ -302,7 +333,7 @@ export function setupRecipeRoutes() {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       event.sender.send('suggested-output-chunk', { 
         error: errorMessage, 
-        done: true  // Make sure done:true is sent with errors
+        done: true
       });
 
       return { 

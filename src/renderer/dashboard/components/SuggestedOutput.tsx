@@ -84,105 +84,109 @@ export const SuggestedOutput = React.forwardRef<
       try {
         const newSections: OutputSection[] = [];
 
-        if (!body) {
+        if (!body || !body.segments) {
+          console.warn('SuggestedOutput: Missing body or segments data', { body });
+          setSections([]);
           return;
         }
 
-        // Recipe Question - Persistent
-        newSections.push({
-          type: 'question',
-          title: 'Question',
-          content: (
-            <div className="bg-secondary/20  p-4 rounded-md shadow-sm">
-              <p className="font-medium text-primary">{body.question}</p>
-            </div>
-          )
-        });
+        if (body.question) {
+          newSections.push({
+            type: 'question',
+            title: 'Question',
+            content: (
+              <div className="bg-secondary/20 p-4 rounded-md shadow-sm">
+                <p className="font-medium text-primary">{body.question}</p>
+              </div>
+            )
+          });
+        }
 
         body.segments.forEach((segment, index) => {
-          // Theme - Persistent
-          newSections.push({
-            type: 'theme',
-            title: (
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => togglePrompt(index)}
-                  className="p-1 rounded hover:bg-secondary/10"
-                >
-                  <ChevronRight 
-                    className={`
-                      w-4 h-4 transition-transform
-                      ${expandedPrompts.includes(index) ? 'transform rotate-90' : ''}
-                    `} 
-                  />
-                </button>
-                <span className="text-md font-bold">
-                  Topic: 
-                  <span className="ml-2 px-3 py-1.5 rounded-full bg-brand/10 text-white">{segment.emoji} {segment.theme}</span>
-                </span>
-              </div>
-            ),
-            content: (
-              <div className="space-y-2">
-                {expandedPrompts.includes(index) && (
-                  <div className="mt-2 border-l-2 ml-3 border-secondary/20 pl-4">
-                    <div className="bg-secondary/5 p-4 rounded-md">
-                      <h4 className="text-xs font-medium mb-2 text-secondary">Analysis Recipe</h4>
-                      <p className="text-sm text-secondary/80">{segment.synthesis.prompt}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          });
+          if (!segment) {
+            console.warn(`SuggestedOutput: Invalid segment at index ${index}`, segment);
+            return;
+          }
 
-
-          // Exploration - Dynamic
-          newSections.push({
-            type: 'synthesis',
-            title: (profileTypes?.find(type => type.type === segment.synthesis.type)?.name || ''),
-            content: (
-              <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100 text-sm">
-                <p>{segment.synthesis.analysis}</p>
-              </div>
-            )
-          });
-
-          // Sources - Dynamic
-          newSections.push({
-            type: 'docs',
-            title: 'Related Notes',
-            content: (
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                {segment.docs.map((doc, idx) => (
-                  <div 
-                    key={idx} 
-                    className="bg-secondary/5 border border-dashed rounded-md cursor-pointer border-secondary/20 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100"
-                    onClick={() => openInObsidian(doc.file)}
+          if (segment.theme && segment.emoji) {
+            newSections.push({
+              type: 'theme',
+              title: `Topic: ${segment.emoji} ${segment.theme}`,
+              content: (
+                <div className="space-y-2">
+                  <button 
+                    onClick={() => togglePrompt(index)}
+                    className="p-1 rounded hover:bg-secondary/10"
                   >
-                    <div className="p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-secondary/30">{doc.file}</span>
-                        <button 
-                          className="text-xs opacity-50 hover:opacity-100"
-                        >
-                          Open
-                        </button>
+                    <ChevronRight 
+                      className={`
+                        w-4 h-4 transition-transform
+                        ${expandedPrompts.includes(index) ? 'transform rotate-90' : ''}
+                      `} 
+                    />
+                  </button>
+                  <span className="text-md font-bold">
+                    Topic: 
+                    <span className="ml-2 px-3 py-1.5 rounded-full bg-brand/10 text-white">{segment.emoji} {segment.theme}</span>
+                  </span>
+                </div>
+              )
+            });
+          }
+
+          if (segment.synthesis?.type && segment.synthesis?.analysis) {
+            newSections.push({
+              type: 'synthesis',
+              title: (profileTypes?.find(type => type.type === segment.synthesis.type)?.name || 'Analysis'),
+              content: (
+                <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100 text-sm">
+                  <p>{segment.synthesis.analysis}</p>
+                </div>
+              )
+            });
+          }
+
+          if (segment.docs && segment.docs.length > 0) {
+            newSections.push({
+              type: 'docs',
+              title: 'Related Notes',
+              content: (
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                  {segment.docs.map((doc, idx) => (
+                    <div 
+                      key={idx} 
+                      className="bg-secondary/5 border border-dashed rounded-md cursor-pointer border-secondary/20 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100"
+                      onClick={() => openInObsidian(doc.file)}
+                    >
+                      <div className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-secondary/30">{doc.file}</span>
+                          <button 
+                            className="text-xs opacity-50 hover:opacity-100"
+                          >
+                            Open
+                          </button>
+                        </div>
+                        <p className="text-xs line-clamp-3 text-primary/50">
+                          {doc.content.length > 300 
+                            ? `${doc.content.slice(0, 300)}...` 
+                            : doc.content}
+                        </p>
                       </div>
-                      <p className="text-xs line-clamp-3 text-primary/50">
-                        {doc.content.length > 300 
-                          ? `${doc.content.slice(0, 300)}...` 
-                          : doc.content}
-                      </p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )
-          });
+                  ))}
+                </div>
+              )
+            });
+          }
         });
 
-        setSections(newSections);
+        if (newSections.length > 0) {
+          setSections(newSections);
+        } else {
+          console.warn('SuggestedOutput: No valid sections generated', { body });
+        }
+
       } catch (error) {
         console.error('Error parsing structure:', error);
         setSections([]);
@@ -190,9 +194,8 @@ export const SuggestedOutput = React.forwardRef<
     };
 
     parseAndSetSections();
-  }, [body, expandedPrompts]);
+  }, [body, expandedPrompts, profileTypes]);
 
-  // Helper for temporary success state with message
   const showTemporarySuccess = (
     setState: (state: ButtonState) => void,
     successMessage: string,

@@ -558,6 +558,7 @@ export class FileIndexer {
       entry.files = entry.files.filter(f => f.path !== metadata.path);
       entry.files.push(metadata);
       entry.files.sort((a, b) => {
+        if (!a.createdAt || !b.createdAt) return 0;
         return b.createdAt.getTime() - a.createdAt.getTime();
       });
       this.tagIndex.set(normalizedTag, entry);
@@ -576,6 +577,7 @@ export class FileIndexer {
       entry.files = entry.files.filter(f => f.path !== metadata.path);
       entry.files.push(metadata);
       entry.files.sort((a, b) => {
+        if (!a.createdAt || !b.createdAt) return 0;
         return b.createdAt.getTime() - a.createdAt.getTime();
       });
       this.linkIndex.set(link, entry);
