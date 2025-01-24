@@ -700,9 +700,9 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             onClick={submitPrompt}
           >
             {generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'Generating...' : 
-              generationsRemaining !== null ? 
-                `Generate Recipe (${generationsRemaining} left ${isAuthenticated ? 'this week' : 'today'})` : 
-                'Generate Recipe'}
+              generationsRemaining > 0 ? 
+                `Generate Recipe` : 
+                'Login to generate more recipes'}
           </button>
         </div>
         <p className="text-sm text-primary/50">Discover emerging themes and connections from selected ingredients. Creates a structured synthesis while preserving links to source notes.</p>

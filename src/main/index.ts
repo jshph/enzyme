@@ -211,14 +211,14 @@ function createWindow(): void {
     // if (is.dev && import.meta.env.VITE_ELECTRON_RENDERER_URL) {
     //   mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
     // } else {
-    // mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
-    logger.debug('Loading main window content');
-    try {
-      mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
-      logger.debug('Main window content loaded successfully');
-    } catch (error) {
-      logger.error('Error loading main window content:', error);
-    }
+    mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
+    // logger.debug('Loading main window content');
+    // try {
+    //   mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
+    //   logger.debug('Main window content loaded successfully');
+    // } catch (error) {
+    //   logger.error('Error loading main window content:', error);
+    // }
 
     // Add this event handler
     mainWindow.on('closed', async () => {
