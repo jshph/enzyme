@@ -111,6 +111,9 @@ implementation notes:
 - counts should correspond to at max, the number of notes with that link. Not defaultign to 30
 - links for non-created markdown files (minimal solution)
 - remove the limits when logged in. Also remove the indicators when not logged in
+- hover on open should show a tooltip to ensure that hte vault is open first as a vault
+- clean up messaging on settings around vault, "it's read only"
+- relative paths in the output display, not absolute (finish this)
 
 TODO before launch
 
@@ -118,9 +121,6 @@ TODO before launch
 - index mentioned entities which don't have notes, not just tags. Clean up the entities by removing header suffixes, blocks, etc. Treat embeds as links. But on retrieval, you'll need to not just grep for the link but the link + the suffix.
 
 - logging in doesnt update the settings and the trending data. it should
-- relative paths in the output display, not absolute
-- hover on open should show a tooltip to ensure that hte vault is open first as a vault
-- clean up messaging on settings around vault, "it's read only"
 
 
 - write through a few more blog posts to edit them

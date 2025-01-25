@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { LocalSettings, store, logger, getServerUrl } from "./index.js";
 
 export interface Settings {
+  vaultPath: string;
   port: number;
   includedPatterns: string[];
   excludedPatterns: string[];
@@ -11,9 +12,10 @@ export interface Settings {
 }
   
 const DEFAULT_SETTINGS: Settings = {
+  vaultPath: '',
   port: 3779,
   includedPatterns: ['**/*.md'],
-  excludedPatterns: [],
+  excludedPatterns: ['.obsidian*/**/*'],
   doCache: false,
   defaultPatternLimit: 10,
   excludedTags: [],
@@ -96,13 +98,17 @@ export function validateSettings(settings: any) {
 export async function getSettings() {
   try {
     const { access_token, email } = await getCurrentSession();
-    if (!access_token || !email) {
-      throw new Error('No authenticated session');
-    }
-
     const localSettings = store.get('localSettings') || { vaultPath: '' };
 
-    // Get settings from server using the fresh access token
+    // If not authenticated, return merged local settings
+    if (!access_token || !email) {
+      return { 
+        ...DEFAULT_SETTINGS, 
+        vaultPath: localSettings.vaultPath 
+      };
+    }
+
+    // Get settings from server
     const response = await fetch(`${SERVER_URL}/user/config?email=${email}`, {
       headers: {
         'Content-Type': 'application/json',
@@ -112,33 +118,54 @@ export async function getSettings() {
 
     if (!response.ok) {
       console.error('Failed to fetch settings:', await response.text());
-      return { ...DEFAULT_SETTINGS, vaultPath: localSettings.vaultPath };
+      return { 
+        ...DEFAULT_SETTINGS, 
+        vaultPath: localSettings.vaultPath 
+      };
     }
 
     const serverSettings = await response.json();
     
-    // Merge server settings with local vault path
-    return {
+    // Merge settings preserving local vault path
+    const mergedSettings = {
+      ...DEFAULT_SETTINGS,
       ...serverSettings,
-      vaultPath: localSettings.vaultPath
+      vaultPath: localSettings.vaultPath || serverSettings.vaultPath || ''
     };
-  } catch (error) {
-    // console.error('Error fetching settings:', error);
-    const localSettings = store.get('localSettings') || { vaultPath: '' };
-    return { ...DEFAULT_SETTINGS, vaultPath: localSettings.vaultPath };
-  }
 
+    // Update local settings if needed
+    if (mergedSettings.vaultPath !== localSettings.vaultPath) {
+      store.set('localSettings', { vaultPath: mergedSettings.vaultPath });
+    }
+
+    return mergedSettings;
+
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    const localSettings = store.get('localSettings') || { vaultPath: '' };
+    return { 
+      ...DEFAULT_SETTINGS, 
+      vaultPath: localSettings.vaultPath 
+    };
+  }
 }
 
 export async function clearSession() {
+  const localSettings = store.get('localSettings') || { vaultPath: '' };
+  
   store.delete('auth');
   store.delete('spaces');
-
-  // Don't clear local settings, we want to keep the vault path
-
-  // But do clear the settings and reset
   store.delete('settings');
-  await validateSettings(DEFAULT_SETTINGS);
+
+  // Preserve vaultPath in localSettings
+  store.set('localSettings', { vaultPath: localSettings.vaultPath });
+  
+  // Reset settings while keeping vaultPath
+  const defaultWithVaultPath = {
+    ...DEFAULT_SETTINGS,
+    vaultPath: localSettings.vaultPath
+  };
+  await validateSettings(defaultWithVaultPath);
 }
 
 export function setupUserIPCRoutes() {

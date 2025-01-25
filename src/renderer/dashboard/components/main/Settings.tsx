@@ -135,7 +135,7 @@ const Settings: React.FC = () => {
       <div className="space-y-6">
         <div className="bg-brand/5 p-4 rounded-lg">
           <p className="text-brand/80 text-sm">
-              Set up your markdown vault settings here. This vault is where Enzyme will analyze your knowledge. 
+              Set up your markdown vault settings here. This vault becomes your playground in Enzyme.
               You can choose an existing directory for your vault, or if you don't have one yet, a new vault will be created for you. (
               <a className="text-blue-300 hover:text-blue-400" href="https://obsidian.md" target="_blank" rel="noopener noreferrer">
                 Obsidian
@@ -170,24 +170,6 @@ const Settings: React.FC = () => {
                   Initializing vault...
                 </div>
               )}
-            </div>
-
-            <div className="mt-4 bg-brand/5 border-l-4 border-brand/10 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-brand/60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-secondary/80">
-                  The vault path is stored locally on this machine. If you use Enzyme on multiple computers, you'll need to set the vault path on each one.
-                  </p>
-                  <p className="mt-2 text-sm text-secondary/40">
-                    Note: You may need to grant permission in System Preferences &gt; Security & Privacy &gt; Files and Folders for Enzyme to access your vault folder.
-                  </p>
-                </div>
-              </div>
             </div>
 
             <div>

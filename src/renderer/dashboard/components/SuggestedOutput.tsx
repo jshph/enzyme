@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Calendar, Mail, RefreshCw, ChevronRight, Check, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.js';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import { useSettingsManager } from '../hooks/useSettingsManager.js';
 
 interface SuggestedOutputProps {
   body: SuggestedOutputBody;
@@ -89,7 +90,8 @@ export const SuggestedOutput = React.forwardRef<
     isSuccess: false,
     message: 'Email me a copy'
   });
-
+  const { settings } = useSettingsManager();
+  
   const togglePrompt = (index: number) => {
     setExpandedPrompts(prev => 
       prev.includes(index) 
@@ -112,6 +114,14 @@ export const SuggestedOutput = React.forwardRef<
           setSections([]);
           return;
         }
+
+        const trimVaultPath = (filePath: string) => {
+          if (!settings.vaultPath) {
+            console.warn('vaultPath is undefined in trimVaultPath');
+            return filePath;
+          }
+          return filePath.replace(settings.vaultPath, '').replace(/^\/+/, '');
+        };
 
         if (body.question) {
           newSections.push({
@@ -207,7 +217,7 @@ export const SuggestedOutput = React.forwardRef<
                     >
                       <div className="p-4 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-secondary/30">{doc.file}</span>
+                          <span className="text-xs text-secondary/30">{trimVaultPath(doc.file)}</span>
                           <button 
                             className="text-xs opacity-50 hover:opacity-100 flex items-center gap-1"
                           >
@@ -242,7 +252,7 @@ export const SuggestedOutput = React.forwardRef<
     };
 
     parseAndSetSections();
-  }, [body, expandedPrompts, profileTypes]);
+  }, [body, expandedPrompts, profileTypes, settings.vaultPath]);
 
   const showTemporarySuccess = (
     setState: (state: ButtonState) => void,

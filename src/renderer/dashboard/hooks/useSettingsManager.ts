@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface Settings {
   vaultPath?: string;
@@ -9,14 +10,15 @@ export interface Settings {
   [key: string]: any;
 }
 
-export const useSettingsManager = (initialSettings: Settings = {}) => {
-  const [settings, setSettings] = useState<Settings>(initialSettings);
-  const [originalSettings, setOriginalSettings] = useState<Settings>(initialSettings);
+export const useSettingsManager = (providedInitialSettings: Settings = {}) => {
+  const [settings, setSettings] = useState<Settings>(providedInitialSettings);
+  const [originalSettings, setOriginalSettings] = useState<Settings>(providedInitialSettings);
   const [hasVaultInitialized, setHasVaultInitialized] = useState<boolean>(false);
+  const { isAuthenticated } = useAuth();
 
   const arrayFields = ['includedPatterns', 'excludedPatterns', 'excludedTags'];
 
-  const saveLocalSettings = async (settings: Settings) => {
+  const saveLocalSettings = useCallback(async () => {
     if (settings.vaultPath) {
       await window.electron.ipcRenderer.invoke('update-local-settings', {
         vaultPath: settings.vaultPath
@@ -24,7 +26,7 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
     } else {
       console.log('No vault path provided');
     }
-  }
+  }, [settings]);
 
   const processArrayField = useCallback((value: string[] | string): string => {
     if (Array.isArray(value)) {
@@ -38,11 +40,11 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
   }, []);
 
   const updateSetting = useCallback((key: string, value: any) => {
-    setSettings(currentSettings => ({
-      ...currentSettings,
+    setSettings(prevSettings => ({
+      ...prevSettings,
       [key]: value
     }));
-  }, []);
+  }, [setSettings]);
 
   const hasChanges = useCallback(() => {
     return JSON.stringify(settings) !== JSON.stringify(originalSettings);
@@ -50,16 +52,16 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
 
   const resetSettings = useCallback(() => {
     setSettings(originalSettings);
-  }, [originalSettings]);
+  }, [setSettings, originalSettings]);
 
-  const refreshSettings = async (): Promise<Settings> => {
-    const savedSettings = await window.electron.ipcRenderer.invoke('get-settings');
-
-    await saveLocalSettings(savedSettings);
-
-    setSettings(savedSettings);
-    setOriginalSettings(savedSettings);
-    return savedSettings;
+  const refreshSettings = async () => {
+    try {
+      const newSettings = await window.electron.ipcRenderer.invoke
+      ('get-settings');
+      setSettings(newSettings);
+    } catch (error) {
+      console.error('Error refreshing settings:', error);
+    }
   };
 
   const initializeVault = async (): Promise<boolean> => {
@@ -116,11 +118,11 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
     }
   }, [settings, arrayFields, prepareArrayField]);
 
+  // Refresh settings when the page is visible
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
-        console.log('refreshing settings')
-        refreshSettings();
+        await refreshSettings();
       }
     };
 
@@ -129,6 +131,12 @@ export const useSettingsManager = (initialSettings: Settings = {}) => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  // Also refresh settings when authentication changes
+  useEffect(() => {
+    refreshSettings();
+    initializeVault();
+  }, [isAuthenticated]);
 
   return {
     settings,
