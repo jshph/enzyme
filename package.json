@@ -1,6 +1,6 @@
 {
   "name": "enzyme",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "type": "module",
