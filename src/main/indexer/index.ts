@@ -401,7 +401,7 @@ export class FileIndexer {
         tags = this.extractTags(frontmatter, content);
         links = this.extractMarkdownLinks(content);
       } catch (error) {
-        console.error(`Error parsing frontmatter for file ${filePath}:`, error);
+        // console.error(`Error parsing frontmatter for file ${filePath}:`, error);
       }
 
       frontmatter = {
