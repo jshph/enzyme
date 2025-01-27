@@ -396,14 +396,18 @@ export class FileIndexer {
       let links: string[] = [];
 
       try {
-        const { data: frontmatter } = matter.default(content);
+        const parsedMatter = matter.default(content);
+        frontmatter = parsedMatter.data;
         tags = this.extractTags(frontmatter, content);
         links = this.extractMarkdownLinks(content);
       } catch (error) {
-        // console.error(`Error parsing frontmatter for file ${filePath}:`, error);
+        console.error(`Error parsing frontmatter for file ${filePath}:`, error);
       }
 
-      frontmatter.creationDate = await getFileCreationDate(frontmatter, filePath);
+      frontmatter = {
+        ...frontmatter,
+        createdAt: await getFileCreationDate(frontmatter, filePath)
+      };
 
       return { content, stats, frontmatter, tags, links };
     });
@@ -503,7 +507,7 @@ export class FileIndexer {
       // Extract metadata
       const metadata: FileMetadata = {  
         path: filePath,
-        createdAt: frontmatter.creationDate,  
+        createdAt: frontmatter.createdAt,  
         tags: tags, 
         links: links,
         lastModified: stats.mtimeMs
@@ -703,8 +707,8 @@ export class FileIndexer {
             .forEach(f => recentUniqueFiles.add(f.path));
     });
 
-    // If we have fewer than 50 recent files, use all files without time filter
-    const useTimeFilter = recentUniqueFiles.size >= 50;
+    // If we have fewer than 200 recent files, use all files without time filter
+    const useTimeFilter = recentUniqueFiles.size >= 200;
     const tagCounts = new Map<string, number>();
     const linkCounts = new Map<string, number>();
 

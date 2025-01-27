@@ -4,9 +4,9 @@ import { promises as fs } from 'fs';
 export async function getFileCreationDate(frontmatter: any, file: string): Promise<Date> {
   try {
     // if it is a valid date string, return that, otherwise remove the brackets and try again
-    if (frontmatter.created) {
+    if (frontmatter.created || frontmatter.date) {
       // Try casting to a date
-      const date = new Date(frontmatter.created);
+      const date = new Date(frontmatter.created || frontmatter.date);
       if (!isNaN(date.getTime())) {
         return date;
       }
