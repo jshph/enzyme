@@ -19,13 +19,13 @@ const server = new Server(
       resources: {},
       tools: {
         retrieve_by_tag: {
-          description: "Retrieve the latest notes from the user's vault by tag, i.e. when the syntax #tag is used in the query",
+          description: "Retrieve the latest notes from the user's vault by tag, i.e. when the syntax #tag is used in the prompt or when the user asks to gather the latest thoughts for a tag",
         },
         retrieve_by_link: {
-          description: "Retrieve the latest notes from the user's vault by link, i.e. when the syntax [[link]] is used in the query",
+          description: "Retrieve the latest notes from the user's vault by link, i.e. when the syntax [[link]] is used in the prompt or when the user asks to gather the latest thoughts for a link",
         },
         retrieve_by_folder: {
-          description: "Retrieve the latest notes from the user's vault by folder, i.e. when the syntax folder/ is used in the query or when the user explicitly asks for a folder",
+          description: "Retrieve the latest notes from the user's vault by folder, i.e. when the syntax folder/ is used in the prompt or when the user asks to gather the latest thoughts for a folder",
         }
       },
       prompts: {
