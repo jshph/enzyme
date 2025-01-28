@@ -18,7 +18,7 @@ interface SuggestedOutputProps {
 
 interface OutputSection {
   type: 'docs' | 'question' | 'synthesis' | 'theme';
-  title: string;
+  title: React.ReactNode;
   content: React.ReactNode;
 }
 
@@ -191,7 +191,7 @@ export const SuggestedOutput = React.forwardRef<
                 </div>
               ),
               content: (
-                <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100 text-sm">
+                <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 hover:border-opacity-100 text-sm">
                   <p>{segment.synthesis.analysis}</p>
                 </div>
               )
@@ -212,7 +212,7 @@ export const SuggestedOutput = React.forwardRef<
                   {segment.docs.map((doc, idx) => (
                     <div 
                       key={idx} 
-                      className="bg-secondary/5 border border-dashed rounded-md cursor-pointer border-secondary/20 animate-[pulse_2s_ease-in-out_infinite] hover:border-opacity-100"
+                      className="bg-secondary/5 border border-dashed rounded-md cursor-pointer border-secondary/20 hover:border-opacity-100"
                       onClick={() => openInObsidian(doc.file)}
                     >
                       <div className="p-4 space-y-2">
