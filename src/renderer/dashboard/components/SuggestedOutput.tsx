@@ -169,7 +169,7 @@ export const SuggestedOutput = React.forwardRef<
                     <div className="mt-2 border-l-2 ml-3 border-secondary/20 pl-4">
                       <div className="bg-secondary/5 p-4 rounded-md">
                         <h4 className="text-xs font-medium mb-2 text-secondary flex items-center">
-                          Analysis Recipe
+                          Personalized Analysis Recipe
                           <InfoTooltip content="This is the prompt used to analyze your notes. It helps generate insights and connections between your ideas." />
                         </h4>
                         <p className="text-sm text-secondary/80">{segment.synthesis.prompt}</p>
