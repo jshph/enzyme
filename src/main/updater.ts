@@ -3,10 +3,14 @@ const { autoUpdater } = pkg;
 import { dialog, app } from 'electron';
 import semver from 'semver';
 import { logger } from './ipc/index.js';
+import { EventEmitter } from 'events';
 
 export function setupIpcUpdater() {
   logger.debug('Setting up auto-updater');
 
+  // Remove any existing listeners to prevent duplicates
+  autoUpdater.removeAllListeners();
+  
   // Configure auto updater
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -59,6 +63,20 @@ export function setupIpcUpdater() {
       }
     });
   });
+
+  // Move the error handler here instead of in checkForUpdates
+  autoUpdater.on('error', (error) => {
+    logger.error('Update error:', error);
+    if (error.message.includes('retry')) {
+      logger.info('Retrying update download...');
+      setTimeout(() => {
+        autoUpdater.checkForUpdatesAndNotify({
+          title: 'Update Available',
+          body: 'A new version of Enzyme is available. Click to download.'
+        });
+      }, 5000);
+    }
+  });
 }
 
 export async function checkForUpdates(ghToken?: string) {
@@ -80,21 +98,6 @@ export async function checkForUpdates(ghToken?: string) {
     autoUpdater.channel = 'latest';
     autoUpdater.allowPrerelease = false;
     autoUpdater.forceDevUpdateConfig = false;
-    
-    // Add error handling for download failures
-    autoUpdater.on('error', (error) => {
-      logger.error('Update error:', error);
-      // Attempt to restart the download if it fails
-      if (error.message.includes('retry')) {
-        logger.info('Retrying update download...');
-        setTimeout(() => {
-          autoUpdater.checkForUpdatesAndNotify({
-            title: 'Update Available',
-            body: 'A new version of Enzyme is available. Click to download.'
-          });
-        }, 5000); // Wait 5 seconds before retrying
-      }
-    });
     
     logger.info('Checking for update');
     const result = await autoUpdater.checkForUpdatesAndNotify({
