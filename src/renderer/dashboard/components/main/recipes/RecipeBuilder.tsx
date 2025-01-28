@@ -564,6 +564,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         <div className="space-y-4">
           <div className="justify-between">
             <h3 className="text-lg font-semibold text-primary/90">Ingredients</h3>
+              <p className="text-sm text-primary/50 leading-none pt-2 transition-opacity duration-100" style={{opacity: selectedEntities.size > 0 ? 1 : 0}}>Click and drag an ingredient's count in order to change the number of document mentions.</p>
           </div>
         </div>
 
