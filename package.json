@@ -1,11 +1,11 @@
 {
-  "name": "enzyme",
+  "name": "Enzyme",
   "version": "0.0.9",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "type": "module",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "Joshua Pham",
+  "homepage": "https://enzyme.garden",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
