@@ -39,7 +39,7 @@ type GenerationState =
 const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAuthReady } = useAuth();
   const [profiles, setProfiles] = useState<any[]>([{ id: 'selfReflection', name: 'Self Reflection', description: 'Focus on personal growth and insight development' }]);
   const [selectedProfile, setSelectedProfile] = useState('selfReflection');
   const [selectedProfileTypes, setSelectedProfileTypes] = useState<any[]>([]);
@@ -92,32 +92,61 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     });
   }, []);
 
+  // Add loading state for trending data
+  const [isTrendingDataLoading, setIsTrendingDataLoading] = useState(true);
+
+  // Simplify state management to just track if we can interact
+  const [isIndexerReady, setIsIndexerReady] = useState(false);
+
+  // Modify fetchTrendingData to check if indexer is ready
   const fetchTrendingData = async () => {
-    const result = await window.electron.ipcRenderer.invoke('trending-data-update');
-    // Format the tags and links with the # and [[ ]]
-    const formattedTags = result.tags.map(tag => ({ 
-      type: 'tag', 
-      name: `#${tag.name}`,
-      timeline: tag.timeline 
-    }));
-    const formattedLinks = result.links.map(link => ({ 
-      type: 'link', 
-      name: `[[${link.name}]]`,
-      timeline: link.timeline 
-    }));
-    setTrendingData({ tags: formattedTags, links: formattedLinks });
+    try {
+      setIsTrendingDataLoading(true);
+      // First check if indexer is ready
+      const indexerStatus = await window.electron.ipcRenderer.invoke('check-indexer-status');
+      setIsIndexerReady(!indexerStatus.isIndexing);
+      
+      if (indexerStatus.isIndexing) {
+        console.log('Indexer not ready yet, will retry');
+        return;
+      }
+
+      const result = await window.electron.ipcRenderer.invoke('trending-data-update');
+      // Format the tags and links with the # and [[ ]]
+      const formattedTags = result.tags.map(tag => ({ 
+        type: 'tag', 
+        name: `#${tag.name}`,
+        timeline: tag.timeline 
+      }));
+      const formattedLinks = result.links.map(link => ({ 
+        type: 'link', 
+        name: `[[${link.name}]]`,
+        timeline: link.timeline 
+      }));
+      setTrendingData({ tags: formattedTags, links: formattedLinks });
+    } catch (error) {
+      console.error('Error fetching trending data:', error);
+    } finally {
+      setIsTrendingDataLoading(false);
+    }
   };
 
+  // Add polling effect to check indexer status
   useEffect(() => {
-    if (hasVaultInitialized && currentView === 'recipes') {
-      fetchTrendingData();
+    if (hasVaultInitialized && currentView === 'recipes' && !isIndexerReady) {
+      const pollInterval = setInterval(fetchTrendingData, 1000); // Poll every second
+      return () => clearInterval(pollInterval);
     }
-  }, [currentView, hasVaultInitialized]);
+  }, [currentView, hasVaultInitialized, isIndexerReady]);
 
   const [suggestedOutputs, setSuggestedOutputs] = useState<SuggestedOutputBody[]>();
 
-  // Update toggleEntity to use the helper and handle context updates
+  // Update toggleEntity to check isIndexerReady
   const toggleEntity = useCallback(async (type: 'tag' | 'link', name: string) => {
+    if (!hasVaultInitialized || !isIndexerReady) {
+      return; // Prevent interaction if vault isn't initialized or indexer isn't ready
+    }
+
     const isAdding = !selectedEntities.has(name);
     updateSelectedEntity(name, isAdding);
 
@@ -126,83 +155,87 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       const updatedEntities = new Map(selectedEntities);
       updatedEntities.set(name, { type, count: DEFAULT_COUNT, maxCount: DEFAULT_COUNT });
 
-      // const query = Array.from(updatedEntities.keys())
-      //   .map(name => `${name}<${DEFAULT_CONTEXT_RECALL}`)
-      //   .join(' ');
-
       const query = `${name}<${DEFAULT_CONTEXT_RECALL}`;
 
-      const context = await window.electron.ipcRenderer.invoke('get-context', query);
+      try {
+        const context = await window.electron.ipcRenderer.invoke('get-context', query);
 
-      if (context.length === 0) {
-        console.error('No context found');
-        return;
+        if (!context || context.length === 0) {
+          console.error('No context found');
+          // Remove the entity if no context found
+          updateSelectedEntity(name, false);
+          return;
+        }
+
+        // Count occurrences of this entity in context
+        const maxCount = context.length;
+        const initialCount = Math.min(DEFAULT_COUNT, maxCount);
+
+        // Update selectedEntities with maxCount
+        updatedEntities.set(name, { type, count: initialCount, maxCount });
+        setSelectedEntities(updatedEntities);
+
+        // Initialize doc count with the calculated initial count
+        updateDocCountForMention(name, initialCount);
+
+        // Create graph data from context
+        const documents = context.map(({file}) => ({
+          id: file,
+          type: 'document',
+          name: path.basename(file)
+        }));
+
+        // Add the current entity as a mention node first
+        const mentions = [{
+          id: name,
+          type: 'mention',
+          name: name
+        }, ...context.flatMap(({tags, links}) => 
+          [
+            ...tags.map(tag => ({
+              id: tag,
+              type: 'mention',
+              name: tag
+            })),
+            ...links.map(link => ({
+              id: link,
+              type: 'mention',
+              name: link
+            }))
+          ]
+        )];
+
+        const links = context.flatMap(({file, tags, links}) => {
+          const tagLinks = tags.map(tag => ({
+            source: file,
+            target: tag
+          }));
+
+          const linkLinks = links.map(link => ({
+            source: file,
+            target: link
+          }));
+
+          return [{
+            source: name,
+            target: file
+          }, ...tagLinks, ...linkLinks];
+        });
+        
+        // Update graph with new data
+        graphViewRef.current?.addToSimulation(
+          links, 
+          documents,
+          mentions
+        );
+
+        // Update the count of the entity
+        initializeDocCountForMention(name);
+      } catch (error) {
+        console.error('Error fetching context:', error);
+        // Remove the entity if context fetch fails
+        updateSelectedEntity(name, false);
       }
-
-      // Count occurrences of this entity in context
-      const maxCount = context.length;
-      const initialCount = Math.min(DEFAULT_COUNT, maxCount);
-
-      // Update selectedEntities with maxCount
-      updatedEntities.set(name, { type, count: initialCount, maxCount });
-      setSelectedEntities(updatedEntities);
-
-      // Initialize doc count with the calculated initial count
-      updateDocCountForMention(name, initialCount);
-
-      // Create graph data from context
-      const documents = context.map(({file}) => ({
-        id: file,
-        type: 'document',
-        name: path.basename(file)
-      }));
-
-      // Add the current entity as a mention node first
-      const mentions = [{
-        id: name,
-        type: 'mention',
-        name: name
-      }, ...context.flatMap(({tags, links}) => 
-        [
-          ...tags.map(tag => ({
-            id: tag,
-            type: 'mention',
-            name: tag
-          })),
-          ...links.map(link => ({
-            id: link,
-            type: 'mention',
-            name: link
-          }))
-        ]
-      )];
-
-      const links = context.flatMap(({file, tags, links}) => {
-        const tagLinks = tags.map(tag => ({
-          source: file,
-          target: tag
-        }));
-
-        const linkLinks = links.map(link => ({
-          source: file,
-          target: link
-        }));
-
-        return [{
-          source: name,
-          target: file
-        }, ...tagLinks, ...linkLinks];
-      });
-      
-      // Update graph with new data
-      graphViewRef.current?.addToSimulation(
-        links, 
-        documents,
-        mentions
-      );
-
-      // Update the count of the entity
-      initializeDocCountForMention(name);
     } else {
       // If removing, use removeNodesAndLinks
       graphViewRef.current?.removeNodesAndLinks(name);
@@ -218,7 +251,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         return next;
       });
     }
-  }, [selectedEntities, updateSelectedEntity]);
+  }, [selectedEntities, updateSelectedEntity, hasVaultInitialized, isIndexerReady]);
 
   const initializeDocCountForMention = (mention: string) => {
     updateDocCountForMention(mention, DEFAULT_COUNT);
@@ -557,19 +590,40 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         {/* Header section */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-primary/90">Create a recipe</h2>
-          <p className="text-sm text-primary/50">Discover patterns in your vault through lightweight, customizable recipes.<br/>Select ingredients below to define your recipe's scope and surface relevant connections.</p>
+          <p className="text-sm text-primary/50">
+            {!hasVaultInitialized || !isIndexerReady
+              ? 'Initializing vault index...'
+              : 'Discover patterns in your vault through lightweight, customizable recipes.'}
+            <br/>
+            {hasVaultInitialized && isIndexerReady && 
+              'Select ingredients below to define your recipe\'s scope and surface relevant connections.'}
+          </p>
         </div>
 
         {/* Recipe builder section */}
         <div className="space-y-4">
           <div className="justify-between">
             <h3 className="text-lg font-semibold text-primary/90">Ingredients</h3>
-              <p className="text-sm text-primary/50 leading-none pt-2 transition-opacity duration-100" style={{opacity: selectedEntities.size > 0 ? 1 : 0}}>Click and drag an ingredient's count in order to change the number of document mentions.</p>
+            {hasVaultInitialized && isIndexerReady && selectedEntities.size > 0 && (
+              <p className="text-sm text-primary/50 leading-none pt-2 transition-opacity duration-100">
+                Click and drag an ingredient's count in order to change the number of document mentions.
+              </p>
+            )}
           </div>
         </div>
 
         {/* Suggested ingredients section */}
-        {trendingData && (
+        {!hasVaultInitialized || !isIndexerReady ? (
+          <div className="animate-pulse space-y-3">
+            <div className="h-8 bg-brand/20 rounded w-1/2"></div>
+            <div className="h-4 bg-brand/20 rounded w-3/4"></div>
+          </div>
+        ) : isTrendingDataLoading ? (
+          <div className="animate-pulse space-y-3">
+            <div className="h-8 bg-brand/20 rounded w-1/2"></div>
+            <div className="h-4 bg-brand/20 rounded w-3/4"></div>
+          </div>
+        ) : trendingData && (
           <div className="space-y-3">
             <div 
               className="flex flex-wrap gap-2 text-xs"
@@ -687,11 +741,14 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
 
           <button
-            disabled={!hasVaultInitialized || 
+            disabled={
+              !hasVaultInitialized || 
+              !isIndexerReady ||
               selectedEntities.size === 0 || 
               generationState.status === 'generating' || 
               generationState.status === 'awaiting_first_token' || 
-              generationsRemaining === 0}
+              generationsRemaining === 0
+            }
             className={`
               bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md 
               cursor-pointer hover:bg-brand/60 transition-colors font-medium 
@@ -700,7 +757,11 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             `}
             onClick={submitPrompt}
           >
-            {generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'Generating...' : 
+            {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
+              !isAuthReady ? 'Checking Authentication...' :
+              !isAuthenticated ? 'Please Login' :
+              generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
+                ? 'Generating...' : 
               generationsRemaining > 0 ? 
                 `Generate Recipe` : 
                 'Login to generate more recipes'}

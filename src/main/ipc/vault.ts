@@ -102,6 +102,15 @@ export function setupVaultIPCRoutes() {
     return indexer.queryForTagsAndLinks(query)
   });
 
+  // Update the check-indexer-status handler to be simpler
+  ipcMain.handle('check-indexer-status', async () => {
+    const indexer = getFileIndexer();
+    return {
+      ready: !indexer.isIndexing,
+      isIndexing: indexer.isIndexing
+    };
+  });
+
   ipcMain.handle('collect-debug-logs', async () => {
     try {
       const userDataPath = app.getPath('userData');

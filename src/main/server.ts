@@ -2,7 +2,7 @@ import express, { Express } from 'express';
 import { Server } from 'http';
 import { extractPatterns, MatchResult, QueryPattern } from './extract/index.js';
 import { parseQueryString } from './extract/queryParser.js';
-import { ElectronFileIndexer } from './indexer/electron.js';
+import { ElectronFileIndexer, getFileIndexer } from './indexer/electron.js';
 import * as winston from 'winston';
 import path from 'path';
 import { app as electronApp, Notification } from 'electron';
@@ -57,7 +57,7 @@ export class ServerContext {
   public async getContext(query: string, format: 'json' | 'md' = 'md'): Promise<string[] | MatchResult[]> {
     const queryPatterns: QueryPattern[] = parseQueryString(query);
     const results = await extractPatterns(queryPatterns, this.config?.defaultPatternLimit);
-    
+      
     const combinedResults = [...results];
     
     const formattedResults = combinedResults.map(result => {
@@ -72,17 +72,25 @@ export class ServerContext {
       } else {
         return result;
       }
-    });
+      });
 
     return formattedResults as string[] | MatchResult[];
   }
 
-  async startServer(indexer: ElectronFileIndexer, port: number) {
+  async getTrendingEntities(): Promise<string[]> {
+    const trendingData = await this.indexer?.getTrendingData();
+    const items = trendingData?.items;
+    const tags = items?.tags.map(item => item.name) ?? [];
+    const links = items?.links.map(item => item.name) ?? [];
+    return [...tags, ...links];
+  }
+
+  async startServer(port: number) {
     if (server) {
       await this.stopServer();
     }
     
-    this.indexer = indexer;
+    this.indexer = getFileIndexer();
 
     app.use(cors());
     app.use(express.json());
@@ -109,6 +117,13 @@ export class ServerContext {
         this.logger.error(`Error retrieving notes: ${error}`);
         res.status(500).json({ error: "An error occurred while retrieving notes" });
       }
+    }) as express.RequestHandler);
+
+    app.get('/trending-entities', (async (req: express.Request, res: express.Response) => {
+      const trendingEntities = await this.getTrendingEntities();
+      res.json({
+        entities: trendingEntities
+      });
     }) as express.RequestHandler);
   
     server = app.listen(port, () => {

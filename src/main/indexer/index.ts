@@ -73,10 +73,10 @@ export class FileIndexer {
   private watcher: chokidar.FSWatcher | null = null;
   public vaultPath: string | null = null;
   private spacesPath: string = "enzyme-spaces";
-  private isIndexing: boolean = false;
+  public isIndexing: boolean = false;
   private indexQueue: Array<() => Promise<void>> = [];
-  private totalFiles: number = 0;
-  private processedFiles: number = 0;
+  public totalFiles: number = 0;
+  public processedFiles: number = 0;
   private excludedTags: string[] = [];
   private excludedPatterns: string[] = [];
   private includedPatterns: string[] = [];
@@ -88,13 +88,12 @@ export class FileIndexer {
   private linkToFileMap: Map<string, string> = new Map();
   private logger: winston.Logger;
   private logPath: string = '.';
-  private initializeTimeout: NodeJS.Timeout | null = null;
   private searchCache: Map<string, CachedSearchTerm> = new Map();
   private readonly CACHE_TTL = 5000; // Cache results for 5 seconds
   private readonly MIN_SEARCH_LENGTH = 2; // Only search for terms 2+ chars
   private serverContext: ServerContext = new ServerContext();
   private trendingCache: TrendingDataCache | null = null;
-
+  public hasVaultInitialized: boolean = false;
 
   constructor() {
     // Initialize logger
@@ -118,85 +117,73 @@ export class FileIndexer {
   }
 
   async initialize(vaultPath: string, includedPatterns: string[], excludedPatterns: string[], excludedTags: string[], doCache: boolean = false, spacesPath: string | null = null, port: number = 3779, defaultPatternLimit: number = 10): Promise<boolean> {
-    // Clear any existing timeout
-    if (this.initializeTimeout) {
-      clearTimeout(this.initializeTimeout);
-      this.initializeTimeout = null;
-    }
-
-    if (!vaultPath || vaultPath.length === 0) {
-      this.notify('Indexing Error', 'No vault path provided');
-      return false;
-    }
-
-    // Verify the path exists and is accessible
-    try {
-      await fs.access(vaultPath, fs.constants.R_OK);
-    } catch (error) {
-      this.notify('Indexing Error', `Cannot access vault path: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      return false;
-    }
-
-    // Quick check for at least one markdown file
-    try {
-      const files = await this.getAllFiles(vaultPath);
-      if (files.length === 0) {
-        this.notify('Indexing Error', 'No markdown files found in the selected directory');
-      }
-      if (files.length > 100000) {
-        this.notify('Indexing Error', 'Too many files (>100000) - please select a more specific directory');
-      }
-    } catch (error) {
-      throw new Error(`Error scanning directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-
-    this.logger.debug(`Initializing file indexer...`);
-    this.clearIndex();
+    this.hasVaultInitialized = false;
+    this.isIndexing = true;
     
-    this.vaultPath = vaultPath;
-    if (spacesPath) {
-      this.spacesPath = spacesPath;
-    }
-    this.excludedTags = excludedTags.map(tag => tag.toLowerCase());
-    this.excludedPatterns = excludedPatterns.map(pattern => pattern.toLowerCase());
-    this.includedPatterns = includedPatterns.map(pattern => pattern.toLowerCase());
+    try {
+      if (!vaultPath || vaultPath.length === 0) {
+        this.notify('Indexing Error', 'No vault path provided');
+        return false;
+      }
 
-    // Add .obsidian to excluded patterns if not already present
-    const updatedExcludedPatterns = [
-      ...excludedPatterns,
-      '.obsidian/**/*'  // Exclude all files in .obsidian folder
-    ].map(pattern => pattern.toLowerCase());
-    
-    this.excludedPatterns = updatedExcludedPatterns;
+      // Verify the path exists and is accessible
+      try {
+        await fs.access(vaultPath, fs.constants.R_OK);
+      } catch (error) {
+        this.notify('Indexing Error', `Cannot access vault path: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return false;
+      }
 
-    // Start indexing with a timeout
-    this.initializeTimeout = setTimeout(() => {
-      this.logger.error('Indexing timed out');
+      // Quick check for at least one markdown file
+      try {
+        const files = await this.getAllFiles(vaultPath);
+        if (files.length === 0) {
+          this.notify('Indexing Error', 'No markdown files found in the selected directory');
+        }
+        if (files.length > 100000) {
+          this.notify('Indexing Error', 'Too many files (>100000) - please select a more specific directory');
+        }
+      } catch (error) {
+        throw new Error(`Error scanning directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+
+      this.logger.debug(`Initializing file indexer...`);
       this.clearIndex();
-    }, 9000); // Slightly less than the main timeout
-
-    try {
-      await this.indexDirectory(vaultPath);
-
-      if (this.initializeTimeout) {
-        clearTimeout(this.initializeTimeout);
-        this.initializeTimeout = null;
+      
+      this.vaultPath = vaultPath;
+      if (spacesPath) {
+        this.spacesPath = spacesPath;
       }
+      this.excludedTags = excludedTags.map(tag => tag.toLowerCase());
+      this.excludedPatterns = excludedPatterns.map(pattern => pattern.toLowerCase());
+      this.includedPatterns = includedPatterns.map(pattern => pattern.toLowerCase());
+
+      // Add .obsidian to excluded patterns if not already present
+      const updatedExcludedPatterns = [
+        ...excludedPatterns,
+        '.obsidian/**/*'  // Exclude all files in .obsidian folder
+      ].map(pattern => pattern.toLowerCase());
+      
+      this.excludedPatterns = updatedExcludedPatterns;
+
+      const success = await this.indexDirectory(vaultPath);
+      this.hasVaultInitialized = success;
+      this.isIndexing = false;
       
       // Compute trending data cache after indexing is complete
       await this.computeTrendingDataCache();
       
-      await this.serverContext.startServer(this, port);
+      await this.serverContext.startServer(port);
 
       return true; // Return success
-
     } catch (error) {
+      this.hasVaultInitialized = false;
+      this.isIndexing = false;
       this.clearIndex();
       this.notify('Indexing Error', error instanceof Error ? error.message : 'Unknown error');
       return false; // Return failure
     }
   }
-
 
   async stop(): Promise<void> {
     if (this.watcher) {
@@ -255,12 +242,11 @@ export class FileIndexer {
     }
   }
   
-
-  private async indexDirectory(vaultPath: string): Promise<void> {
+  private async indexDirectory(vaultPath: string): Promise<boolean> {
     this.logger.info(`Starting to index directory: ${vaultPath}`);
 
     if (!vaultPath || vaultPath.length === 0) {
-      return;
+      return false;
     }
 
     try {
@@ -278,8 +264,7 @@ export class FileIndexer {
         });
       } else {
         this.logger.warn('No markdown files found in the directory');
-        this.emitIndexingStatus();
-        return;
+        return false;
       }
 
       this.processedFiles = 0;
@@ -337,13 +322,11 @@ export class FileIndexer {
         this.logger.info(`Skipped ${skippedFiles} files during indexing`);
       }
 
+      return true;
     } catch (error) {
       this.logger.error(`Error during indexing: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      throw error;
+      return false;
     } finally {
-      // Only emit status once at the end of indexing
-      this.logger.info('Emitting indexing status');
-      this.emitIndexingStatus();
       
       // Perform validation checks on the index
       this.logger.info('Performing validation checks on the index');
@@ -361,8 +344,19 @@ export class FileIndexer {
           persistent: true
         });
 
+        let isInitialScan = true;
+
         this.watcher
+          .on('ready', () => {
+            isInitialScan = false;
+            this.logger.info('Initial scan complete');
+          })
           .on('add', path => {
+            if (isInitialScan) {
+              this.logger.debug(`Initial scan found: ${path}`);
+            } else {
+              this.logger.debug(`New file created: ${path}`);
+            }
             this.handleFileChange(path);
           })
           .on('change', path => {
@@ -378,6 +372,7 @@ export class FileIndexer {
   }
 
   public clearIndex(): void {
+    this.logger.info(`Clearing index ${new Error().stack}`);
     this.tagIndex = new Map();
     this.linkIndex = new Map();
     this.folderIndex = new Map();
@@ -501,9 +496,6 @@ export class FileIndexer {
         });
       }
 
-      // Emit indexing status
-      this.emitIndexingStatus();
-
       // Extract metadata
       const metadata: FileMetadata = {  
         path: filePath,
@@ -518,7 +510,6 @@ export class FileIndexer {
       this.updateFolderIndex(metadata);
 
       this.processedFiles++;
-      this.emitIndexingStatus();
 
     } catch (error) {
       // console.error(`Error indexing file ${filePath}:`, error);
@@ -655,7 +646,6 @@ export class FileIndexer {
         await this.computeTrendingDataCache();
       } finally {
         this.isIndexing = false;
-        this.emitIndexingStatus();
         this.processQueue();
       }
     }, this.BATCH_DELAY);
@@ -754,61 +744,6 @@ export class FileIndexer {
     this.logger.info(`Notification: ${title} (${body})`);
   }
 
-  private async emitIndexingStatus(): Promise<void> {
-    // Initial indexing
-    if (this.totalFiles > 0) {
-        if (this.processedFiles >= this.totalFiles) {
-            this.emit('indexing-status', {
-                isComplete: true,
-                message: `Indexed ${this.processedFiles} files`
-            });
-
-            this.emit('indexing-complete', {
-                totalFiles: this.processedFiles
-            });
-
-            if (this.processedFiles > 0) {
-                this.notify('Vault Indexing Complete', `Successfully indexed ${this.processedFiles} files`);
-            }
-            
-            // Reset counters after completion
-            this.totalFiles = 0;
-        } else {
-            this.emit('indexing-status', {
-                isComplete: false,
-                message: 'Indexing vault...'
-            });
-        }
-    } else if (this.totalFiles === 0) {
-      this.emit('indexing-status', {
-        isComplete: true,
-        message: 'No files found in vault'
-      });
-
-      this.emit('indexing-complete', {
-        totalFiles: 0
-      });
-    }
-    // Batch updates
-    else if (this.batchTotalFiles > 0) {
-        if (this.batchProcessedFiles >= this.batchTotalFiles) {
-            this.emit('indexing-status', {
-                isComplete: true,
-                message: `Processed ${this.batchTotalFiles} file changes`
-            });
-            
-            // Reset batch counters after completion
-            this.batchTotalFiles = 0;
-            this.batchProcessedFiles = 0;
-        } else {
-            this.emit('indexing-status', {
-                isComplete: false,
-                message: `Processing ${this.batchTotalFiles} file changes...`
-            });
-        }
-    }
-  }
-
   getFileMetadata(filePath: string): FileMetadata | undefined {
     // Check all indices for the file
     for (const index of [this.tagIndex, this.linkIndex, this.folderIndex]) {
@@ -873,7 +808,6 @@ export class FileIndexer {
   public getLinks(): Set<string> {
     return this.linkSet;
   }
-
 
   private fuzzyMatch(pattern: string, str: string, fileCount: number): number | null {
     if (pattern.length > str.length) return null;
@@ -1077,6 +1011,7 @@ let instance: FileIndexer | null = null;
 
 export function getFileIndexer(): FileIndexer {
   if (!instance) {
+    console.log("Creating new FileIndexer");
     instance = new FileIndexer();
   }
   return instance;
