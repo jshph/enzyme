@@ -6,6 +6,7 @@ import { useAuth } from '../../../contexts/AuthContext.js';
 import { GraphView, GraphViewRef } from "../../GraphView.js";
 import path from 'path';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
 interface SelectedEntity {
   type: 'tag' | 'link';
@@ -380,6 +381,19 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     }
   }, []);
 
+  // Add this state/effect to manage device ID
+  const [deviceId] = useState(() => {
+    // Try to get existing device ID from localStorage
+    const stored = localStorage.getItem('enzyme-device-id');
+    if (stored) return stored;
+    
+    // Generate new device ID if none exists
+    const newId = uuidv4();
+    localStorage.setItem('enzyme-device-id', newId);
+    return newId;
+  });
+
+  // Update submitPrompt to include device ID and restore generation handling
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
 
@@ -424,11 +438,12 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
       window.electron.ipcRenderer.on('suggested-output-chunk', handleGenerationChunk);
 
-      // Make the generation request with abort signal
+      // Pass deviceId to generation request
       await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
         context, 
         query,
         profileId: selectedProfile,
+        deviceId,
         signal: abortControllerRef.current.signal
       });
 
@@ -438,11 +453,8 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         status: 'error', 
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
-      new Notification('Error', {
-        body: "Failed to generate recipe. Please try again."
-      });
     }
-  }, [selectedEntities, selectedProfile, generationState, handleGenerationChunk, makeQuery]);
+  }, [selectedEntities, selectedProfile, deviceId, generationState, handleGenerationChunk, makeQuery]);
 
   const handleEmailRecipeOutput = async () => {
     await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
@@ -720,10 +732,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           </div>
         )}
 
-        <div className="flex justify-normal items-center space-y-2">
+        <div className="flex items-end gap-4">
           {/* Add Profile selector */}
-          <div className="space-y-2">
-            <label htmlFor="profile-select" className="block text-lg font-semibold text-primary/90">
+          <div className="flex-2">
+            <label htmlFor="profile-select" className="block text-lg font-semibold text-primary/90 mb-2">
               Choose a recipe profile
             </label>
             <select
@@ -752,14 +764,13 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             className={`
               bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md 
               cursor-pointer hover:bg-brand/60 transition-colors font-medium 
-              disabled:opacity-50 disabled:cursor-not-allowed ml-4
+              disabled:opacity-50 disabled:cursor-not-allowed
               ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
             `}
             onClick={submitPrompt}
           >
             {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
               !isAuthReady ? 'Checking Authentication...' :
-              !isAuthenticated ? 'Please Login' :
               generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
                 ? 'Generating...' : 
               generationsRemaining > 0 ? 

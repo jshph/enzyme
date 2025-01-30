@@ -5,7 +5,7 @@ type LoginProps = {
   setCurrentView: (view: string) => void,
 }
 
-const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
+const Login: React.FC<LoginProps> = ({ setCurrentView }) => {
   const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const { 
@@ -26,7 +26,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentView, init }) => {
     e.preventDefault();
     const success = await handleOtpVerification(email, otpCode);
     if (success) {
-      setCurrentView('settings');
+      setCurrentView('recipes');
     }
   };
 

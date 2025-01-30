@@ -8,7 +8,7 @@ import Store from 'electron-store';
 const SERVER_URL = getServerUrl();
 const contextServer = useContextServer();
 const generationStore = new Store();
-const MAX_UNAUTHENTICATED_GENERATIONS = 2; // Per day
+const MAX_UNAUTHENTICATED_GENERATIONS = 20; // Per day
 const UNAUTHENTICATED_STORE_KEY = 'unauthenticatedGenerations';
 
 // Initialize store with date tracking
@@ -144,7 +144,7 @@ export function setupRecipeRoutes() {
     }
   });
 
-  ipcMain.handle('generate-suggested-output', async (event, { context, query, profileId, signal }) => {
+  ipcMain.handle('generate-suggested-output', async (event, { context, query, profileId, deviceId, signal }) => {
     let abortController: AbortController | null = null;
     
     try {
@@ -212,8 +212,9 @@ export function setupRecipeRoutes() {
       const response = await fetch(`${SERVER_URL}/digest/generate-suggested`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
+          ...(access_token && { 'Authorization': `Bearer ${access_token}` }),
+          'Content-Type': 'application/json',
+          'X-Device-ID': deviceId // Add device ID header
         },
         body: JSON.stringify({ context, query, profileId }),
         signal: abortController.signal

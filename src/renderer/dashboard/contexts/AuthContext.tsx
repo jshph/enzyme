@@ -1,24 +1,23 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useAuthManager } from '../hooks/useAuthManager.js';
 
-interface AuthContextType {
+interface AuthContextProps {
   isAuthenticated: boolean;
-  setIsAuthenticated: (isAuthenticated: boolean) => void;
-  setEmail: (email: string) => void;
+  isAuthReady: boolean;
   email: string;
   loading: boolean;
   message: string;
   error: boolean;
   showOtpForm: boolean;
   handleLogin: (email: string) => Promise<void>;
-  handleOtpVerification: (email: string, otp: string) => Promise<boolean>;
+  handleOtpVerification: (email: string, otpCode: string) => Promise<boolean>;
   handleLogout: () => Promise<void>;
   clearMessage: () => void;
   isSessionValid: () => Promise<boolean>;
   verifySession: () => Promise<boolean>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const auth = useAuthManager();
@@ -30,9 +29,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextProps => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;

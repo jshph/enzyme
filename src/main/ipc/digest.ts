@@ -18,11 +18,11 @@ const contextServer = useContextServer();
 
 export async function getDigestUsage(): Promise<DigestUsage | null> {
   try {
-    const { email, token } = await getCurrentSession();
+    const { email, access_token } = await getCurrentSession();
     const response = await fetch(`${SERVER_URL}/digest/usage?email=${encodeURIComponent(email)}`, {
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` })
+        ...(access_token && { 'Authorization': `Bearer ${access_token}` })
       }
     });
 
