@@ -68,6 +68,7 @@
     "lucide-react": "^0.468.0",
     "menubar": "^9.5.1",
     "node-cron": "^3.0.3",
+    "node-machine-id": "^1.1.12",
     "pdf-lib": "^1.17.1",
     "prismjs": "^1.29.0",
     "react": "^18.3.1",

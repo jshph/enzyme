@@ -45,6 +45,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const [selectedProfile, setSelectedProfile] = useState('selfReflection');
   const [selectedProfileTypes, setSelectedProfileTypes] = useState<any[]>([]);
   const graphViewRef = useRef<GraphViewRef>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
 
   useEffect(() => {
     window.electron.ipcRenderer.invoke('get-profiles')
@@ -52,6 +53,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         setProfiles(profiles);
         setSelectedProfileTypes(profiles.find(profile => profile.id === selectedProfile)?.types || []);
       });
+
+    window.electron.ipcRenderer.invoke('get-device-id').then(id => {
+      setDeviceId(id);
+    });
   }, []);
 
   const [trendingData, setTrendingData] = useState<any>(null);
@@ -381,18 +386,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     }
   }, []);
 
-  // Add this state/effect to manage device ID
-  const [deviceId] = useState(() => {
-    // Try to get existing device ID from localStorage
-    const stored = localStorage.getItem('enzyme-device-id');
-    if (stored) return stored;
-    
-    // Generate new device ID if none exists
-    const newId = uuidv4();
-    localStorage.setItem('enzyme-device-id', newId);
-    return newId;
-  });
-
   // Update submitPrompt to include device ID and restore generation handling
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
@@ -437,13 +430,12 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       };
 
       window.electron.ipcRenderer.on('suggested-output-chunk', handleGenerationChunk);
-
       // Pass deviceId to generation request
       await window.electron.ipcRenderer.invoke('generate-suggested-output', { 
         context, 
         query,
         profileId: selectedProfile,
-        deviceId,
+        deviceId: deviceId,
         signal: abortControllerRef.current.signal
       });
 

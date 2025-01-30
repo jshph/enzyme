@@ -11,6 +11,7 @@ import { setupVaultIPCRoutes } from './vault.js';
 import { setupSpaceRoutes } from './space.js';
 import { setupRecipeRoutes } from './recipe.js';
 import { setupUserIPCRoutes } from "./user.js";
+import nodeMachineId from 'node-machine-id';
 
 interface Auth {
   email: string;
@@ -151,6 +152,22 @@ export function setupIPC() {
   ipcMain.handle('check-vault-status', () => {
     return isVaultConfigured();
   });
+
+  ipcMain.handle('get-device-id', async () => {
+    try {
+      // Get unique and consistent machine ID
+      const machineId = await nodeMachineId.machineId();
+      return machineId;
+    } catch (error) {
+      console.error('Error getting machine ID:', error);
+      // Fallback to a combination of app-specific identifiers
+      const fallbackId = `${app.getName()}-${app.getPath('userData')}`;
+      return fallbackId;
+    }
+  });
+  
+
+
 
   setupAuthIPCRoutes();
   setupDigestIPCRoutes();
