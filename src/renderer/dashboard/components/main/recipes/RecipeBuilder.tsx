@@ -6,7 +6,6 @@ import { useAuth } from '../../../contexts/AuthContext.js';
 import { GraphView, GraphViewRef } from "../../GraphView.js";
 import path from 'path';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 
 interface SelectedEntity {
   type: 'tag' | 'link';
@@ -77,6 +76,55 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     intensity: number;
     direction: 'left' | 'right' | null;
   } | null>(null);
+
+  const { settings, updateSetting, initializeVault } = useSettingsContext();
+  const { verifySession } = useAuth();
+  const [error, setError] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const browseVaultDirectory = async () => {
+    try {
+      const result = await window.electron.ipcRenderer.invoke('select-directory');
+      if (result) {
+        updateSetting('vaultPath', result);
+        
+        try {
+          setError(false);
+
+          // Initialize vault
+          await initializeVault();
+          await verifySession();
+
+          setError(false);
+          
+          setTimeout(() => {
+            if (!error) {
+              setMessage('');
+            }
+          }, 3000);
+          
+        } catch (err: any) {
+          setMessage(err.message);
+          if (err.message?.includes('access')) {
+            setMessage('Permission denied. Please grant access to the selected folder in System Preferences > Security & Privacy > Files and Folders.');
+          } else if (err.message?.includes('timeout')) {
+            setMessage('Indexing timed out. Please try selecting a folder with fewer files or check system resources.');
+          } else if (err.message?.includes('No markdown files')) {
+            setMessage('No markdown files found in the selected directory. Please select your markdown vault folder.');
+          } else if (err.message?.includes('Too many files')) {
+            setMessage('Too many files in the selected directory. Please select a more specific folder.');
+          }
+          setError(true);
+          updateSetting('vaultPath', '');
+        }
+      }
+    } catch (err) {
+      setMessage('Failed to select directory. Please try again.');
+      setError(true);
+      console.error('Error selecting directory:', err);
+    }
+  };
+
 
   // Add this helper function to keep selectedIdsRef in sync
   const updateSelectedEntity = useCallback((name: string, doAdd: boolean) => {
@@ -601,21 +649,47 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
             {!hasVaultInitialized || !isIndexerReady
               ? 'Initializing vault index...'
               : 'Discover patterns in your vault through lightweight, customizable recipes.'}
-            <br/>
-            {hasVaultInitialized && isIndexerReady && 
-              'Select ingredients below to define your recipe\'s scope and surface relevant connections.'}
           </p>
+
+          <div>
+              <div className="mt-8 flex m-6">
+                <input 
+                  type="text" 
+                  value={settings.vaultPath || ''} 
+                  className="flex-2 rounded-l-md input-base bg-input/50 p-4 text-sm w-2/3" 
+                  readOnly 
+                />
+                <button 
+                  onClick={browseVaultDirectory} 
+                  className="flex-2 bg-brand/80 text-primary/90 px-4 py-2 rounded-r-md hover:bg-brand/90 text-sm"
+                >
+                  Browse
+                </button>
+              </div>
+              <p className="mt-2 text-sm text-secondary/70">Select the root folder for your markdown vault. {hasVaultInitialized && isIndexerReady && 'Then, select ingredients below to define your recipe\'s scope and surface relevant connections.'}</p>
+              {error && <p className="mt-2 text-sm text-secondary/70">{message}</p>}
+              {!hasVaultInitialized && settings.vaultPath && (
+                <div className="mt-4 flex items-center text-sm text-gray-600">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Initializing vault...
+                </div>
+              )}
+            </div>
         </div>
 
         {/* Recipe builder section */}
         <div className="space-y-4">
           <div className="justify-between">
             <h3 className="text-lg font-semibold text-primary/90">Ingredients</h3>
-            {hasVaultInitialized && isIndexerReady && selectedEntities.size > 0 && (
-              <p className="text-sm text-primary/50 leading-none pt-2 transition-opacity duration-100">
+              <p className={
+                "text-sm text-primary/50 leading-none pt-2 transition-opacity duration-100 opacity-0" +
+                (selectedEntities.size > 0 && hasVaultInitialized && isIndexerReady ? 'opacity-100' : '')
+              }>
                 Click and drag an ingredient's count in order to change the number of document mentions.
               </p>
-            )}
           </div>
         </div>
 
