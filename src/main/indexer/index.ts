@@ -123,6 +123,7 @@ export class FileIndexer {
     try {
       if (!vaultPath || vaultPath.length === 0) {
         this.notify('Indexing Error', 'No vault path provided');
+        this.logger.error('No vault path provided');
         return false;
       }
 
@@ -130,6 +131,7 @@ export class FileIndexer {
       try {
         await fs.access(vaultPath, fs.constants.R_OK);
       } catch (error) {
+        this.logger.error(`Cannot access vault path: ${error instanceof Error ? error.message : 'Unknown error'}`);
         this.notify('Indexing Error', `Cannot access vault path: ${error instanceof Error ? error.message : 'Unknown error'}`);
         return false;
       }
@@ -282,6 +284,11 @@ export class FileIndexer {
       this.logger.info('Starting to process files...');
       let indexedFiles = 0;
       let skippedFiles = 0;
+
+      if (!this.vaultPath) {
+        this.logger.error('Vault path is not set');
+        return false;
+      }
 
       await Promise.all(files.map(async (file) => {
         try {
