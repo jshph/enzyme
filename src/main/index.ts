@@ -206,11 +206,8 @@ function createWindow(): void {
 
 
     // Load the remote URL for development or the local html file when packaged
-    if (!process.defaultApp) {
-      mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
-    } else {
-      mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
-    }
+    //   mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
+    mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
 
     // Add this event handler
     mainWindow.on('closed', async () => {

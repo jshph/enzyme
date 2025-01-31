@@ -583,6 +583,9 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     };
   }, []);
 
+  // Add this near the top with other state declarations
+  const [isOutputExpanded, setIsOutputExpanded] = useState(true);
+
   return (
     <>
       <div
@@ -712,111 +715,150 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
         {selectedEntities.size > 0 && (
           <div className="w-full h-full overflow-hidden relative">
             <div className="flex items-center flex-col relative">
-              <div className="flex-grow relative h-[650px] w-[800px]">
-              <GraphView
-                ref={graphViewRef}
-                width={800}
-                height={600}
-                selectedMentionDocCounts={selectedMentionDocCounts}
-              />
-            </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-end gap-4">
-          {/* Add Profile selector */}
-          <div className="flex-2">
-            <label htmlFor="profile-select" className="block text-lg font-semibold text-primary/90 mb-2">
-              Choose a recipe profile
-            </label>
-            <select
-              id="profile-select"
-              value={selectedProfile}
-              onChange={handleProfileChange}
-              className="w-full px-3 py-2 bg-background/40 rounded-lg shadow-sm border border-primary/20 focus:outline-none focus:ring-2 focus:ring-brand/50"
-            >
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            disabled={
-              !hasVaultInitialized || 
-              !isIndexerReady ||
-              selectedEntities.size === 0 || 
-              generationState.status === 'generating' || 
-              generationState.status === 'awaiting_first_token' || 
-              generationsRemaining === 0
-            }
-            className={`
-              bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md 
-              cursor-pointer hover:bg-brand/60 transition-colors font-medium 
-              disabled:opacity-50 disabled:cursor-not-allowed
-              ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
-            `}
-            onClick={submitPrompt}
-          >
-            {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
-              !isAuthReady ? 'Checking Authentication...' :
-              generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
-                ? 'Generating...' : 
-              generationsRemaining > 0 ? 
-                `Generate Recipe` : 
-                'Login to generate more recipes'}
-          </button>
-        </div>
-        <p className="text-sm text-primary/50">Discover emerging themes and connections from selected ingredients. Creates a structured synthesis while preserving links to source notes.</p>
-
-
-        {/* Output section */}
-        {((suggestedOutputs?.[0]?.segments?.length || 0 > 0 || 
-           generationState.status === 'generating') && 
-           generationState.status !== 'awaiting_first_token') && (
-          <div className="mt-8 space-y-4">
-            <div className="gap-4">
-              <SuggestedOutput
-                body={suggestedOutputs?.[0]}
-                onEditPrompt={updateSegmentPrompt}
-                onSchedule={handleScheduleRecipe}
-                onRetry={handleRetry}
-                onEmailButtonClick={handleEmailRecipeOutput}
-                profileTypes={selectedProfileTypes}
-              />
+              <div className="flex-grow relative h-[650px] w-[800px] mb-[120px]">
+                <GraphView
+                  ref={graphViewRef}
+                  width={800}
+                  height={600}
+                  selectedMentionDocCounts={selectedMentionDocCounts}
+                />
+              </div>
             </div>
           </div>
         )}
 
-        {generationState.status === 'error' && (
-          <p className="text-red-500 text-sm mt-2">{generationState.error}</p>
-        )}
 
-        {generationState.status === 'awaiting_first_token' && (
-          <div className="space-y-4 animate-pulse">
-            <div className="h-8 bg-brand/20 rounded-lg w-3/4"></div>
-            <div className="space-y-3">
-              <div className="h-4 bg-brand/20 rounded w-1/2"></div>
-              <div className="h-4 bg-brand/20 rounded w-full"></div>
-              <div className="h-4 bg-brand/20 rounded w-3/4"></div>
-            </div>
-            <div className="space-y-2">
-              <div className="h-20 bg-brand/10 rounded-lg"></div>
-              <div className="h-20 bg-brand/10 rounded-lg"></div>
-            </div>
-          </div>
-        )}
+        {/* Fixed Footer Section - Positioned relative to main content */}
+        <div className={`
+          fixed bottom-0 inset-x-0
+          ml-64 /* Matches main content offset */
+          bg-background/70 backdrop-blur-sm
+          border-t border-primary/10
+          transition-all duration-300 ease-in-out
+          ${isOutputExpanded ? 'max-h-[100vh]' : 'max-h-[180px]'}
+        `}>
+          {/* Header Section */}
+          <div className="px-6 py-8 border-b border-primary/10">
+            <div className="flex items-center justify-between">
+              <div className="flex-2">
+                <label htmlFor="profile-select" className="block text-lg font-semibold text-primary/90 mb-2">
+                  Choose a recipe profile
+                </label>
+                <div className="flex items-center gap-4">
+                  <select
+                    id="profile-select"
+                    value={selectedProfile}
+                    onChange={handleProfileChange}
+                    className="w-[300px] px-3 py-2 bg-background/40 rounded-lg shadow-sm border border-primary/20 focus:outline-none focus:ring-2 focus:ring-brand/50"
+                  >
+                    {profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
 
-        {suggestedOutputs && !isAuthenticated && (
-          <div className="mt-4 p-4 bg-brand/10 rounded-lg">
-            <p className="text-sm text-primary/70">
-              Log in to save recipes and schedule automated insights from your notes.
+                  <button
+                    disabled={
+                      !hasVaultInitialized || 
+                      !isIndexerReady ||
+                      selectedEntities.size === 0 || 
+                      generationState.status === 'generating' || 
+                      generationState.status === 'awaiting_first_token' || 
+                      generationsRemaining === 0
+                    }
+                    className={`
+                      bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md 
+                      cursor-pointer hover:bg-brand/60 transition-colors font-medium 
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
+                    `}
+                    onClick={submitPrompt}
+                  >
+                    {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
+                      !isAuthReady ? 'Checking Authentication...' :
+                      generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
+                        ? 'Generating...' : 
+                      generationsRemaining > 0 ? 
+                        `Generate Recipe` : 
+                        'Login to generate more recipes'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Expand/Collapse Button - Only show when there's output */}
+              {(suggestedOutputs?.[0] || generationState.status === 'generating') && (
+                <button
+                  onClick={() => setIsOutputExpanded(!isOutputExpanded)}
+                  className="p-2 hover:bg-primary/10 rounded-full transition-colors"
+                >
+                  <svg
+                    className={`w-6 h-6 transition-transform duration-300 ${isOutputExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            
+            <p className="text-sm text-primary/50 mt-2">
+              Discover emerging themes and connections from selected ingredients. Creates a structured synthesis while preserving links to source notes.
             </p>
           </div>
-        )}
+
+          {/* Scrollable Output Section */}
+          <div className={`
+            overflow-y-auto transition-all duration-300
+            ${isOutputExpanded ? 'max-h-[calc(80vh-120px)]' : 'max-h-0'}
+          `}>
+            {((suggestedOutputs?.[0]?.segments?.length || 0 > 0 || 
+              generationState.status === 'generating') && 
+              generationState.status !== 'awaiting_first_token') && (
+              <div className="p-6 space-y-4">
+                <SuggestedOutput
+                  body={suggestedOutputs?.[0]}
+                  onEditPrompt={updateSegmentPrompt}
+                  onSchedule={handleScheduleRecipe}
+                  onRetry={handleRetry}
+                  onEmailButtonClick={handleEmailRecipeOutput}
+                  profileTypes={selectedProfileTypes}
+                />
+              </div>
+            )}
+
+            {generationState.status === 'error' && (
+              <p className="text-red-500 text-sm p-6">{generationState.error}</p>
+            )}
+
+            {generationState.status === 'awaiting_first_token' && (
+              <div className="space-y-4 animate-pulse p-6">
+                <div className="h-8 bg-brand/20 rounded-lg w-3/4"></div>
+                <div className="space-y-3">
+                  <div className="h-4 bg-brand/20 rounded w-1/2"></div>
+                  <div className="h-4 bg-brand/20 rounded w-full"></div>
+                  <div className="h-4 bg-brand/20 rounded w-3/4"></div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-20 bg-brand/10 rounded-lg"></div>
+                  <div className="h-20 bg-brand/10 rounded-lg"></div>
+                </div>
+              </div>
+            )}
+
+            {suggestedOutputs && !isAuthenticated && (
+              <div className="p-6">
+                <div className="p-4 bg-brand/10 rounded-lg">
+                  <p className="text-sm text-primary/70">
+                    Log in to save recipes and schedule automated insights from your notes.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </>
   )

@@ -348,7 +348,7 @@ export const SuggestedOutput = React.forwardRef<
       ref={ref}
       className={`
         rounded-lg border border-primary/20 bg-background/60 p-6 space-y-6
-        ${className}
+        ${className || ''}
       `}
     >
       {sections.map((section, index) => (
