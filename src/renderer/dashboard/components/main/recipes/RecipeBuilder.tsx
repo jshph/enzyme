@@ -81,6 +81,8 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   const { verifySession } = useAuth();
   const [error, setError] = useState(false);
   const [message, setMessage] = useState('');
+  
+  const [isOutputExpanded, setIsOutputExpanded] = useState(false);
 
   const browseVaultDirectory = async () => {
     try {
@@ -439,6 +441,8 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   const submitPrompt = useCallback(async () => {
     if (selectedEntities.size === 0) return;
 
+    setIsOutputExpanded(true);
+
     // Reset states
     setGenerationState({ status: 'awaiting_first_token' });
     setSuggestedOutputs(undefined);
@@ -495,7 +499,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
     }
-  }, [selectedEntities, selectedProfile, deviceId, generationState, handleGenerationChunk, makeQuery]);
+  }, [selectedEntities, selectedProfile, deviceId, generationState, handleGenerationChunk, makeQuery, isOutputExpanded]);
 
   const handleEmailRecipeOutput = async () => {
     await window.electron.ipcRenderer.invoke('email-recipe-output', suggestedOutputs);
@@ -636,8 +640,6 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
     };
   }, []);
 
-  // Add this near the top with other state declarations
-  const [isOutputExpanded, setIsOutputExpanded] = useState(true);
   return (
     <>
       <div
