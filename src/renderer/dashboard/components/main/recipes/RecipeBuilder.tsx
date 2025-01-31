@@ -36,7 +36,7 @@ type GenerationState =
   | { status: 'error'; error: string }
   | { status: 'completed' };
 
-const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
+const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: string) => void }> = ({ currentView, setCurrentView }) => {
   // const editor = useCreateEditor();
   const { hasVaultInitialized } = useSettingsContext();
   const { isAuthenticated, isAuthReady } = useAuth();
@@ -349,6 +349,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
   const checkGenerationLimits = useCallback(() => {
     window.electron.ipcRenderer.invoke('check-generation-limits')
       .then(({ remaining }) => {
+        console.log('checkGenerationLimits', { remaining });
         setGenerationsRemaining(Math.max(0, remaining));
       })
       .catch(() => {
@@ -624,6 +625,10 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
     setSelectedProfileTypes(newProfile?.types || []);
   }, [profiles]);
 
+  const switchToLogin = () => {
+    setCurrentView('login');
+  }
+
   // Add cleanup on unmount
   useEffect(() => {
     return () => {
@@ -633,7 +638,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
 
   // Add this near the top with other state declarations
   const [isOutputExpanded, setIsOutputExpanded] = useState(true);
-
   return (
     <>
       <div
@@ -644,15 +648,17 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
       >
         {/* Header section */}
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-primary/90">Create a recipe</h2>
-          <p className="text-sm text-primary/50">
+          <div className="bg-brand/5 p-4 rounded-lg">
+            <p className="text-sm text-brand/100">
             {!hasVaultInitialized || !isIndexerReady
-              ? 'Initializing vault index...'
-              : 'Discover patterns in your vault through lightweight, customizable recipes.'}
-          </p>
+              ? 'Getting everything ready...'
+              : "Select tags and links below to generate a recipe that guides you through connected ideas in your notes."}
+            </p>
+          </div>
 
           <div>
-              <div className="mt-8 flex m-6">
+              <p className="mt-6 text-sm text-secondary/70">First, select the folder containing your markdown notes. {hasVaultInitialized && isIndexerReady && 'Then, you can mix and match ingredients below to explore the connections.'}</p>
+              <div className="mt-4 flex m-6">
                 <input 
                   type="text" 
                   value={settings.vaultPath || ''} 
@@ -666,17 +672,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                   Browse
                 </button>
               </div>
-              <p className="mt-2 text-sm text-secondary/70">Select the root folder for your markdown vault. {hasVaultInitialized && isIndexerReady && 'Then, select ingredients below to define your recipe\'s scope and surface relevant connections.'}</p>
               {error && <p className="mt-2 text-sm text-secondary/70">{message}</p>}
-              {!hasVaultInitialized && settings.vaultPath && (
-                <div className="mt-4 flex items-center text-sm text-gray-600">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Initializing vault...
-                </div>
-              )}
             </div>
         </div>
 
@@ -809,37 +805,38 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
           bg-background/70 backdrop-blur-sm
           border-t border-primary/10
           transition-all duration-300 ease-in-out
-          ${isOutputExpanded ? 'max-h-[100vh]' : 'max-h-[180px]'}
+          ${isOutputExpanded ? 'max-h-[100vh]' : 'max-h-[80px]'}
         `}>
           {/* Header Section */}
-          <div className="px-6 py-8 border-b border-primary/10">
+          <div className="px-6 py-4 border-b border-primary/10">
             <div className="flex items-center justify-between">
               <div className="flex-2">
-                <label htmlFor="profile-select" className="block text-lg font-semibold text-primary/90 mb-2">
-                  Choose a recipe profile
-                </label>
                 <div className="flex items-center gap-4">
-                  <select
-                    id="profile-select"
-                    value={selectedProfile}
-                    onChange={handleProfileChange}
-                    className="w-[300px] px-3 py-2 bg-background/40 rounded-lg shadow-sm border border-primary/20 focus:outline-none focus:ring-2 focus:ring-brand/50"
-                  >
-                    {profiles.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex flex-row items-center gap-3">
+                    <label htmlFor="profile-select" className="text-sm text-primary/80 whitespace-nowrap">
+                      Profile:
+                    </label>
+                    <select
+                      id="profile-select"
+                      value={selectedProfile}
+                      onChange={handleProfileChange}
+                      className="text-sm w-[300px] p-3 bg-background/40 rounded-lg shadow-sm border border-primary/20 focus:outline-none focus:ring-2 focus:ring-brand/50"
+                    >
+                      {profiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <button
                     disabled={
                       !hasVaultInitialized || 
                       !isIndexerReady ||
-                      selectedEntities.size === 0 || 
+                      (selectedEntities.size === 0 && generationsRemaining > 0) || 
                       generationState.status === 'generating' || 
-                      generationState.status === 'awaiting_first_token' || 
-                      generationsRemaining === 0
+                      generationState.status === 'awaiting_first_token'
                     }
                     className={`
                       bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md 
@@ -847,7 +844,7 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                       disabled:opacity-50 disabled:cursor-not-allowed
                       ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
                     `}
-                    onClick={submitPrompt}
+                    onClick={generationsRemaining === 0 ? switchToLogin : submitPrompt}
                   >
                     {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
                       !isAuthReady ? 'Checking Authentication...' :
@@ -877,10 +874,6 @@ const RecipeBuilder: React.FC<{ currentView: string}> = ({ currentView }) => {
                 </button>
               )}
             </div>
-            
-            <p className="text-sm text-primary/50 mt-2">
-              Discover emerging themes and connections from selected ingredients. Creates a structured synthesis while preserving links to source notes.
-            </p>
           </div>
 
           {/* Scrollable Output Section */}

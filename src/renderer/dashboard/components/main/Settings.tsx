@@ -80,7 +80,7 @@ const Settings: React.FC = () => {
       {/* Status Messages */}
       {message && (
         <div className={`mt-4 p-4 rounded-md ${
-          error ? 'bg-red/5 text-red/80' : 'bg-brand/5 text-brand/80'
+          error ? 'bg-red/5 text-red/80' : 'bg-brand/5 text-brand/100'
         }`}>
           <p>{message}</p>
         </div>

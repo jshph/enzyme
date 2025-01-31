@@ -17,7 +17,7 @@ const Main: React.FC<MainProps> = ({ currentView, setCurrentView }) => {
         </div>
 
         <div style={{ display: currentView === 'recipes' ? 'block' : 'none' }}>
-          <Recipes currentView={currentView} />
+          <Recipes currentView={currentView} setCurrentView={setCurrentView} />
         </div>
         
         {/* {hiddenFeatures} */}

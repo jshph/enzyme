@@ -11,7 +11,7 @@ interface AppState {
 }
 
 const AppContent: React.FC = () => {
-  const [currentView, setCurrentView] = useState('settings')
+  const [currentView, setCurrentView] = useState('recipes')
   const [appState, setAppState] = useState<AppState>({ 
     isAppReady: false, 
     isVaultInitialized: false 

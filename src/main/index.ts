@@ -184,9 +184,7 @@ function createWindow(): void {
 
     mainWindow = new BrowserWindow({
       width: 1400,
-      height: 1080,
-      minWidth: 1400,
-      minHeight: 1080,
+      height: 950,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -196,7 +194,8 @@ function createWindow(): void {
       titleBarStyle: 'hiddenInset',
       trafficLightPosition: { x: 15, y: 15 },
       backgroundColor: '#202020',
-      frame: false
+      frame: false,
+      resizable: true
     });
 
     mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -204,11 +203,10 @@ function createWindow(): void {
       return { action: 'deny' }
     })
 
+    mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
+    // mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
 
-    // Load the remote URL for development or the local html file when packaged
-    //   mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
-    mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
-
+    
     // Add this event handler
     mainWindow.on('closed', async () => {
       logger.debug('Main window closed');
