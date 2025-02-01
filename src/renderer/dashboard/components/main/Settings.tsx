@@ -89,8 +89,7 @@ const Settings: React.FC = () => {
       <div className="space-y-6">
         <div className="bg-brand/5 p-4 rounded-lg">
           <p className="text-brand/80 text-sm">
-              Set up your markdown vault settings here. This vault becomes your playground in Enzyme.
-              You can choose an existing directory for your vault, or if you don't have one yet, a new vault will be created for you. (
+              Set up your markdown vault settings here. (
               <a className="text-blue-300 hover:text-blue-400" href="https://obsidian.md" target="_blank" rel="noopener noreferrer">
                 Obsidian
               </a> is a great way to work with your vault.)
@@ -112,10 +111,9 @@ const Settings: React.FC = () => {
               </p>
             </div>
 
-            <div className={`space-y-6 border-t border-input/30 pt-6 mt-6 ${isAuthenticated ? '' : 'opacity-50'}`}>
+            <div className={`space-y-6 border-t border-input/30 pt-6 mt-6`}>
               <h3 className="text-lg font-medium text-primary/90">
                 Advanced Settings 
-                <span className="text-secondary/70">{isAuthenticated ? '' : ' (login to configure)'}</span>
               </h3>
             
             <div>
@@ -124,7 +122,6 @@ const Settings: React.FC = () => {
                 value={processArrayField(settings.includedPatterns || [])}
                 onChange={(e) => updateSetting('includedPatterns', e.target.value)}
                 className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/20 text-sm"
-                disabled={!isAuthenticated}
               />
               <p className="text-secondary/70 text-sm">Example: *.md to include all markdown files</p>
             </div>
@@ -135,7 +132,6 @@ const Settings: React.FC = () => {
                 value={processArrayField(settings.excludedPatterns || [])}
                 onChange={(e) => updateSetting('excludedPatterns', e.target.value)}
                 className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/20 text-sm"
-                disabled={!isAuthenticated}
               />
               <p className="text-secondary/70 text-sm">Example: private/*, templates/* to exclude private and template folders</p>
             </div>
@@ -146,7 +142,6 @@ const Settings: React.FC = () => {
                 value={processArrayField(settings.excludedTags || [])}
                 onChange={(e) => updateSetting('excludedTags', e.target.value)}
                 className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/50 text-sm"
-                disabled={!isAuthenticated}
               />
               <p className="text-secondary/70 text-sm">Tags to ignore when analyzing your vault (comma-separated)</p>
             </div>

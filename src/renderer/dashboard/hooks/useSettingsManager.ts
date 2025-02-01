@@ -84,15 +84,16 @@ export const useSettingsManager = (providedInitialSettings: Settings = {}) => {
       arrayFields.forEach(field => {
         if (typeof preparedSettings[field] === 'string') {
           let values = prepareArrayField(preparedSettings[field] as string);
-          
           preparedSettings[field] = values;
         }
       });
 
-      await saveLocalSettings(preparedSettings);
+      // Save vault path to electron store
+      await saveLocalSettings();
 
-      const { vaultPath, ...serverSettings } = preparedSettings;
-      const result = await window.electron.ipcRenderer.invoke('update-settings', serverSettings);
+      // Save other settings to .enzyme.conf
+      const { vaultPath, ...fileSettings } = preparedSettings;
+      const result = await window.electron.ipcRenderer.invoke('update-settings', fileSettings);
 
       if (result.success) {
         setOriginalSettings(settings);
@@ -103,7 +104,7 @@ export const useSettingsManager = (providedInitialSettings: Settings = {}) => {
       console.error('Error saving settings:', error);
       throw error;
     }
-  }, [settings, arrayFields, prepareArrayField]);
+  }, [settings, arrayFields, prepareArrayField, saveLocalSettings]);
 
   // Refresh settings when the page is visible
   useEffect(() => {

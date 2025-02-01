@@ -1,5 +1,7 @@
 import { ipcMain } from "electron";
-import { LocalSettings, store, logger, getServerUrl } from "./index.js";
+import { store, logger } from "./index.js";
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 export interface Settings {
   vaultPath: string;
@@ -21,7 +23,6 @@ const DEFAULT_SETTINGS: Settings = {
   excludedTags: [],
 };
 
-const SERVER_URL = getServerUrl();
 
 // Modify getCurrentSession to handle token refresh
 export async function getCurrentSession(): Promise<{ access_token: string; email: string; refresh_token: string }> {
@@ -67,6 +68,7 @@ export async function getCurrentSession(): Promise<{ access_token: string; email
     return { access_token: '', email: '', refresh_token: '' };
   }
 }
+
   
 export function validateSettings(settings: any) {
   // check if settings has all the fields that DEFAULT_SETTINGS has
@@ -95,63 +97,51 @@ export function validateSettings(settings: any) {
   return settings;
 }
 
+
+async function readConfigFile(vaultPath: string): Promise<Partial<Settings>> {
+  try {
+    const configPath = path.join(vaultPath, '.enzyme.conf');
+    const configContent = await fs.readFile(configPath, 'utf-8');
+    return JSON.parse(configContent);
+  } catch (error) {
+    // If file doesn't exist or is invalid, return empty object
+    return {};
+  }
+}
+
+async function writeConfigFile(vaultPath: string, settings: Partial<Settings>) {
+  try {
+    const configPath = path.join(vaultPath, '.enzyme.conf');
+    await fs.writeFile(configPath, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (error) {
+    logger.error('Error writing config file:', error);
+    throw error;
+  }
+}
+
 export async function getSettings() {
   try {
-    const { access_token, email } = await getCurrentSession();
     const localSettings = store.get('localSettings') || { vaultPath: '' };
-
+    
     // Start with default settings
-    const mergedSettings = {
+    let mergedSettings = {
       ...DEFAULT_SETTINGS,
       vaultPath: localSettings.vaultPath
     };
 
-    // If not authenticated, return defaults with local vault path
-    if (!access_token || !email) {
-      return mergedSettings;
-    }
-
-    // Get settings from server
-    const response = await fetch(`${SERVER_URL}/user/config?email=${email}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${access_token}`
-      }
-    });
-
-    if (!response.ok) {
-      console.error('Failed to fetch settings:', await response.text());
-      return mergedSettings;
-    }
-
-    const serverSettings = await response.json();
-
-    // Merge array fields by concatenating
-    Object.keys(serverSettings).forEach(key => {
-      if (Array.isArray(DEFAULT_SETTINGS[key])) {
-        // Combine arrays and remove duplicates
-        mergedSettings[key] = [...new Set([
-          ...mergedSettings[key],
-          ...serverSettings[key]
-        ])];
-      } else {
-        // For non-array fields, use server value if present
-        mergedSettings[key] = serverSettings[key];
-      }
-    });
-
-    // Ensure vault path is preserved
-    mergedSettings.vaultPath = localSettings.vaultPath || serverSettings.vaultPath || '';
-
-    // Update local settings if needed
-    if (mergedSettings.vaultPath !== localSettings.vaultPath) {
-      store.set('localSettings', { vaultPath: mergedSettings.vaultPath });
+    // If we have a vault path, try to read the config file
+    if (localSettings.vaultPath) {
+      const fileSettings = await readConfigFile(localSettings.vaultPath);
+      mergedSettings = {
+        ...mergedSettings,
+        ...fileSettings,
+        vaultPath: localSettings.vaultPath // Always preserve vault path
+      };
     }
 
     return mergedSettings;
-
   } catch (error) {
-    console.error('Error fetching settings:', error);
+    logger.error('Error getting settings:', error);
     const localSettings = store.get('localSettings') || { vaultPath: '' };
     return {
       ...DEFAULT_SETTINGS,
@@ -179,46 +169,32 @@ export async function clearSession() {
 }
 
 export function setupUserIPCRoutes() {
-  ipcMain.handle('get-settings', async (_) => {
+  ipcMain.handle('get-settings', async () => {
     return await getSettings();
   });
 
   ipcMain.handle('update-settings', async (_, newSettings) => {
     try {
-      const { access_token, email } = await getCurrentSession();
-      
-      if (!access_token || !email) {
-        throw new Error('No authenticated session');
+      const localSettings = store.get('localSettings') || { vaultPath: '' };
+      if (!localSettings.vaultPath) {
+        throw new Error('No vault path set');
       }
 
-      // Update settings on server
-      const response = await fetch(`${SERVER_URL}/user/update-config?email=${email}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${access_token}`
-        },
-        body: JSON.stringify(newSettings)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update settings: ${await response.text()}`);
-      }
-
+      // Write settings to config file
+      await writeConfigFile(localSettings.vaultPath, newSettings);
       return { success: true };
     } catch (error) {
-      console.error('Error updating settings:', error);
+      logger.error('Error updating settings:', error);
       throw error;
     }
   });
 
-
-  ipcMain.handle('update-local-settings', async (_, newLocalSettings: LocalSettings) => {
+  ipcMain.handle('update-local-settings', async (_, newLocalSettings) => {
     try {
       store.set('localSettings', newLocalSettings);
       return { success: true };
     } catch (error) {
-      console.error('Error saving local settings:', error);
+      logger.error('Error saving local settings:', error);
       throw error;
     }
   });
