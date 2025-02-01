@@ -84,6 +84,67 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   
   const [isOutputExpanded, setIsOutputExpanded] = useState(false);
 
+
+  // Add this helper function to keep selectedIdsRef in sync
+  const updateSelectedEntity = useCallback((name: string, doAdd: boolean) => {
+    setSelectedEntities(prev => {
+      const next = new Map(prev);
+      if (doAdd) {
+        next.set(name, { 
+          type: name.startsWith('#') ? 'tag' : 'link', 
+          count: DEFAULT_COUNT,
+          maxCount: DEFAULT_COUNT
+        });
+        initializeDocCountForMention(name);
+      } else {
+        next.delete(name);
+        updateDocCountForMention(name, 0);
+        graphViewRef.current?.removeNodesAndLinks(name);
+      }
+      return next;
+    });
+  }, []);
+
+  // Add loading state for trending data
+  const [isTrendingDataLoading, setIsTrendingDataLoading] = useState(true);
+
+  // Simplify state management to just track if we can interact
+  const [isIndexerReady, setIsIndexerReady] = useState(false);
+
+  // Modify fetchTrendingData to only handle initial data
+  const fetchTrendingData = async () => {
+    try {
+      // First check if indexer is ready
+      const indexerStatus = await window.electron.ipcRenderer.invoke('check-indexer-status');
+      setIsIndexerReady(!indexerStatus.isIndexing);
+      
+      if (indexerStatus.isIndexing) {
+        console.log('Indexer not ready yet, will retry');
+        return;
+      }
+
+      const result = await window.electron.ipcRenderer.invoke('trigger-trending-data-update');
+      updateTrendingDataState(result);
+    } catch (error) {
+      console.error('Error fetching trending data:', error);
+    }
+  };
+
+  // Add helper function to update trending data state
+  const updateTrendingDataState = (result: any) => {
+    const formattedTags = result.tags.map(tag => ({ 
+      type: 'tag', 
+      name: `#${tag.name}`,
+      timeline: tag.timeline 
+    }));
+    const formattedLinks = result.links.map(link => ({ 
+      type: 'link', 
+      name: `[[${link.name}]]`,
+      timeline: link.timeline 
+    }));
+    setTrendingData({ tags: formattedTags, links: formattedLinks });
+  };
+
   const browseVaultDirectory = async () => {
     try {
       const result = await window.electron.ipcRenderer.invoke('select-directory');
@@ -92,11 +153,19 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
         
         try {
           setError(false);
-
-          // Initialize vault
-          await initializeVault();
+          setIsTrendingDataLoading(true);
+          // Clear existing trending data before initialization
+          setTrendingData(null);
+          
+          // Initialize vault and get initial trending data
+          const initResult = await initializeVault();
+          if (initResult.trendingData) {
+            updateTrendingDataState(initResult.trendingData);
+          }
+          
           await verifySession();
-
+          setIsTrendingDataLoading(false);
+          
           setError(false);
           
           setTimeout(() => {
@@ -128,69 +197,6 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   };
 
 
-  // Add this helper function to keep selectedIdsRef in sync
-  const updateSelectedEntity = useCallback((name: string, doAdd: boolean) => {
-    setSelectedEntities(prev => {
-      const next = new Map(prev);
-      if (doAdd) {
-        next.set(name, { 
-          type: name.startsWith('#') ? 'tag' : 'link', 
-          count: DEFAULT_COUNT,
-          maxCount: DEFAULT_COUNT
-        });
-        initializeDocCountForMention(name);
-      } else {
-        next.delete(name);
-        updateDocCountForMention(name, 0);
-        graphViewRef.current?.removeNodesAndLinks(name);
-      }
-      return next;
-    });
-  }, []);
-
-  // Add loading state for trending data
-  const [isTrendingDataLoading, setIsTrendingDataLoading] = useState(true);
-
-  // Simplify state management to just track if we can interact
-  const [isIndexerReady, setIsIndexerReady] = useState(false);
-
-  // Modify fetchTrendingData to only handle initial data
-  const fetchTrendingData = async () => {
-    try {
-      setIsTrendingDataLoading(true);
-      // First check if indexer is ready
-      const indexerStatus = await window.electron.ipcRenderer.invoke('check-indexer-status');
-      setIsIndexerReady(!indexerStatus.isIndexing);
-      
-      if (indexerStatus.isIndexing) {
-        console.log('Indexer not ready yet, will retry');
-        return;
-      }
-
-      const result = await window.electron.ipcRenderer.invoke('trending-data-update');
-      updateTrendingDataState(result);
-    } catch (error) {
-      console.error('Error fetching trending data:', error);
-    } finally {
-      setIsTrendingDataLoading(false);
-    }
-  };
-
-  // Add helper function to update trending data state
-  const updateTrendingDataState = (result: any) => {
-    const formattedTags = result.tags.map(tag => ({ 
-      type: 'tag', 
-      name: `#${tag.name}`,
-      timeline: tag.timeline 
-    }));
-    const formattedLinks = result.links.map(link => ({ 
-      type: 'link', 
-      name: `[[${link.name}]]`,
-      timeline: link.timeline 
-    }));
-    setTrendingData({ tags: formattedTags, links: formattedLinks });
-  };
-
   // Add effect to handle trending data updates
   useEffect(() => {
     // Set up listener for trending data updates
@@ -200,10 +206,12 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
 
     window.electron.ipcRenderer.on('trending-data-updated', handleTrendingDataUpdate);
 
+    setIsTrendingDataLoading(true);
     // Fetch initial data when component mounts
     if (hasVaultInitialized && currentView === 'recipes' && !isIndexerReady) {
       fetchTrendingData();
     }
+    setIsTrendingDataLoading(false);
 
     // Cleanup listener on unmount
     return () => {
@@ -708,17 +716,12 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
         </div>
 
         {/* Suggested ingredients section */}
-        {!hasVaultInitialized || !isIndexerReady ? (
+        {!hasVaultInitialized || !isIndexerReady || isTrendingDataLoading ? (
           <div className="animate-pulse space-y-3">
             <div className="h-8 bg-brand/20 rounded w-1/2"></div>
             <div className="h-4 bg-brand/20 rounded w-3/4"></div>
           </div>
-        ) : isTrendingDataLoading ? (
-          <div className="animate-pulse space-y-3">
-            <div className="h-8 bg-brand/20 rounded w-1/2"></div>
-            <div className="h-4 bg-brand/20 rounded w-3/4"></div>
-          </div>
-        ) : trendingData && (
+        ) : trendingData ? (
           <div className="space-y-3">
             <div 
               className="flex flex-wrap gap-2 text-xs"
@@ -796,7 +799,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
               })}
             </div>
           </div>
-        )}
+        ) : null}
 
         <NoteTimeline timelineData={timelineData} />
 

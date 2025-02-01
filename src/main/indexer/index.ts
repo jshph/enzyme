@@ -5,7 +5,7 @@ import * as chokidar from 'chokidar';
 import { getFileCreationDate } from '../utils.js';
 import * as winston from 'winston';
 import { ServerContext } from '../server.js';
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 import minimatch from 'minimatch';
 
 export interface FileMetadata {
@@ -346,9 +346,7 @@ export class FileIndexer {
             this.logger.info('Initial scan complete');
           })
           .on('add', path => {
-            if (isInitialScan) {
-              this.logger.debug(`Initial scan found: ${path}`);
-            } else {
+            if (!isInitialScan) {
               this.logger.debug(`New file created: ${path}`);
             }
             this.handleFileChange(path);
@@ -697,10 +695,7 @@ export class FileIndexer {
           }))
         };
 
-        // Send to all windows
-        BrowserWindow.getAllWindows().forEach(window => {
-          window.webContents.send('trending-data-updated', enrichedData);
-        });
+        // ipcRenderer.send('trending-data-updated', enrichedData);
 
       } finally {
         this.isIndexing = false;

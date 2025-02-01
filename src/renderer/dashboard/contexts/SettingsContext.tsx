@@ -11,7 +11,7 @@ interface SettingsContextType {
   saveSettings: () => Promise<void>;
   processArrayField: (value: string[] | string) => string;
   prepareArrayField: (value: string) => string[]; 
-  initializeVault: () => Promise<boolean>;
+  initializeVault: () => Promise<{success: boolean, trendingData: any}>;
   hasVaultInitialized: boolean;
 }
 

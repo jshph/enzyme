@@ -64,14 +64,14 @@ export const useSettingsManager = (providedInitialSettings: Settings = {}) => {
     }
   };
 
-  const initializeVault = async (): Promise<boolean> => {
+  const initializeVault = async (): Promise<{success: boolean, trendingData: any}> => {
     try {
       const savedSettings = await window.electron.ipcRenderer.invoke('get-settings');
       
       setHasVaultInitialized(false);
       const result = await window.electron.ipcRenderer.invoke('initialize-index', savedSettings);
       setHasVaultInitialized(result.success);
-      return result.success;
+      return result;
     } catch (error) {
       console.error('Error initializing vault:', error);
       throw error;

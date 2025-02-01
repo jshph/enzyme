@@ -50,7 +50,27 @@ export function setupVaultIPCRoutes() {
         settings.excludedPatterns || [],
         settings.excludedTags || [],
         false
-      ).then(() => ({ success: true }));
+      ).then(() => {
+        // Get initial trending data after initialization
+        const trendingData = indexer.getTrendingData();
+
+        // Format the data for the frontend
+        const enrichedData = {
+          tags: trendingData.items.tags.map(tag => ({
+            ...tag,
+            timeline: trendingData.timeline.tags.get(tag.name) || []
+          })),
+          links: trendingData.items.links.map(link => ({
+            ...link,
+            timeline: trendingData.timeline.links.get(link.name) || []
+          }))
+        };
+        
+        return { 
+          success: true,
+          trendingData: enrichedData // Include trending data in initialization response
+        };
+      });
 
       // Race between timeout and initialization
       const result = await Promise.race([initPromise, timeoutPromise]);
@@ -65,8 +85,8 @@ export function setupVaultIPCRoutes() {
       };
     }
   });
-  
-  ipcMain.handle('trending-data-update', (_) => {
+
+  ipcMain.handle('trigger-trending-data-update', (_) => {
     const indexer = getFileIndexer();
     const { items: trendingItems, timeline } = indexer.getTrendingData();
     
@@ -83,7 +103,7 @@ export function setupVaultIPCRoutes() {
     };
 
     return enrichedData;
-  });
+  })
 
   ipcMain.handle('query-for-links-and-tags', (_, query: string) => {
     return indexer.queryForTagsAndLinks(query)
