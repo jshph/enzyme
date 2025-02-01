@@ -66,25 +66,12 @@ export function setupVaultIPCRoutes() {
     }
   });
   
-  ipcMain.on('reindex-directory', async (_, settings: Settings) => {
-    await indexer.stop();
-    const localSettings = store.get('localSettings') || { vaultPath: '' };
-    
-    await indexer.initialize(
-      localSettings.vaultPath,
-      settings.includedPatterns || ['**/*.md'],
-      settings.excludedPatterns || [],
-      settings.excludedTags || [],
-      false
-    );
-  });
-  
   ipcMain.handle('trending-data-update', (_) => {
     const indexer = getFileIndexer();
     const { items: trendingItems, timeline } = indexer.getTrendingData();
     
     // Format the data for the frontend
-    const enrichedData: TrendingDataWithTimeline = {
+    const enrichedData = {
       tags: trendingItems.tags.map(tag => ({
         ...tag,
         timeline: timeline.tags.get(tag.name) || []

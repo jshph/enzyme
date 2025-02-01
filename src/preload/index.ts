@@ -4,31 +4,6 @@ import { Settings } from '../main/ipc/user.js';
 import { LocalSettings } from '../main/ipc/index.js';
 import { SpaceInfo } from '../main/ipc/space.js';
 
-// Custom APIs for renderer
-const api = {
-  // Auth
-  login: (email: string, password: string) => ipcRenderer.invoke('login', email, password),
-  verifyOtp: (email: string, token: string) => ipcRenderer.invoke('verify-otp', email, token),
-  authSendVerificationCode: (email: string) => ipcRenderer.invoke('auth:send-verification-code', email),
-  authVerifySession: () => ipcRenderer.invoke('auth:verify-session'),
-  logout: () => ipcRenderer.invoke('auth:logout'),
-
-  // Vault
-  initializeIndex: (settings: Settings) => ipcRenderer.invoke('initialize-index', settings),
-  reindexDirectory: (settings: Settings) => ipcRenderer.invoke('reindex-directory', settings),
-  trendingDataUpdate: () => ipcRenderer.invoke('trending-data-update'),
-
-  // Settings
-  getSettings: () => ipcRenderer.invoke('get-settings'),
-  updateSettings: (newSettings: Settings) => ipcRenderer.invoke('update-settings', newSettings),
-  updateLocalSettings: (newLocalSettings: LocalSettings) => ipcRenderer.invoke('update-local-settings', newLocalSettings),
-
-  // Spaces
-  createSpace: (spaceData: SpaceInfo) => ipcRenderer.invoke('create-space', spaceData),
-  submitToSpace: (spaceName: string, submission: any) => ipcRenderer.invoke('submit-to-space', { spaceName, submission }),
-  clearSpaces: () => ipcRenderer.invoke('clear-spaces'),
-  fetchSpaceSubmissions: (spaceId: string) => ipcRenderer.invoke('fetch-space-submissions', spaceId)
-}
 
 // Define the app state type
 interface AppState {
@@ -64,7 +39,6 @@ interface AppState {
         }
       }
     })
-    contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
     console.error(error)
   }

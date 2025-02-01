@@ -154,7 +154,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   // Simplify state management to just track if we can interact
   const [isIndexerReady, setIsIndexerReady] = useState(false);
 
-  // Modify fetchTrendingData to check if indexer is ready
+  // Modify fetchTrendingData to only handle initial data
   const fetchTrendingData = async () => {
     try {
       setIsTrendingDataLoading(true);
@@ -168,18 +168,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
       }
 
       const result = await window.electron.ipcRenderer.invoke('trending-data-update');
-      // Format the tags and links with the # and [[ ]]
-      const formattedTags = result.tags.map(tag => ({ 
-        type: 'tag', 
-        name: `#${tag.name}`,
-        timeline: tag.timeline 
-      }));
-      const formattedLinks = result.links.map(link => ({ 
-        type: 'link', 
-        name: `[[${link.name}]]`,
-        timeline: link.timeline 
-      }));
-      setTrendingData({ tags: formattedTags, links: formattedLinks });
+      updateTrendingDataState(result);
     } catch (error) {
       console.error('Error fetching trending data:', error);
     } finally {
@@ -187,12 +176,39 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
     }
   };
 
-  // Add polling effect to check indexer status
+  // Add helper function to update trending data state
+  const updateTrendingDataState = (result: any) => {
+    const formattedTags = result.tags.map(tag => ({ 
+      type: 'tag', 
+      name: `#${tag.name}`,
+      timeline: tag.timeline 
+    }));
+    const formattedLinks = result.links.map(link => ({ 
+      type: 'link', 
+      name: `[[${link.name}]]`,
+      timeline: link.timeline 
+    }));
+    setTrendingData({ tags: formattedTags, links: formattedLinks });
+  };
+
+  // Add effect to handle trending data updates
   useEffect(() => {
+    // Set up listener for trending data updates
+    const handleTrendingDataUpdate = (_: any, data: any) => {
+      updateTrendingDataState(data);
+    };
+
+    window.electron.ipcRenderer.on('trending-data-updated', handleTrendingDataUpdate);
+
+    // Fetch initial data when component mounts
     if (hasVaultInitialized && currentView === 'recipes' && !isIndexerReady) {
-      const pollInterval = setInterval(fetchTrendingData, 1000); // Poll every second
-      return () => clearInterval(pollInterval);
+      fetchTrendingData();
     }
+
+    // Cleanup listener on unmount
+    return () => {
+      window.electron.ipcRenderer.removeListener('trending-data-updated', handleTrendingDataUpdate);
+    };
   }, [currentView, hasVaultInitialized, isIndexerReady]);
 
   const [suggestedOutputs, setSuggestedOutputs] = useState<SuggestedOutputBody[]>();

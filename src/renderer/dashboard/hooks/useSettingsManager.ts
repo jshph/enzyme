@@ -68,14 +68,6 @@ export const useSettingsManager = (providedInitialSettings: Settings = {}) => {
     try {
       const savedSettings = await window.electron.ipcRenderer.invoke('get-settings');
       
-      // Ensure .obsidian is in excluded patterns
-      if (!savedSettings.excludedPatterns) {
-        savedSettings.excludedPatterns = [];
-      }
-      if (!savedSettings.excludedPatterns.includes('.obsidian*/**/*')) {
-        savedSettings.excludedPatterns.push('.obsidian*/**/*');
-      }
-      
       setHasVaultInitialized(false);
       const result = await window.electron.ipcRenderer.invoke('initialize-index', savedSettings);
       setHasVaultInitialized(result.success);
@@ -92,11 +84,6 @@ export const useSettingsManager = (providedInitialSettings: Settings = {}) => {
       arrayFields.forEach(field => {
         if (typeof preparedSettings[field] === 'string') {
           let values = prepareArrayField(preparedSettings[field] as string);
-          
-          // Ensure .obsidian is in excluded patterns
-          if (field === 'excludedPatterns' && !values.includes('.obsidian/**/*')) {
-            values.push('.obsidian/**/*');
-          }
           
           preparedSettings[field] = values;
         }

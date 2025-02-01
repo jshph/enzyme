@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS: Settings = {
   vaultPath: '',
   port: 3779,
   includedPatterns: ['**/*.md'],
-  excludedPatterns: ['.obsidian*/**/*'],
+  excludedPatterns: ['**/.obsidian*/**/*', "**/.trash"],
   doCache: false,
   defaultPatternLimit: 10,
   excludedTags: [],
@@ -100,12 +100,15 @@ export async function getSettings() {
     const { access_token, email } = await getCurrentSession();
     const localSettings = store.get('localSettings') || { vaultPath: '' };
 
-    // If not authenticated, return merged local settings
+    // Start with default settings
+    const mergedSettings = {
+      ...DEFAULT_SETTINGS,
+      vaultPath: localSettings.vaultPath
+    };
+
+    // If not authenticated, return defaults with local vault path
     if (!access_token || !email) {
-      return { 
-        ...DEFAULT_SETTINGS, 
-        vaultPath: localSettings.vaultPath 
-      };
+      return mergedSettings;
     }
 
     // Get settings from server
@@ -118,20 +121,27 @@ export async function getSettings() {
 
     if (!response.ok) {
       console.error('Failed to fetch settings:', await response.text());
-      return { 
-        ...DEFAULT_SETTINGS, 
-        vaultPath: localSettings.vaultPath 
-      };
+      return mergedSettings;
     }
 
     const serverSettings = await response.json();
-    
-    // Merge settings preserving local vault path
-    const mergedSettings = {
-      ...DEFAULT_SETTINGS,
-      ...serverSettings,
-      vaultPath: localSettings.vaultPath || serverSettings.vaultPath || ''
-    };
+
+    // Merge array fields by concatenating
+    Object.keys(serverSettings).forEach(key => {
+      if (Array.isArray(DEFAULT_SETTINGS[key])) {
+        // Combine arrays and remove duplicates
+        mergedSettings[key] = [...new Set([
+          ...mergedSettings[key],
+          ...serverSettings[key]
+        ])];
+      } else {
+        // For non-array fields, use server value if present
+        mergedSettings[key] = serverSettings[key];
+      }
+    });
+
+    // Ensure vault path is preserved
+    mergedSettings.vaultPath = localSettings.vaultPath || serverSettings.vaultPath || '';
 
     // Update local settings if needed
     if (mergedSettings.vaultPath !== localSettings.vaultPath) {
@@ -143,9 +153,9 @@ export async function getSettings() {
   } catch (error) {
     console.error('Error fetching settings:', error);
     const localSettings = store.get('localSettings') || { vaultPath: '' };
-    return { 
-      ...DEFAULT_SETTINGS, 
-      vaultPath: localSettings.vaultPath 
+    return {
+      ...DEFAULT_SETTINGS,
+      vaultPath: localSettings.vaultPath
     };
   }
 }

@@ -5,7 +5,8 @@ import * as chokidar from 'chokidar';
 import { getFileCreationDate } from '../utils.js';
 import * as winston from 'winston';
 import { ServerContext } from '../server.js';
-import { app } from 'electron';
+import { app, BrowserWindow } from 'electron';
+import minimatch from 'minimatch';
 
 export interface FileMetadata {
   path: string;
@@ -150,6 +151,8 @@ export class FileIndexer {
       }
 
       this.logger.debug(`Initializing file indexer...`);
+      this.logger.debug(`Excluded patterns: ${this.excludedPatterns}`);
+
       this.clearIndex();
       
       this.vaultPath = vaultPath;
@@ -159,14 +162,6 @@ export class FileIndexer {
       this.excludedTags = excludedTags.map(tag => tag.toLowerCase());
       this.excludedPatterns = excludedPatterns.map(pattern => pattern.toLowerCase());
       this.includedPatterns = includedPatterns.map(pattern => pattern.toLowerCase());
-
-      // Add .obsidian to excluded patterns if not already present
-      const updatedExcludedPatterns = [
-        ...excludedPatterns,
-        '.obsidian/**/*'  // Exclude all files in .obsidian folder
-      ].map(pattern => pattern.toLowerCase());
-      
-      this.excludedPatterns = updatedExcludedPatterns;
 
       const success = await this.indexDirectory(vaultPath);
       this.hasVaultInitialized = success;
@@ -293,17 +288,12 @@ export class FileIndexer {
       await Promise.all(files.map(async (file) => {
         try {
           const relativePath = path.relative(this.vaultPath!, file);
-          
-          if (!file.toLowerCase().endsWith('.md')) {
-            skippedFiles++;
-            return;
-          }
 
           const { content, stats, frontmatter, tags, links } = await this.getFileData(file);
           
           this.linkToFileMap.set(path.basename(file), file);
           
-          const isIncluded = this.isIncluded(relativePath, tags);
+          const isIncluded = await this.shouldIncludeFile(file);
 
           if (isIncluded) {
             await this.indexFile(content, stats, frontmatter, tags, links, file);
@@ -316,7 +306,6 @@ export class FileIndexer {
             }
           } else {
             skippedFiles++;
-            this.logger.debug(`Skipped excluded file: ${relativePath}`);
           }
           this.processedFiles++;
         } catch (error) {
@@ -344,9 +333,7 @@ export class FileIndexer {
         this.logger.info('Reinitializing the file watcher');
         this.watcher = chokidar.watch(this.includedPatterns.map(pattern => path.join(this.vaultPath!, pattern)), {
           ignored: [
-            ...this.excludedPatterns,
-            '**/\\.obsidian*/**',  // Explicitly ignore .obsidian folder
-            '**/\\.obsidian*'      // Ignore the folder itself
+            ...this.excludedPatterns
           ],
           persistent: true
         });
@@ -379,7 +366,6 @@ export class FileIndexer {
   }
 
   public clearIndex(): void {
-    this.logger.info(`Clearing index ${new Error().stack}`);
     this.tagIndex = new Map();
     this.linkIndex = new Map();
     this.folderIndex = new Map();
@@ -416,74 +402,119 @@ export class FileIndexer {
   }
 
   private matchPattern(str: string, pattern: string): boolean {
-    const regexPattern = pattern
-      .replace(/\./g, '\\.')     // Escape dots
-      .replace(/\*/g, '.*')      // Convert * to .*
-      .replace(/\?/g, '.');      // Convert ? to .
-    return new RegExp(`^${regexPattern}$`).test(str);
+    return minimatch(str, pattern, { dot: true });
   };
 
   private async getAllFiles(dir: string): Promise<string[]> {
     try {
       const entries = await fs.readdir(dir, { withFileTypes: true });
       const files = await Promise.all(entries.map(async (entry) => {
-        // Skip .obsidian folder entirely
-        if (entry.name === '.obsidian') {
+        // Skip .obsidian folder and other excluded patterns
+        if (this.shouldSkipEntry(entry.name, dir)) {
+          this.logger.debug(`Skipping excluded entry: ${entry.name}`);
           return [];
         }
         
-        const res = path.join(dir, entry.name);
+        const fullPath = path.join(dir, entry.name);
+        
         if (entry.isDirectory()) {
-          return this.getAllFiles(res);
-        } else {
-          // Only include markdown files
-          return res.toLowerCase().endsWith('.md') ? res : [];
+          return this.getAllFiles(fullPath);
         }
+        
+        // Only include markdown files that match our inclusion/exclusion criteria
+        if (await this.shouldIncludeFile(fullPath)) {
+          return [fullPath];
+        }
+        
+        return [];
       }));
 
       const allFiles = files.flat();
-      const markdownFiles = allFiles.filter(file => file.toLowerCase().endsWith('.md'));
-      const skippedFiles = allFiles.length - markdownFiles.length;
       
-      if (skippedFiles > 0) {
-        this.logger.debug(`Skipped ${skippedFiles} non-markdown files in directory: ${dir}`);
+      if (allFiles.length === 0) {
+        this.logger.debug(`No includable files found in directory: ${dir}`);
+      } else {
+        this.logger.debug(`Found ${allFiles.length} includable files in directory: ${dir}`);
       }
       
-      return markdownFiles;
+      return allFiles;
     } catch (error) {
       this.logger.error(`Error reading directory ${dir}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return [];
     }
   }
-  private isIncluded(path: string, tags: string[]): boolean {
-    // Add check for .obsidian folder
-    if (path.includes('.obsidian')) {
+
+  private shouldSkipEntry(entryName: string, dir: string): boolean {
+    // Always skip .obsidian folder
+    if (entryName === '.obsidian') {
+      return true;
+    }
+
+    // Skip any paths that match excluded patterns
+    const relativePath = this.vaultPath ? path.relative(this.vaultPath, path.join(dir, entryName)) : entryName;
+    return this.excludedPatterns.some(pattern => this.matchPattern(relativePath, pattern));
+  }
+
+  private async shouldIncludeFile(filePath: string): Promise<boolean> {
+    // Only include markdown files
+    if (!filePath.toLowerCase().endsWith('.md')) {
+      this.logger.debug(`Skipped non-markdown file: ${filePath}`);
       return false;
     }
 
-    const isExcludedByTag = tags.some((tag: string) => {
-      tag = tag.toLowerCase();
-      return this.excludedTags.includes(tag) || 
-             this.excludedTags.some(pattern => this.matchPattern(tag, pattern));
-    });
+    // Check file content and tags
+    try {
+      const { tags } = await this.getFileData(filePath);
+      
+      // Check for excluded tags
+      const hasExcludedTag = tags.some(tag => {
+        const normalizedTag = tag.toLowerCase();
+        return this.excludedTags.includes(normalizedTag) || 
+               this.excludedTags.some(pattern => this.matchPattern(normalizedTag, pattern));
+      });
 
-    return !isExcludedByTag && 
-           this.includedPatterns.some(pattern => this.matchPattern(path, pattern)) && 
-           !this.excludedPatterns.some(pattern => this.matchPattern(path, pattern));
-  } 
+      if (hasExcludedTag) {
+        this.logger.debug(`Excluded file by tags: ${filePath}`);
+        return false;
+      }
+
+      // Check path patterns
+      
+      const isExcluded = this.excludedPatterns.some(pattern => 
+        this.matchPattern(filePath, pattern)
+      );
+      
+      if (isExcluded) {
+        this.logger.debug(`Excluded file ${filePath} using pattern ${JSON.stringify(this.excludedPatterns)}`);
+        return false;
+      }
+
+      const isIncluded = this.includedPatterns.some(pattern => 
+        this.matchPattern(filePath, pattern)
+      );
+      
+      if (!isIncluded) {
+        this.logger.debug(`File does not match any include patterns: ${filePath}, using pattern ${JSON.stringify(this.includedPatterns)}`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      this.logger.error(`Error checking file inclusion for ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
+    }
+  }
 
   private async indexFileByPath(filePath: string): Promise<void> {
-    const { content, stats, frontmatter, tags, links } = await this.getFileData(filePath);
-
-    if (!this.isIncluded(filePath, tags)) {
-      return;
+    try {
+      const { content, stats, frontmatter, tags, links } = await this.getFileData(filePath);
+      
+      if (await this.shouldIncludeFile(filePath)) {
+        await this.indexFile(content, stats, frontmatter, tags, links, filePath);
+      }
+    } catch (error) {
+      this.logger.error(`Error indexing file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    if (tags.some((tag: string) => this.excludedTags.includes(tag))) {
-      return;
-    }
-
-    await this.indexFile(content, stats, frontmatter, tags, links, filePath);
   }
 
   private async indexFile(content: string, stats: any, frontmatter: any, tags: string[], links: string[], filePath: string): Promise<void> {
@@ -650,7 +681,27 @@ export class FileIndexer {
 
         this.processedFiles += this.batchProcessedFiles;
 
+        // Compute new trending data and emit via IPC
         await this.computeTrendingDataCache();
+        const { items: trendingItems, timeline } = this.getTrendingData();
+        
+        // Format the data for the frontend
+        const enrichedData = {
+          tags: trendingItems.tags.map(tag => ({
+            ...tag,
+            timeline: timeline.tags.get(tag.name) || []
+          })),
+          links: trendingItems.links.map(link => ({
+            ...link,
+            timeline: timeline.links.get(link.name) || []
+          }))
+        };
+
+        // Send to all windows
+        BrowserWindow.getAllWindows().forEach(window => {
+          window.webContents.send('trending-data-updated', enrichedData);
+        });
+
       } finally {
         this.isIndexing = false;
         this.processQueue();
