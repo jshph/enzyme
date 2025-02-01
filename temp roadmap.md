@@ -114,18 +114,22 @@ implementation notes:
 - hover on open should show a tooltip to ensure that hte vault is open first as a vault
 - clean up messaging on settings around vault, "it's read only"
 - relative paths in the output display, not absolute (finish this)
+- logging in doesnt update the settings and the trending data. it should
+- write through a few more blog posts to edit them
+  - claude blog post
+- min height is too big -- 956
+
 
 TODO before launch
 
+- clear log file on every restart
+
+- handle vault changes - should update trending data
+- validate the .trash and .obsidian folders handling - with this recent change. Also fix indexing
+
+
 - toggled entities should not persist when changing vaults
 - index mentioned entities which don't have notes, not just tags. Clean up the entities by removing header suffixes, blocks, etc. Treat embeds as links. But on retrieval, you'll need to not just grep for the link but the link + the suffix.
-
-- logging in doesnt update the settings and the trending data. it should
-
-
-- write through a few more blog posts to edit them
-  - claude blog post
-  - 
 
 
 - verify the behavior of scheduled recipes
@@ -133,6 +137,8 @@ TODO before launch
 
 - don't hallucinate, error out when there aren't any files so we aren't synthesizing just a few
 
+
+- later - a "save to vault" option - settings can have an output option
 
 
 - figure out onboarding - revisit obsidian notes (things like auto tagging, etc)

@@ -4,14 +4,14 @@ import { useSettingsManager, Settings } from '../hooks/useSettingsManager.js';
 
 interface SettingsContextType {
   settings: Settings;
-  refreshSettings: () => Promise<void>;
+  refreshSettings: () => Promise<any>;
   updateSetting: (key: string, value: any) => void;
   hasChanges: () => boolean;
   resetSettings: () => void;
   saveSettings: () => Promise<void>;
   processArrayField: (value: string[] | string) => string;
   prepareArrayField: (value: string) => string[]; 
-  initializeVault: () => Promise<{success: boolean, trendingData: any}>;
+  initializeVault: (vaultPath: string) => Promise<{success: boolean, trendingData: any}>;
   hasVaultInitialized: boolean;
 }
 

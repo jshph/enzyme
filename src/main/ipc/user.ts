@@ -3,6 +3,8 @@ import { store, logger } from "./index.js";
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+const SERVER_URL = process.env.SERVER_URL || 'https://api.enzyme.so';
+
 export interface Settings {
   vaultPath: string;
   port: number;
@@ -119,68 +121,39 @@ async function writeConfigFile(vaultPath: string, settings: Partial<Settings>) {
   }
 }
 
-export async function getSettings() {
+export async function getSettings(vaultPath: string) {
   try {
-    const localSettings = store.get('localSettings') || { vaultPath: '' };
+    // Read settings from .enzyme.conf in vault folder
+    const fileSettings = await readConfigFile(vaultPath);
     
-    // Start with default settings
-    let mergedSettings = {
-      ...DEFAULT_SETTINGS,
-      vaultPath: localSettings.vaultPath
-    };
-
-    // If we have a vault path, try to read the config file
-    if (localSettings.vaultPath) {
-      const fileSettings = await readConfigFile(localSettings.vaultPath);
-      mergedSettings = {
-        ...mergedSettings,
-        ...fileSettings,
-        vaultPath: localSettings.vaultPath // Always preserve vault path
-      };
-    }
-
-    return mergedSettings;
-  } catch (error) {
-    logger.error('Error getting settings:', error);
-    const localSettings = store.get('localSettings') || { vaultPath: '' };
     return {
       ...DEFAULT_SETTINGS,
-      vaultPath: localSettings.vaultPath
+      ...fileSettings,
+      vaultPath
+    };
+  } catch (error) {
+    logger.error('Error getting settings:', error);
+    return {
+      ...DEFAULT_SETTINGS,
+      vaultPath
     };
   }
 }
 
-export async function clearSession() {
-  const localSettings = store.get('localSettings') || { vaultPath: '' };
-  
-  store.delete('auth');
-  store.delete('spaces');
-  store.delete('settings');
-
-  // Preserve vaultPath in localSettings
-  store.set('localSettings', { vaultPath: localSettings.vaultPath });
-  
-  // Reset settings while keeping vaultPath
-  const defaultWithVaultPath = {
-    ...DEFAULT_SETTINGS,
-    vaultPath: localSettings.vaultPath
-  };
-  await validateSettings(defaultWithVaultPath);
-}
-
 export function setupUserIPCRoutes() {
-  ipcMain.handle('get-settings', async () => {
-    return await getSettings();
+  // Get settings using vault path from store
+  ipcMain.handle('get-settings', async (_, {vaultPath}) => {
+    return await getSettings(vaultPath);
   });
 
+  // Update settings in .enzyme.conf
   ipcMain.handle('update-settings', async (_, newSettings) => {
     try {
-      const localSettings = store.get('localSettings') || { vaultPath: '' };
+      const localSettings = store.get('localSettings') || {};
       if (!localSettings.vaultPath) {
         throw new Error('No vault path set');
       }
 
-      // Write settings to config file
       await writeConfigFile(localSettings.vaultPath, newSettings);
       return { success: true };
     } catch (error) {
@@ -189,12 +162,24 @@ export function setupUserIPCRoutes() {
     }
   });
 
-  ipcMain.handle('update-local-settings', async (_, newLocalSettings) => {
+  // Update vault path in electron store
+  ipcMain.handle('update-vault-path', async (_, vaultPath) => {
     try {
-      store.set('localSettings', newLocalSettings);
-      return { success: true };
+      store.set('localSettings', { vaultPath });
+      // Load and return settings from new vault path
+      return await getSettings(vaultPath);
     } catch (error) {
-      logger.error('Error saving local settings:', error);
+      logger.error('Error updating vault path:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('get-vault-path', async () => {
+    try {
+      const localSettings = store.get('localSettings') || {};
+      return localSettings.vaultPath;
+    } catch (error) {
+      logger.error('Error getting vault path:', error);
       throw error;
     }
   });

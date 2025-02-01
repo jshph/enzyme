@@ -44,8 +44,8 @@ const AppContent: React.FC = () => {
 
       try {
         console.log('initVault - refreshing settings')
-        await refreshSettings()
-        await initializeVault()
+        const settings = await refreshSettings()
+        await initializeVault(settings.vaultPath)
         await window.electron.ipcRenderer.invoke('set-vault-initialized', true)
       } catch (err) {
         console.error('Failed to initialize vault:', err)

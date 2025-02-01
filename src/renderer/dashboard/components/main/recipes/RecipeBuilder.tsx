@@ -158,7 +158,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
           setTrendingData(null);
           
           // Initialize vault and get initial trending data
-          const initResult = await initializeVault();
+          const initResult = await initializeVault(result);
           if (initResult.trendingData) {
             updateTrendingDataState(initResult.trendingData);
           }

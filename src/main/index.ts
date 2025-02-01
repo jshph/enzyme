@@ -206,7 +206,7 @@ function createWindow(): void {
     mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
     // mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
 
-    
+
     // Add this event handler
     mainWindow.on('closed', async () => {
       logger.debug('Main window closed');

@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
 import { TokenManager } from "../auth.js";
 import { getServerUrl, logger, store } from "./index.js";
-import { clearSession, getCurrentSession } from "./user.js";
+import { getCurrentSession } from "./user.js";
 import { checkForUpdates } from '../updater.js';
 
 export function setupAuthIPCRoutes() {
@@ -160,8 +160,6 @@ export function setupAuthIPCRoutes() {
         store.delete('auth');
       }
 
-      await clearSession();
-      
       return data;
     } catch (error) {
       console.error('Error logging out:', error);
