@@ -8,7 +8,7 @@ import Store from 'electron-store';
 const SERVER_URL = getServerUrl();
 const contextServer = useContextServer();
 const generationStore = new Store();
-const MAX_UNAUTHENTICATED_GENERATIONS = 20; // Per day
+const MAX_UNAUTHENTICATED_GENERATIONS = 50; // Per day
 const UNAUTHENTICATED_STORE_KEY = 'unauthenticatedGenerations';
 
 // Initialize store with date tracking

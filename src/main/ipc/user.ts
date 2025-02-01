@@ -2,8 +2,9 @@ import { ipcMain } from "electron";
 import { store, logger } from "./index.js";
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { getServerUrl } from "./index.js";
 
-const SERVER_URL = process.env.SERVER_URL || 'https://api.enzyme.so';
+const SERVER_URL = getServerUrl();
 
 export interface Settings {
   vaultPath: string;
@@ -66,7 +67,7 @@ export async function getCurrentSession(): Promise<{ access_token: string; email
     store.delete('auth');
     return { access_token: '', email: '', refresh_token: '' };
   } catch (error) {
-    // console.error('Error refreshing session:', error);
+    logger.error('Error refreshing session:', error);
     return { access_token: '', email: '', refresh_token: '' };
   }
 }

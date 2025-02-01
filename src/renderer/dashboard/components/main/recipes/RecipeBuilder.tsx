@@ -374,12 +374,10 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   // Check generation limits on mount and auth change
   const checkGenerationLimits = useCallback(() => {
     window.electron.ipcRenderer.invoke('check-generation-limits')
-      .then(({ remaining }) => {
-        console.log('checkGenerationLimits', { remaining });
+      .then(({ remaining, authenticated }) => {
         setGenerationsRemaining(Math.max(0, remaining));
       })
       .catch(() => {
-        // If there's an error, set to 0 to maintain consistent type
         setGenerationsRemaining(0);
       });
   }, [isAuthenticated]);
@@ -865,13 +863,13 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
                       disabled:opacity-50 disabled:cursor-not-allowed
                       ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
                     `}
-                    onClick={generationsRemaining === 0 ? switchToLogin : submitPrompt}
+                    onClick={generationsRemaining <= 0 && !isAuthenticated ? switchToLogin : submitPrompt}
                   >
                     {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
                       !isAuthReady ? 'Checking Authentication...' :
                       generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
                         ? 'Generating...' : 
-                      generationsRemaining > 0 ? 
+                      generationsRemaining > 0 || isAuthenticated ? 
                         `Generate Recipe` : 
                         'Login to generate more recipes'}
                   </button>
