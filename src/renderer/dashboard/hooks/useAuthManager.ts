@@ -18,15 +18,19 @@ export const useAuthManager = () => {
         setEmail(response.user.email);
         return true;
       } else {
-        // Clear auth state if verification fails
+        // Ensure both state and store are cleared
         setIsAuthenticated(false);
         setEmail('');
+        // Add this line to ensure store is cleared
+        await window.electron.ipcRenderer.invoke('auth:clear-store');
         return false;
       }
     } catch (error) {
       console.error('Error verifying session:', error);
       setIsAuthenticated(false);
       setEmail('');
+      // Add this line to ensure store is cleared on error
+      await window.electron.ipcRenderer.invoke('auth:clear-store');
       return false;
     } finally {
       setIsAuthReady(true);

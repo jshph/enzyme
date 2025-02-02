@@ -94,6 +94,11 @@ export function setupAuthIPCRoutes() {
       const session = await getCurrentSession();
       const { access_token, refresh_token } = session;
 
+      if (!access_token && !refresh_token) {
+        store.delete('auth');
+        return { isAuthenticated: false };
+      }
+
       const response = await fetch(`${SERVER_URL}/auth/verify-session`, {
         method: 'POST',
         headers: { 
@@ -106,34 +111,42 @@ export function setupAuthIPCRoutes() {
       });
 
       const data = await response.json();
-      if (!response.ok || data.error) {
+      
+      // Handle reauth requirement
+      if (data.shouldReauthenticate) {
         store.delete('auth');
-        return { isAuthenticated: false, error: data.error };
+        return { 
+          isAuthenticated: false, 
+          error: data.error,
+          shouldReauthenticate: true 
+        };
       }
 
-      if (!data.isAuthenticated) {
+      // Clear store in failure cases
+      if (!response.ok || data.error || !data.isAuthenticated) {
         store.delete('auth');
-        return { isAuthenticated: false };
+        return { 
+          isAuthenticated: false, 
+          error: data.error || 'Session verification failed' 
+        };
       }
-      
+
       // Update stored auth with new tokens if provided
       if (data.access_token) {
         store.set('auth', { 
           email: data.user.email, 
           access_token: data.access_token,
-          refresh_token: data.refresh_token || refresh_token // Keep old refresh token if new one not provided
+          refresh_token: data.refresh_token || refresh_token // Fallback to existing refresh token if not provided
         });
-
-        // Check for updates when session is verified
-        const ghToken = await fetchGithubToken(data.access_token);
-        if (ghToken) {
-          await checkForUpdates(ghToken);
-        }
       }
       
-      return { isAuthenticated: true, user: data.user };
+      return { 
+        isAuthenticated: true, 
+        user: data.user,
+        shouldReauthenticate: false
+      };
     } catch (error) {
-      console.error('Error verifying session:', error);
+      store.delete('auth');
       return { 
         isAuthenticated: false,
         error: 'Failed to verify session'
@@ -167,6 +180,16 @@ export function setupAuthIPCRoutes() {
         success: false,
         error: 'Failed to logout'
       };
+    }
+  });
+
+  ipcMain.handle('auth:clear-store', async () => {
+    try {
+      store.delete('auth');
+      return { success: true };
+    } catch (error) {
+      logger.error('Error clearing auth store:', error);
+      return { success: false };
     }
   });
   
