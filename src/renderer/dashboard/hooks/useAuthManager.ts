@@ -1,5 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 
+type OtpVerificationResponse = {
+  success: boolean;
+  message?: string;
+  pricingUrl?: string;
+  error?: string;
+}
+
 export const useAuthManager = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -75,7 +82,7 @@ export const useAuthManager = () => {
     }
   }, [clearMessage]);
 
-  const handleOtpVerification = useCallback(async (emailInput: string, otpCode: string): Promise<boolean> => {
+  const handleOtpVerification = useCallback(async (emailInput: string, otpCode: string): Promise<OtpVerificationResponse> => {
     setLoading(true);
     clearMessage();
 
@@ -85,16 +92,16 @@ export const useAuthManager = () => {
         setIsAuthenticated(true);
         setEmail(emailInput);
         setShowOtpForm(false);
-        return true;
+        return response;
       } else {
         setError(true);
         setMessage('Invalid verification code');
-        return false;
+        return { success: false, error: 'Invalid verification code' };
       }
     } catch (err) {
       setError(true);
       setMessage('Failed to verify code');
-      return false;
+      return { success: false, error: 'Failed to verify code' };
     } finally {
       setLoading(false);
     }

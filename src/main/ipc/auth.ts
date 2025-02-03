@@ -45,7 +45,6 @@ export function setupAuthIPCRoutes() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       
-      // Store both access token and refresh token if verification was successful
       if (data.success && data.session?.access_token) {
         store.set('auth', {
           email,
@@ -60,7 +59,11 @@ export function setupAuthIPCRoutes() {
         }
       }
       
-      return { success: true, message: data.message };
+      return { 
+        success: true, 
+        message: data.message,
+        pricingUrl: `http://localhost:4321/pricing?email=${encodeURIComponent(email)}`
+      };
     } catch (error) {
       console.error('Error verifying OTP:', error);
       return { 
@@ -192,5 +195,26 @@ export function setupAuthIPCRoutes() {
       return { success: false };
     }
   });
-  
+
+  // Add a new handler to check subscription status
+  ipcMain.handle('auth:check-subscription', async () => {
+    try {
+      const session = await getCurrentSession();
+      if (!session.access_token) return { hasSubscription: false };
+
+      const response = await fetch(`${SERVER_URL}/auth/check-subscription`, {
+        headers: { 
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      const data = await response.json();
+      return { 
+        hasSubscription: data.hasSubscription,
+        // If they have subscription, app can now proceed
+      };
+    } catch (error) {
+      return { hasSubscription: false };
+    }
+  });
 }

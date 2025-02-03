@@ -24,9 +24,10 @@ const Login: React.FC<LoginProps> = ({ setCurrentView }) => {
 
   const onSubmitOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await handleOtpVerification(email, otpCode);
-    if (success) {
-      setCurrentView('recipes');
+    const result = await handleOtpVerification(email, otpCode);
+    if (result.success && result.pricingUrl) {
+      window.open(result.pricingUrl, '_blank');
+      // setMessage('Please complete subscription in your browser to continue');
     }
   };
 
