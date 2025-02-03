@@ -13,6 +13,7 @@ interface SettingsContextType {
   prepareArrayField: (value: string) => string[]; 
   initializeVault: (vaultPath: string) => Promise<{success: boolean, trendingData: any}>;
   hasVaultInitialized: boolean;
+  configureClaudeMcp: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

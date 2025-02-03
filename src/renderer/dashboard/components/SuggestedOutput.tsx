@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Calendar, Mail, RefreshCw, ChevronRight, Check, Info } from 'lucide-react';
+import { Calendar, Mail, RefreshCw, ChevronRight, Check, Info, Copy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.js';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useSettingsManager } from '../hooks/useSettingsManager.js';
@@ -14,6 +14,7 @@ interface SuggestedOutputProps {
   onRetry?: () => void;
   onEmailButtonClick?: () => void;
   profileTypes?: { type: string; name: string }[];
+  query?: string;
 }
 
 interface OutputSection {
@@ -70,10 +71,31 @@ const InfoTooltip = ({ content }: { content: string }) => (
   </Tooltip.Provider>
 );
 
+const ANALYSIS_PROMPT_TEMPLATE = `
+I'm thinking about the following analysis
+<analysis>
+{analysis}
+</analysis>
+
+Help me explore this further. Please use the following notes from my vault as context: {query}
+`;
+
+const buildAnalysisPrompt = (analysis: string, query: string) => {
+  const queryElements = query.split(' ');
+  const entities: string[] = [];
+  for (const element of queryElements) {
+    if (element.includes('<')) {
+      const [entity, count] = element.split('<');
+      entities.push(`${count} notes that mention ${entity}`);
+    }
+  }
+  return ANALYSIS_PROMPT_TEMPLATE.replace('{analysis}', analysis).replace('{query}', entities.join(', '));
+};
+
 export const SuggestedOutput = React.forwardRef<
   HTMLDivElement,
   SuggestedOutputProps
->(({ body, className, onEditPrompt, onSchedule, onRetry, onEmailButtonClick, profileTypes }, ref) => {
+>(({ body, className, onEditPrompt, onSchedule, onRetry, onEmailButtonClick, profileTypes, query }, ref) => {
   const { isAuthenticated } = useAuth();
   const [sections, setSections] = useState<OutputSection[]>([]);
   const [showScheduler, setShowScheduler] = useState(false);
@@ -91,6 +113,7 @@ export const SuggestedOutput = React.forwardRef<
     message: 'Email me a copy'
   });
   const { settings } = useSettingsManager();
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   
   const togglePrompt = (index: number) => {
     setExpandedPrompts(prev => 
@@ -191,7 +214,41 @@ export const SuggestedOutput = React.forwardRef<
                 </div>
               ),
               content: (
-                <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 hover:border-opacity-100 text-sm">
+                <div className="bg-secondary/5 border border-dashed rounded-md border-secondary/20 p-4 hover:border-opacity-100 text-sm relative group">
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Tooltip.Provider>
+                      <Tooltip.Root>
+                        <Tooltip.Trigger asChild>
+                          <button
+                            onClick={() => {
+                              const prompt = buildAnalysisPrompt(segment.synthesis.analysis, query || '');
+                              navigator.clipboard.writeText(prompt);
+                              setCopiedIndex(index);
+                              setTimeout(() => setCopiedIndex(null), 2000);
+                            }}
+                            className="p-1 hover:bg-secondary/10 rounded"
+                          >
+                            {copiedIndex === index ? (
+                              <Check className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                          <Tooltip.Content
+                            className="bg-surface text-white px-2 py-1 rounded text-xs"
+                            side="left"
+                          >
+                            {copiedIndex === index 
+                              ? "Copied!" 
+                              : "Copy to continue the conversation in Claude Desktop"}
+                            <Tooltip.Arrow className="fill-surface" />
+                          </Tooltip.Content>
+                        </Tooltip.Portal>
+                      </Tooltip.Root>
+                    </Tooltip.Provider>
+                  </div>
                   <p>{segment.synthesis.analysis}</p>
                 </div>
               )
@@ -252,7 +309,7 @@ export const SuggestedOutput = React.forwardRef<
     };
 
     parseAndSetSections();
-  }, [body, expandedPrompts, profileTypes, settings.vaultPath]);
+  }, [body, expandedPrompts, profileTypes, settings.vaultPath, query]);
 
   const showTemporarySuccess = (
     setState: (state: ButtonState) => void,

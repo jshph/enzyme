@@ -7,6 +7,7 @@ export interface Settings {
   includedPatterns?: string[];
   excludedPatterns?: string[];
   excludedTags?: string[];
+  mcpEnabled?: boolean;
   [key: string]: any;
 }
 
@@ -67,6 +68,10 @@ export const useSettingsManager = () => {
       const result = await window.electron.ipcRenderer.invoke('initialize-index', newSettings);
       setHasVaultInitialized(result.success);
       
+      // Check MCP status after initialization
+      const mcpStatus = await window.electron.ipcRenderer.invoke('check-mcp-status');
+      newSettings.mcpEnabled = mcpStatus.enabled;
+      
       return { ...newSettings, ...result };
     } catch (error) {
       console.error('Error refreshing settings:', error);
@@ -96,6 +101,16 @@ export const useSettingsManager = () => {
       }
     }
   }, [refreshSettings]);
+
+  const configureClaudeMcp = useCallback(async () => {
+    try {
+      await window.electron.ipcRenderer.invoke('configure-claude-mcp');
+      updateSetting('mcpEnabled', true);
+    } catch (error) {
+      console.error('Error configuring Claude MCP:', error);
+      throw error;
+    }
+  }, []);
 
   // Save settings to .enzyme.conf
   const saveSettings = useCallback(async () => {
@@ -132,6 +147,7 @@ export const useSettingsManager = () => {
     refreshSettings,
     hasVaultInitialized,
     processArrayField,
-    hasChanges
+    hasChanges,
+    configureClaudeMcp
   };
 }; 

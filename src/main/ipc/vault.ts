@@ -30,6 +30,27 @@ interface TimelineItem {
   name: string;
 }
 
+// Add this function to check if MCP is configured in Claude Desktop
+async function checkMcpStatus() {
+  try {
+    const claudeDesktopPath = path.join(app.getPath('home'), 'Library/Application Support/Claude/claude_desktop_config.json');
+    const configStr = await fs.readFile(claudeDesktopPath, 'utf-8');
+    const config = JSON.parse(configStr);
+    
+    // Check if enzyme MCP server is configured
+    return {
+      enabled: !!config.mcpServers?.enzyme,
+      error: null
+    };
+  } catch (error) {
+    logger.error('Error checking MCP status:', error);
+    return {
+      enabled: false,
+      error: error instanceof Error ? error.message : 'Failed to check MCP status'
+    };
+  }
+}
+
 export function setupVaultIPCRoutes() {
   ipcMain.handle('initialize-index', async (_, settings: Settings): Promise<InitializeResult> => {
     try {
@@ -197,5 +218,9 @@ export function setupVaultIPCRoutes() {
       logger.error('Error configuring Claude MCP:', error);
       throw new Error(error instanceof Error ? error.message : 'Failed to write configuration file');
     }
+  });
+
+  ipcMain.handle('check-mcp-status', async () => {
+    return checkMcpStatus();
   });
 }

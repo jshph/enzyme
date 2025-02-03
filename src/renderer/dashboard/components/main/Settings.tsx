@@ -10,6 +10,7 @@ const Settings: React.FC = () => {
     hasChanges, 
     saveSettings,
     processArrayField,
+    configureClaudeMcp
   } = useSettingsContext();
 
   const { isAuthenticated } = useAuth();
@@ -84,7 +85,8 @@ const Settings: React.FC = () => {
     setMcpMessage('Configuring Claude MCP...');
     
     try {
-      await window.electron.ipcRenderer.invoke('configure-claude-mcp');
+      await configureClaudeMcp();
+      // await window.electron.ipcRenderer.invoke('configure-claude-mcp');
       setMcpSetupState('success');
       setMcpMessage('Claude MCP configuration updated! Please restart Claude Desktop to apply changes.');
     } catch (err) {

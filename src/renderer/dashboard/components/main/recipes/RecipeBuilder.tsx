@@ -6,6 +6,8 @@ import { useAuth } from '../../../contexts/AuthContext.js';
 import { GraphView, GraphViewRef } from "../../GraphView.js";
 import path from 'path';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { Info, ArrowUpRight } from 'lucide-react';
+import * as Tooltip from '@radix-ui/react-tooltip';
 
 interface SelectedEntity {
   type: 'tag' | 'link';
@@ -874,6 +876,33 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
                         `Generate Recipe` : 
                         'Login to generate more recipes'}
                   </button>
+
+                  {(suggestedOutputs?.[0] || generationState.status === 'generating') && !settings.mcpEnabled && (
+                    <Tooltip.Provider>
+                      <Tooltip.Root delayDuration={200}>
+                        <Tooltip.Trigger asChild>
+                          <button
+                            onClick={() => {
+                              setCurrentView('settings');
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 text-sm bg-brand/20 hover:bg-brand/30 rounded-md"
+                          >
+                            <ArrowUpRight className="w-4 h-4" />
+                            <span>Setup Enzyme for Claude Desktop</span>
+                          </button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                          <Tooltip.Content
+                            className="max-w-xs bg-surface text-white px-3 py-2 rounded text-xs"
+                            side="top"
+                          >
+                            Enable Claude MCP integration in Settings to continue conversations
+                            <Tooltip.Arrow className="fill-surface" />
+                          </Tooltip.Content>
+                        </Tooltip.Portal>
+                      </Tooltip.Root>
+                    </Tooltip.Provider>
+                  )}
                 </div>
               </div>
 
@@ -912,6 +941,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
                   onRetry={handleRetry}
                   onEmailButtonClick={handleEmailRecipeOutput}
                   profileTypes={selectedProfileTypes}
+                  query={makeQuery()}
                 />
               </div>
             )}
