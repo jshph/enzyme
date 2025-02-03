@@ -387,7 +387,8 @@ export class FileIndexer {
   }
 
   private matchPattern(str: string, pattern: string): boolean {
-    return minimatch(str, pattern, { dot: true });
+    // Allow matching patterns relative to the vault path
+    return minimatch(path.relative(this.vaultPath!, str), pattern, { dot: true });
   };
 
   private async getAllFiles(dir: string): Promise<string[]> {
@@ -722,18 +723,29 @@ export class FileIndexer {
     const now = new Date();
     const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     
+    // Helper function to check if a file should be included
+    const shouldIncludeFile = (filePath: string): boolean => {
+        // Check against excluded patterns
+        if (this.excludedPatterns.some(pattern => this.matchPattern(filePath, pattern))) {
+            return false;
+        }
+        
+        // Check against included patterns
+        return this.includedPatterns.some(pattern => this.matchPattern(filePath, pattern));
+    };
+    
     // First check files from last 3 months
     const recentUniqueFiles = new Set<string>();
     
-    // Count recent files first
+    // Count recent files first, respecting exclusion/inclusion patterns
     this.tagIndex.forEach(entry => {
         entry.files
-            .filter(f => f.createdAt >= threeMonthsAgo)
+            .filter(f => f.createdAt >= threeMonthsAgo && shouldIncludeFile(f.path))
             .forEach(f => recentUniqueFiles.add(f.path));
     });
     this.linkIndex.forEach(entry => {
         entry.files
-            .filter(f => f.createdAt >= threeMonthsAgo)
+            .filter(f => f.createdAt >= threeMonthsAgo && shouldIncludeFile(f.path))
             .forEach(f => recentUniqueFiles.add(f.path));
     });
 
@@ -744,9 +756,10 @@ export class FileIndexer {
 
     // Process tag index
     this.tagIndex.forEach((entry, tag) => {
-        const relevantFiles = useTimeFilter ? 
-            entry.files.filter(f => f.createdAt >= threeMonthsAgo) :
-            entry.files;
+        const relevantFiles = entry.files.filter(f => 
+            shouldIncludeFile(f.path) && 
+            (!useTimeFilter || f.createdAt >= threeMonthsAgo)
+        );
         if (relevantFiles.length > 0) {
             tagCounts.set(tag, relevantFiles.length);
         }
@@ -754,9 +767,10 @@ export class FileIndexer {
 
     // Process link index
     this.linkIndex.forEach((entry, link) => {
-        const relevantFiles = useTimeFilter ? 
-            entry.files.filter(f => f.createdAt >= threeMonthsAgo) :
-            entry.files;
+        const relevantFiles = entry.files.filter(f => 
+            shouldIncludeFile(f.path) && 
+            (!useTimeFilter || f.createdAt >= threeMonthsAgo)
+        );
         if (relevantFiles.length > 0) {
             linkCounts.set(link, relevantFiles.length);
         }
@@ -950,9 +964,17 @@ export class FileIndexer {
 
   public getEntityTimeline(entities: Array<[string, { type: 'tag' | 'link'; count: number }]>): TimelineItem[] {
     const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3); // Changed to 3 months
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     
     const timeline: TimelineItem[] = [];
+    
+    // Helper function to check if a file should be included
+    const shouldIncludeFile = (filePath: string): boolean => {
+        if (this.excludedPatterns.some(pattern => this.matchPattern(filePath, pattern))) {
+            return false;
+        }
+        return this.includedPatterns.some(pattern => this.matchPattern(filePath, pattern));
+    };
     
     entities.forEach(([name, { type, count }]) => {
         const index = type === 'tag' ? this.tagIndex : this.linkIndex;
@@ -965,7 +987,10 @@ export class FileIndexer {
         
         if (entry) {
             const filteredFiles = entry.files
-                .filter(file => file.createdAt >= threeMonthsAgo);
+                .filter(file => 
+                    file.createdAt >= threeMonthsAgo && 
+                    shouldIncludeFile(file.path)
+                );
             
             // If we have fewer than 50 total items, include all files
             const fileLimit = filteredFiles.length < 50 ? filteredFiles.length : count;

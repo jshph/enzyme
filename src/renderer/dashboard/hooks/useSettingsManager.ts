@@ -29,54 +29,63 @@ export const useSettingsManager = () => {
     return JSON.stringify(settings) !== JSON.stringify(originalSettings);
   }, [settings, originalSettings]);
 
-  // Update vault path and initialize index
-  const initializeVault = useCallback(async (vaultPath: string) => {
-    console.log('initializeVault', new Error().stack);
+  // Refresh settings and initialize vault
+  const refreshSettings = useCallback(async (newVaultPath?: string) => {
     try {
-      // Update vault path in store and get settings
-      const savedSettings = await window.electron.ipcRenderer.invoke('update-vault-path', vaultPath);
-      setSettings(savedSettings);
-      setOriginalSettings(savedSettings);
+      // Get the vault path - either the new one or latest from store
+      const vaultPath = newVaultPath || await window.electron.ipcRenderer.invoke('get-vault-path');
       
-      setHasVaultInitialized(false);
-      const result = await window.electron.ipcRenderer.invoke('initialize-index', savedSettings);
-      setHasVaultInitialized(result.success);
-      
-      return result;
-    } catch (error) {
-      console.error('Error initializing vault:', error);
-      throw error;
-    }
-  }, []);
-
-  // Load settings when vault path changes
-  const refreshSettings = useCallback(async (vaultPath?: string) => {
-    try {
-      if (!vaultPath) {
-        vaultPath = await window.electron.ipcRenderer.invoke('get-vault-path');
-      }
-
       if (!vaultPath) {
         console.error('No vault path set', new Error().stack);
         return;
       }
 
-      const newSettings = await window.electron.ipcRenderer.invoke('get-settings', {vaultPath});
+      // First update vault path in store if it's new
+      if (newVaultPath) {
+        await window.electron.ipcRenderer.invoke('update-vault-path', newVaultPath);
+      }
 
+      // Get latest settings with the current vault path
+      const newSettings = await window.electron.ipcRenderer.invoke('get-settings', {vaultPath});
+      
+      // Update settings state
       setSettings(newSettings);
       setOriginalSettings(newSettings);
       
-      // If we have a vault path, initialize it
-      if (newSettings.vaultPath) {
-        await initializeVault(newSettings.vaultPath)
-      }
+      // Initialize vault with complete settings
+      setHasVaultInitialized(false);
+      const result = await window.electron.ipcRenderer.invoke('initialize-index', newSettings);
+      setHasVaultInitialized(result.success);
       
-      return newSettings;
+      return { ...newSettings, ...result };
     } catch (error) {
       console.error('Error refreshing settings:', error);
       throw error;
     }
   }, []);
+
+  // Update a single setting
+  const updateSetting = useCallback(async (key: string, value: any) => {
+    // Update local state immediately for responsiveness
+    setSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
+
+    // If updating vault path, refresh settings with new path
+    if (key === 'vaultPath' && value) {
+      try {
+        await refreshSettings(value);
+      } catch (error) {
+        // Revert settings on error
+        setSettings(prev => ({
+          ...prev,
+          [key]: prev[key]
+        }));
+        throw error;
+      }
+    }
+  }, [refreshSettings]);
 
   // Save settings to .enzyme.conf
   const saveSettings = useCallback(async () => {
@@ -95,7 +104,8 @@ export const useSettingsManager = () => {
         throw new Error('Failed to save settings');
       }
 
-      await initializeVault(settings.vaultPath);
+      // Refresh settings to ensure everything is in sync
+      await refreshSettings();
 
       // Update original settings after successful save
       setOriginalSettings(settings);
@@ -103,22 +113,13 @@ export const useSettingsManager = () => {
       console.error('Error saving settings:', error);
       throw error;
     }
-  }, [settings, arrayFields]);
-
-  // Update a single setting
-  const updateSetting = useCallback((key: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  }, []);
+  }, [settings, arrayFields, refreshSettings]);
   
   return {
     settings,
     updateSetting,
     saveSettings,
     refreshSettings,
-    initializeVault,
     hasVaultInitialized,
     processArrayField,
     hasChanges

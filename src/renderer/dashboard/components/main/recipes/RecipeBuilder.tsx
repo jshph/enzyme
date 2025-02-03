@@ -38,7 +38,7 @@ type GenerationState =
 
 const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: string) => void }> = ({ currentView, setCurrentView }) => {
   // const editor = useCreateEditor();
-  const { hasVaultInitialized } = useSettingsContext();
+  const { hasVaultInitialized, updateSetting } = useSettingsContext();
   const { isAuthenticated, isAuthReady } = useAuth();
   const [profiles, setProfiles] = useState<any[]>([{ id: 'selfReflection', name: 'Self Reflection', description: 'Focus on personal growth and insight development' }]);
   const [selectedProfile, setSelectedProfile] = useState('selfReflection');
@@ -77,7 +77,8 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
     direction: 'left' | 'right' | null;
   } | null>(null);
 
-  const { settings, updateSetting, initializeVault } = useSettingsContext();
+  const { settings } = useSettingsContext();
+
   const { verifySession } = useAuth();
   const [error, setError] = useState(false);
   const [message, setMessage] = useState('');
@@ -149,18 +150,18 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
     try {
       const result = await window.electron.ipcRenderer.invoke('select-directory');
       if (result) {
-        updateSetting('vaultPath', result);
-        
         try {
           setError(false);
           setIsTrendingDataLoading(true);
           // Clear existing trending data before initialization
           setTrendingData(null);
           
-          // Initialize vault and get initial trending data
-          const initResult = await initializeVault(result);
-          if (initResult.trendingData) {
-            updateTrendingDataState(initResult.trendingData);
+          // Update setting and initialize vault in one go
+          await updateSetting('vaultPath', result);
+          
+          // Refresh trending data after vault is initialized
+          if (!error) {
+            await fetchTrendingData();
           }
           
           await verifySession();
