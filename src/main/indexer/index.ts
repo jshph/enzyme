@@ -7,6 +7,7 @@ import * as winston from 'winston';
 import { ServerContext } from '../server.js';
 import { app } from 'electron';
 import minimatch from 'minimatch';
+import { initializeLogger } from '../utils/logger.js';
 
 export interface FileMetadata {
   path: string;
@@ -97,24 +98,7 @@ export class FileIndexer {
   public hasVaultInitialized: boolean = false;
 
   constructor() {
-    // Initialize logger
-    this.logPath = path.join(app.getPath('userData'), 'logs');
-    this.logger = winston.createLogger({
-      level: 'debug',
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-      ),
-      transports: [
-        new winston.transports.File({ 
-          filename: path.join(this.logPath, 'error.log'), 
-          level: 'error' 
-        }),
-        new winston.transports.File({ 
-          filename: path.join(this.logPath, 'combined.log')
-        })
-      ]
-    });
+    this.logger = initializeLogger('indexer');
   }
 
   async initialize(vaultPath: string, includedPatterns: string[], excludedPatterns: string[], excludedTags: string[], doCache: boolean = false, spacesPath: string | null = null, port: number = 3779, defaultPatternLimit: number = 10): Promise<boolean> {
@@ -388,7 +372,7 @@ export class FileIndexer {
 
   private matchPattern(str: string, pattern: string): boolean {
     // Allow matching patterns relative to the vault path
-    return minimatch(path.relative(this.vaultPath!, str), pattern, { dot: true });
+    return minimatch(str, pattern, { dot: true });
   };
 
   private async getAllFiles(dir: string): Promise<string[]> {

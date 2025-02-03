@@ -12,6 +12,7 @@ import { setupSpaceRoutes } from './space.js';
 import { setupRecipeRoutes } from './recipe.js';
 import { setupUserIPCRoutes } from "./user.js";
 import nodeMachineId from 'node-machine-id';
+import { initializeLogger } from '../utils/logger.js';
 
 interface Auth {
   email: string;
@@ -97,34 +98,10 @@ function loadEnvironment() {
 // Load environment variables first, do any process.env loading after this
 // loadEnvironment();
 
-function createLogger() {
-  // Now initialize logger with environment variables available
-  const logPath = path.join(app.getPath('userData'), 'logs');
-  const logger = winston.createLogger({
-    level: 'debug',
-    format: winston.format.combine(
-      winston.format.timestamp(),
-      winston.format.json()
-    ),
-    transports: [
-      new winston.transports.File({ filename: path.join(logPath, 'error_main.log'), level: 'error' }),
-      new winston.transports.File({ filename: path.join(logPath, 'combined_main.log') })
-    ]
-  });
-  
-  // Log important environment variables (but not sensitive ones)
-  // logger.info('Environment configuration:', {
-  //   NODE_ENV: import.meta.env.VITE_NODE_ENV,
-  //   SERVER_URL: getServerUrl(),
-  //   // Add other non-sensitive variables as needed
-  // });
-
-  return logger;
-}
-
-export const logger = createLogger();
+export const logger = initializeLogger('main');
 
 export function getServerUrl() {
+  // return "http://localhost:3129";
   return "https://enzyme-server-production.up.railway.app";
 }
 

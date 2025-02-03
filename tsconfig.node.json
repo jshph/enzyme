@@ -5,7 +5,7 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/renderer/**/*"
-  ],
+, "src/main/utils"  ],
   "compilerOptions": {
     "composite": true,
     "types": ["electron-vite/node", "menubar"],

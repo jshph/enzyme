@@ -7,6 +7,7 @@ import * as winston from 'winston';
 import path from 'path';
 import { app as electronApp, Notification } from 'electron';
 import cors from 'cors';
+import { initializeLogger } from './utils/logger.js';
 
 interface ServerConfig {
   vaultPath: string;
@@ -40,18 +41,7 @@ export class ServerContext {
   private logger: winston.Logger;
   private config: ServerConfig | null = null;
   constructor() {
-    const logPath = path.join(electronApp.getPath('userData'), 'logs');
-    this.logger = winston.createLogger({
-      level: 'debug',
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-      ),
-      transports: [
-        new winston.transports.File({ filename: path.join(logPath, 'error_server.log'), level: 'error' }),
-        new winston.transports.File({ filename: path.join(logPath, 'combined_server.log') })
-      ]
-    });
+    this.logger = initializeLogger('server');
   }
 
   public async getContext(query: string, format: 'json' | 'md' = 'md'): Promise<string[] | MatchResult[]> {
