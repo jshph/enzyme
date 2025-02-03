@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { useSettingsContext } from '../../contexts/SettingsContext.js';
+import { ipcRenderer } from 'electron';
+
 const Settings: React.FC = () => {
   const { 
     settings,
@@ -15,6 +17,8 @@ const Settings: React.FC = () => {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [error, setError] = useState(false);
+  const [mcpSetupState, setMcpSetupState] = useState<'idle' | 'configuring' | 'success' | 'error'>('idle');
+  const [mcpMessage, setMcpMessage] = useState('');
 
   const handleSave = async () => {
     setSaveState('saving');
@@ -75,6 +79,29 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleConfigureMcp = async () => {
+    setMcpSetupState('configuring');
+    setMcpMessage('Configuring Claude MCP...');
+    
+    try {
+      await window.electron.ipcRenderer.invoke('configure-claude-mcp');
+      setMcpSetupState('success');
+      setMcpMessage('Claude MCP configuration updated! Please restart Claude Desktop to apply changes.');
+    } catch (err) {
+      setMcpSetupState('error');
+      setMcpMessage(err instanceof Error ? err.message : 'Failed to configure Claude MCP');
+      console.error('Configuration error:', err);
+    }
+
+    // Reset state after 3 seconds
+    setTimeout(() => {
+      if (mcpSetupState === 'success' || mcpSetupState === 'error') {
+        setMcpSetupState('idle');
+        setMcpMessage('');
+      }
+    }, 3000);
+  };
+
   return (
     <div className="space-y-6">
       {/* Status Messages */}
@@ -93,29 +120,14 @@ const Settings: React.FC = () => {
               <a className="text-blue-300 hover:text-blue-400" href="https://obsidian.md" target="_blank" rel="noopener noreferrer">
                 Obsidian
               </a> is a great way to work with your vault.)
-            </p>
-          </div>
+          </p>
+        </div>
 
-          <div className="card space-y-4 bg-surface/50 p-8 rounded-sm">
-            <div>
-              <label className="block text-sm font-medium text-primary/80">Server Port</label>
-              <input 
-                type="number" 
-                value={settings.port || 3779}
-                onChange={(e) => updateSetting('port', Number(e.target.value))}
-                className="mt-1 block w-full p-2 rounded-md input-base bg-input/50 text-sm" 
-              />
-              <p className="mt-2 text-sm text-secondary/70">
-              The port number Enzyme will use. Only change this if you have port conflicts.
-              Server URL: <span>{`http://localhost:${settings.port || 3779}`}</span>
-              </p>
-            </div>
-
-            <div className={`space-y-6 border-t border-input/30 pt-6 mt-6`}>
-              <h3 className="text-lg font-medium text-primary/90">
-                Advanced Settings 
-              </h3>
-            
+        <div className="card space-y-4 bg-surface/50 p-8 rounded-sm">
+          <h2 className="text-lg font-medium text-primary/90">
+            Vault Settings
+          </h2>
+          <div className={`space-y-6 border-input/30`}>
             <div>
               <label className="block text-sm font-medium text-primary/80">Files to Include</label>
               <textarea 
@@ -152,7 +164,7 @@ const Settings: React.FC = () => {
           <div className="flex space-x-4 pt-4">
             <button 
               onClick={handleSave}
-              className={`bg-brand/80 text-primary/90 px-4 py-2 rounded-md hover:bg-brand/90 transition-colors duration-200 ${
+              className={`bg-brand/80 text-primary/90 px-4 py-2 rounded-md hover:bg-brand/90 transition-colors duration-200 text-sm ${
                 !hasChanges() || saveState === 'saving' ? 'opacity-30 cursor-not-allowed' : ''
               }`}
               disabled={!hasChanges() || saveState === 'saving'}
@@ -169,13 +181,57 @@ const Settings: React.FC = () => {
           </div>
       </div>
 
+
+      <div className="card space-y-4 bg-surface/50 p-8 rounded-sm">
+        <h3 className="text-lg font-medium text-primary/90">Model Context Protocol Setup</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-primary/80">Server Port</label>
+            <input 
+              type="number" 
+              value={settings.port || 3779}
+              onChange={(e) => updateSetting('port', Number(e.target.value))}
+              className="mt-1 block w-full p-2 rounded-md input-base bg-input/50 text-sm" 
+            />
+            <p className="mt-2 text-sm text-secondary/70">
+            The port number Enzyme will use. Only change this if you have port conflicts.
+            Server URL: <span>{`http://localhost:${settings.port || 3779}`}</span>
+            </p>
+          </div>
+          <div>
+            <button
+              onClick={handleConfigureMcp}
+              disabled={mcpSetupState === 'configuring'}
+              className={`bg-brand/80 text-primary/90 px-4 py-2 rounded-md hover:bg-brand/90 transition-colors duration-200 text-sm ${
+                mcpSetupState === 'configuring' ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {mcpSetupState === 'configuring' ? 'Configuring...' : 'Enable Claude MCP Integration'}
+            </button>
+            {mcpMessage && (
+              <p className={`mt-2 text-sm ${
+                mcpSetupState === 'error' ? 'text-red/80' : 'text-brand/80'
+              }`}>
+                {mcpMessage}
+              </p>
+            )}
+            <p className="mt-2 text-sm text-secondary/70">
+              One-click setup for Model Context Protocol (MCP) in Claude Desktop. 
+              <a href="https://www.claudemcp.com/docs/" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-400">
+                Learn more
+              </a>
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="card space-y-4 bg-surface/50 p-8 rounded-sm">
         <h3 className="text-lg font-medium text-primary/90">Troubleshooting</h3>
         <div className="space-y-4">
           <div>
             <button
               onClick={handleCollectDebugLogs}
-              className="bg-brand/80 text-primary/90 px-4 py-2 rounded-md hover:bg-brand/90 transition-colors duration-200"
+              className="bg-brand/80 text-primary/90 px-4 py-2 rounded-md hover:bg-brand/90 transition-colors duration-200 text-sm"
             >
               Download Debug Logs
             </button>

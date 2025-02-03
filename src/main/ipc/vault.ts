@@ -159,4 +159,43 @@ export function setupVaultIPCRoutes() {
       throw new Error('Failed to collect debug logs');
     }
   });
+  ipcMain.handle('configure-claude-mcp', async () => {
+    try {
+      // Check if npx is installed by trying to run npx --version
+      try {
+        await new Promise((resolve, reject) => {
+          const npxCheck = require('child_process').exec('npx --version');
+          npxCheck.on('exit', code => {
+            if (code !== 0) reject(new Error('npx not found'));
+            resolve(null);
+          });
+        });
+      } catch (err) {
+        logger.error('npx is not installed:', err);
+        throw new Error('npx is not installed. Please install Node.js which includes npx.');
+      }
+
+      // Claude Desktop path from Application Support
+      const claudeDesktopPath = path.join(app.getPath('home'), 'Library/Application Support/Claude/claude_desktop_config.json');
+      const configStr = await fs.readFile(claudeDesktopPath, 'utf-8');
+      const config = JSON.parse(configStr);
+
+      // Add enzyme MCP server config if not already present
+      if (!config.mcpServers?.enzyme) {
+        config.mcpServers = {
+          ...config.mcpServers,
+          enzyme: {
+            command: 'npx',
+            args: ['-y', 'enzyme-mcp@1.1.3']
+          }
+        };
+      }
+
+      await fs.writeFile(claudeDesktopPath, JSON.stringify(config, null, 2));
+      return { success: true };
+    } catch (error) {
+      logger.error('Error configuring Claude MCP:', error);
+      throw new Error(error instanceof Error ? error.message : 'Failed to write configuration file');
+    }
+  });
 }
