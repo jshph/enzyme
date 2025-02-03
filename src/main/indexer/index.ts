@@ -137,19 +137,6 @@ export class FileIndexer {
         return false;
       }
 
-      // Quick check for at least one markdown file
-      try {
-        const files = await this.getAllFiles(vaultPath);
-        if (files.length === 0) {
-          this.notify('Indexing Error', 'No markdown files found in the selected directory');
-        }
-        if (files.length > 100000) {
-          this.notify('Indexing Error', 'Too many files (>100000) - please select a more specific directory');
-        }
-      } catch (error) {
-        throw new Error(`Error scanning directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-
       this.logger.debug(`Initializing file indexer...`);
       this.logger.debug(`Excluded patterns: ${this.excludedPatterns}`);
 
@@ -172,13 +159,13 @@ export class FileIndexer {
       
       await this.serverContext.startServer(port);
 
-      return true; // Return success
+      return true;
     } catch (error) {
       this.hasVaultInitialized = false;
       this.isIndexing = false;
       this.clearIndex();
       this.notify('Indexing Error', error instanceof Error ? error.message : 'Unknown error');
-      return false; // Return failure
+      return false;
     }
   }
 
@@ -260,7 +247,7 @@ export class FileIndexer {
           this.logger.info(`${index + 1}. ${path.relative(vaultPath, file)}`);
         });
       } else {
-        this.logger.warn('No markdown files found in the directory');
+        this.logger.warn('No markdown files found in the directory: ' + vaultPath);
         return false;
       }
 

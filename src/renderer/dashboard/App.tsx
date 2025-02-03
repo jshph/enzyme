@@ -16,8 +16,8 @@ const AppContent: React.FC = () => {
     isAppReady: false, 
     isVaultInitialized: false 
   })
-  const { refreshSettings, initializeVault } = useSettingsContext()
-  const { isAuthenticated, isAuthReady } = useAuth()
+  const { refreshSettings } = useSettingsContext()
+  const { isAuthReady } = useAuth()
 
   // Listen for app state updates
   useEffect(() => {
@@ -43,9 +43,7 @@ const AppContent: React.FC = () => {
       }
 
       try {
-        console.log('initVault - refreshing settings')
-        const settings = await refreshSettings()
-        await initializeVault(settings.vaultPath)
+        await refreshSettings()
         await window.electron.ipcRenderer.invoke('set-vault-initialized', true)
       } catch (err) {
         console.error('Failed to initialize vault:', err)

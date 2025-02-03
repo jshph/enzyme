@@ -29,39 +29,9 @@ export const useSettingsManager = () => {
     return JSON.stringify(settings) !== JSON.stringify(originalSettings);
   }, [settings, originalSettings]);
 
-  // Load settings when vault path changes
-  const refreshSettings = useCallback(async (vaultPath?: string) => {
-    try {
-      if (!vaultPath) {
-        vaultPath = await window.electron.ipcRenderer.invoke('get-vault-path');
-      }
-
-      if (!vaultPath) {
-        console.error('No vault path set');
-        return;
-      }
-
-      const newSettings = await window.electron.ipcRenderer.invoke('get-settings', {vaultPath});
-
-      setSettings(newSettings);
-      setOriginalSettings(newSettings);
-      
-      // If we have a vault path, initialize it
-      if (newSettings.vaultPath) {
-        setHasVaultInitialized(false);
-        const result = await window.electron.ipcRenderer.invoke('initialize-index', newSettings);
-        setHasVaultInitialized(result.success);
-      }
-      
-      return newSettings;
-    } catch (error) {
-      console.error('Error refreshing settings:', error);
-      throw error;
-    }
-  }, []);
-
   // Update vault path and initialize index
   const initializeVault = useCallback(async (vaultPath: string) => {
+    console.log('initializeVault', new Error().stack);
     try {
       // Update vault path in store and get settings
       const savedSettings = await window.electron.ipcRenderer.invoke('update-vault-path', vaultPath);
@@ -75,6 +45,35 @@ export const useSettingsManager = () => {
       return result;
     } catch (error) {
       console.error('Error initializing vault:', error);
+      throw error;
+    }
+  }, []);
+
+  // Load settings when vault path changes
+  const refreshSettings = useCallback(async (vaultPath?: string) => {
+    try {
+      if (!vaultPath) {
+        vaultPath = await window.electron.ipcRenderer.invoke('get-vault-path');
+      }
+
+      if (!vaultPath) {
+        console.error('No vault path set', new Error().stack);
+        return;
+      }
+
+      const newSettings = await window.electron.ipcRenderer.invoke('get-settings', {vaultPath});
+
+      setSettings(newSettings);
+      setOriginalSettings(newSettings);
+      
+      // If we have a vault path, initialize it
+      if (newSettings.vaultPath) {
+        await initializeVault(newSettings.vaultPath)
+      }
+      
+      return newSettings;
+    } catch (error) {
+      console.error('Error refreshing settings:', error);
       throw error;
     }
   }, []);
@@ -96,9 +95,7 @@ export const useSettingsManager = () => {
         throw new Error('Failed to save settings');
       }
 
-      setHasVaultInitialized(false);
-      const initResult = await window.electron.ipcRenderer.invoke('initialize-index', settings);
-      setHasVaultInitialized(initResult.success);
+      await initializeVault(settings.vaultPath);
 
       // Update original settings after successful save
       setOriginalSettings(settings);

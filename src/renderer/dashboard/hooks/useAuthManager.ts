@@ -26,7 +26,6 @@ export const useAuthManager = () => {
         return false;
       }
     } catch (error) {
-      console.error('Error verifying session:', error);
       setIsAuthenticated(false);
       setEmail('');
       // Add this line to ensure store is cleared on error
@@ -83,13 +82,11 @@ export const useAuthManager = () => {
     try {
       const response = await window.electron.ipcRenderer.invoke('auth:verify-otp', emailInput, otpCode);
       if (response.success) {
-        console.log('verified otp', response)
         setIsAuthenticated(true);
         setEmail(emailInput);
         setShowOtpForm(false);
         return true;
       } else {
-        console.log('failed to verify otp', response)
         setError(true);
         setMessage('Invalid verification code');
         return false;
