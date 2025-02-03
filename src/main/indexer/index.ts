@@ -439,8 +439,15 @@ export class FileIndexer {
       // Check for excluded tags
       const hasExcludedTag = tags.some(tag => {
         const normalizedTag = tag.toLowerCase();
-        return this.excludedTags.includes(normalizedTag) || 
-               this.excludedTags.some(pattern => this.matchPattern(normalizedTag, pattern));
+        return this.excludedTags.some(pattern => 
+          minimatch(normalizedTag, pattern, {
+            // Treat #enzyme/* as a wildcard pattern
+            nobrace: true,
+            noglobstar: false,
+            noext: true
+          }) || 
+          normalizedTag.startsWith(pattern.replace(/\*+$/, '') + '/') // Handle parent tags
+        );
       });
 
       if (hasExcludedTag) {
@@ -540,12 +547,18 @@ export class FileIndexer {
   }
 
   private extractTags(frontMatter: any, content: string): string[] {
-    const frontMatterTags = frontMatter.tags || [];  
+    const frontMatterTags = frontMatter.tags || [];
     const contentTags = (content.match(/#[\w-\/]+/g) || [])
-      .map(tag => tag.substring(1));
+      .map(tag => tag.substring(1))
+      .flatMap(tag => {
+        // Split hierarchical tags into all parent levels
+        const segments = tag.split('/');
+        return segments.map((_, i) => 
+          segments.slice(0, i+1).join('/')
+        );
+      });
     
-    const allTags = [...new Set([...frontMatterTags, ...contentTags])];
-    return allTags;
+    return [...new Set([...frontMatterTags, ...contentTags])];
   }
 
   // Extracts links from the content using regex and returns the link without the brackets

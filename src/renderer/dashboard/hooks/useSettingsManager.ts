@@ -11,8 +11,18 @@ export interface Settings {
 }
 
 export const useSettingsManager = () => {
-  const [settings, setSettings] = useState<Settings>({});
-  const [originalSettings, setOriginalSettings] = useState<Settings>({});
+  const [settings, setSettings] = useState<Settings>({
+    includedPatterns: [],
+    excludedPatterns: [],
+    excludedTags: [],
+    vaultPath: ''
+  });
+  const [originalSettings, setOriginalSettings] = useState<Settings>({
+    includedPatterns: [],
+    excludedPatterns: [],
+    excludedTags: [],
+    vaultPath: ''
+  });
   const [hasVaultInitialized, setHasVaultInitialized] = useState<boolean>(false);
 
   const arrayFields = ['includedPatterns', 'excludedPatterns', 'excludedTags'];

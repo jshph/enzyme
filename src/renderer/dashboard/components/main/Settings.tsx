@@ -143,7 +143,9 @@ const Settings: React.FC = () => {
                 onChange={(e) => updateSetting('excludedTags', e.target.value)}
                 className="mt-1 block w-full rounded-md border border-input/50 px-3 py-2 bg-input/50 text-sm"
               />
-              <p className="text-secondary/70 text-sm">Tags to ignore when analyzing your vault (comma-separated)</p>
+              <p className="text-secondary/70 text-sm">
+                Use wildcards for patterns (e.g., "tag*" to exclude #tag and #tag/child)
+              </p>
             </div>
           </div>
 
