@@ -704,78 +704,60 @@ export class FileIndexer {
   }
 
   private computeTrendingItems(): TrendingItems {
-    const now = new Date();
-    const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    // Time weighting parameters
+    const DECAY_RATE = 0.9; // 10% decay per month
+    const MAX_MONTHS = 12; // Only consider files up to 1 year old
     
-    // Helper function to check if a file should be included
-    const shouldIncludeFile = (filePath: string): boolean => {
-        // Check against excluded patterns
-        if (this.excludedPatterns.some(pattern => this.matchPattern(filePath, pattern))) {
-            return false;
-        }
-        
-        // Check against included patterns
-        return this.includedPatterns.some(pattern => this.matchPattern(filePath, pattern));
+    // Helper functions for time-based scoring
+    const getMonthsSince = (date: Date): number => {
+        const now = new Date();
+        const diffYears = now.getFullYear() - date.getFullYear();
+        return diffYears * 12 + (now.getMonth() - date.getMonth());
     };
-    
-    // First check files from last 3 months
-    const recentUniqueFiles = new Set<string>();
-    
-    // Count recent files first, respecting exclusion/inclusion patterns
-    this.tagIndex.forEach(entry => {
-        entry.files
-            .filter(f => f.createdAt >= threeMonthsAgo && shouldIncludeFile(f.path))
-            .forEach(f => recentUniqueFiles.add(f.path));
-    });
-    this.linkIndex.forEach(entry => {
-        entry.files
-            .filter(f => f.createdAt >= threeMonthsAgo && shouldIncludeFile(f.path))
-            .forEach(f => recentUniqueFiles.add(f.path));
-    });
 
-    // If we have fewer than 200 recent files, use all files without time filter
-    const useTimeFilter = recentUniqueFiles.size >= 200;
-    const tagCounts = new Map<string, number>();
-    const linkCounts = new Map<string, number>();
+    const calculateTimeWeight = (fileDate: Date): number => {
+        const monthsAgo = getMonthsSince(fileDate);
+        return monthsAgo > MAX_MONTHS ? 0 : Math.pow(DECAY_RATE, monthsAgo);
+    };
 
-    // Process tag index
-    this.tagIndex.forEach((entry, tag) => {
-        const relevantFiles = entry.files.filter(f => 
-            shouldIncludeFile(f.path) && 
-            (!useTimeFilter || f.createdAt >= threeMonthsAgo)
-        );
-        if (relevantFiles.length > 0) {
-            tagCounts.set(tag, relevantFiles.length);
-        }
-    });
+    const calculateEntityScore = (files: FileMetadata[]): number => {
+        // Time-weighted score with logarithmic scaling for volume
+        const timeScore = files.reduce((sum, file) => 
+            sum + calculateTimeWeight(file.createdAt), 0);
+        
+        // Logarithmic scaling prevents overwhelming by very popular items
+        return timeScore * Math.log1p(files.length);
+    };
 
-    // Process link index
-    this.linkIndex.forEach((entry, link) => {
-        const relevantFiles = entry.files.filter(f => 
-            shouldIncludeFile(f.path) && 
-            (!useTimeFilter || f.createdAt >= threeMonthsAgo)
-        );
-        if (relevantFiles.length > 0) {
-            linkCounts.set(link, relevantFiles.length);
-        }
-    });
+    // Main processing logic
+    const processEntity = (
+        index: Map<string, IndexEntry>,
+        minFiles: number
+    ): Array<{name: string, score: number}> => {
+        const results: Array<{name: string, score: number}> = [];
+        
+        index.forEach((entry, name) => {
+            const relevantFiles = entry.files
+                .filter(f => this.shouldIncludeFile(f.path))
+                .slice(0, 30); // Consider up to 30 most recent
 
-    const sortByCount = (a: [string, number], b: [string, number]) => b[1] - a[1];
-    
-    // Get all items sorted by count
-    const sortedTags = Array.from(tagCounts.entries()).sort(sortByCount);
-    const sortedLinks = Array.from(linkCounts.entries()).sort(sortByCount);
+            if (relevantFiles.length >= minFiles) {
+                const score = calculateEntityScore(relevantFiles);
+                results.push({ name, score });
+            }
+        });
 
-    // Always limit to 40 of each type
-    const topTags = sortedTags
-        .slice(0, 40)
-        .map(([name, count]) => ({ name, count }));
+        return results.sort((a, b) => b.score - a.score).slice(0, 40);
+    };
 
-    const topLinks = sortedLinks
-        .slice(0, 40)
-        .map(([name, count]) => ({ name, count }));
+    // Process tags and links with minimum file thresholds
+    const tagScores = processEntity(this.tagIndex, 3);
+    const linkScores = processEntity(this.linkIndex, 3);
 
-    return { tags: topTags, links: topLinks };
+    return {
+        tags: tagScores.map(({ name, score }) => ({ name, count: score })),
+        links: linkScores.map(({ name, score }) => ({ name, count: score }))
+    };
   }
 
   async notify(title: string, body: string) {
@@ -947,9 +929,6 @@ export class FileIndexer {
   }
 
   public getEntityTimeline(entities: Array<[string, { type: 'tag' | 'link'; count: number }]>): TimelineItem[] {
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    
     const timeline: TimelineItem[] = [];
     
     // Helper function to check if a file should be included
@@ -971,16 +950,11 @@ export class FileIndexer {
         
         if (entry) {
             const filteredFiles = entry.files
-                .filter(file => 
-                    file.createdAt >= threeMonthsAgo && 
-                    shouldIncludeFile(file.path)
-                );
+                .filter(file => shouldIncludeFile(file.path));
             
-            // If we have fewer than 50 total items, include all files
-            const fileLimit = filteredFiles.length < 50 ? filteredFiles.length : count;
-            
+            // Take up to 'count' files (count is already capped at 30 from computeTrendingItems)
             filteredFiles
-                .slice(0, fileLimit)
+                .slice(0, count)
                 .forEach(file => {
                     timeline.push({
                         date: file.createdAt,
@@ -1053,6 +1027,13 @@ export class FileIndexer {
       items: this.trendingCache.items,
       timeline: this.trendingCache.timeline
     };
+  }
+
+  private getRecentFiles(entry: IndexEntry, limit: number): FileMetadata[] {
+    return entry.files
+        .filter(f => this.shouldIncludeFile(f.path))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, limit);
   }
 }
 
