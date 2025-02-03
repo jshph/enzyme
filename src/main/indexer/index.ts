@@ -421,7 +421,8 @@ export class FileIndexer {
     }
 
     // Skip any paths that match excluded patterns
-    const relativePath = this.vaultPath ? path.relative(this.vaultPath, path.join(dir, entryName)) : entryName;
+    const relativePath = (this.vaultPath ? path.relative(this.vaultPath, path.join(dir, entryName)) : entryName)
+        .split(path.sep).join('/');
     return this.excludedPatterns.some(pattern => this.matchPattern(relativePath, pattern));
   }
 
@@ -457,8 +458,9 @@ export class FileIndexer {
 
       // Check path patterns
       
+      const vaultRelativePath = path.relative(this.vaultPath || '', filePath).split(path.sep).join('/');
       const isExcluded = this.excludedPatterns.some(pattern => 
-        this.matchPattern(filePath, pattern)
+        this.matchPattern(vaultRelativePath, pattern)
       );
       
       if (isExcluded) {
