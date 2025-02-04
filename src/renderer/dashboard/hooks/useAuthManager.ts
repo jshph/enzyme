@@ -4,6 +4,12 @@ type OtpVerificationResponse = {
   success: boolean;
   message?: string;
   pricingUrl?: string;
+  needsSubscription?: boolean;
+  error?: string;
+}
+
+export type SubscriptionStatusResponse = {
+  hasSubscription: boolean;
   error?: string;
 }
 
@@ -131,6 +137,21 @@ export const useAuthManager = () => {
     }
   }, []);
 
+  const checkSubscriptionStatus = useCallback(async (): Promise<SubscriptionStatusResponse> => {
+    try {
+      const response = await window.electron.ipcRenderer.invoke('auth:poll-subscription');
+      return {
+        hasSubscription: response.hasSubscription,
+        error: response.error
+      };
+    } catch (error) {
+      return { 
+        hasSubscription: false,
+        error: 'Failed to check subscription status'
+      };
+    }
+  }, []);
+
   return {
     isAuthenticated,
     isAuthReady,
@@ -146,6 +167,7 @@ export const useAuthManager = () => {
     handleLogout,
     clearMessage,
     isSessionValid,
-    verifySession
+    verifySession,
+    checkSubscriptionStatus
   };
 }; 

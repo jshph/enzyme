@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useAuthManager } from '../hooks/useAuthManager.js';
+import { SubscriptionStatusResponse, useAuthManager } from '../hooks/useAuthManager.js';
 
 interface AuthContextProps {
   isAuthenticated: boolean;
@@ -15,6 +15,7 @@ interface AuthContextProps {
   clearMessage: () => void;
   isSessionValid: () => Promise<boolean>;
   verifySession: () => Promise<boolean>;
+  checkSubscriptionStatus: () => Promise<SubscriptionStatusResponse>;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);

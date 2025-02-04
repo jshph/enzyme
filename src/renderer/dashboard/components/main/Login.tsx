@@ -5,6 +5,13 @@ type LoginProps = {
   setCurrentView: (view: string) => void,
 }
 
+// Add type for OTP verification response
+type OtpVerificationResult = {
+  success: boolean;
+  needsSubscription?: boolean;
+  pricingUrl?: string;
+};
+
 const Login: React.FC<LoginProps> = ({ setCurrentView }) => {
   const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -14,9 +21,11 @@ const Login: React.FC<LoginProps> = ({ setCurrentView }) => {
     error, 
     showOtpForm,
     handleLogin,
-    handleOtpVerification
+    handleOtpVerification,
+    checkSubscriptionStatus,
+    verifySession
   } = useAuth();
-
+  const [awaitingSubscription, setAwaitingSubscription] = useState(false);
   const onSubmitEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     await handleLogin(email);
@@ -24,12 +33,49 @@ const Login: React.FC<LoginProps> = ({ setCurrentView }) => {
 
   const onSubmitOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = await handleOtpVerification(email, otpCode);
-    if (result.success && result.pricingUrl) {
-      window.open(result.pricingUrl, '_blank');
-      // setMessage('Please complete subscription in your browser to continue');
+    const result = await handleOtpVerification(email, otpCode) as OtpVerificationResult;
+    
+    if (result.success) {
+      if (result.needsSubscription && result.pricingUrl) {
+        window.open(result.pricingUrl, '_blank');
+        setAwaitingSubscription(true);
+      } else {
+        setCurrentView('recipes');
+      }
     }
   };
+
+  useEffect(() => {
+    if (awaitingSubscription) {
+      verifySession().then(() => {
+        const interval = setInterval(async () => {
+          const status = await checkSubscriptionStatus();
+          if (status.hasSubscription) {
+            setCurrentView('recipes');
+            clearInterval(interval);
+            setAwaitingSubscription(false);
+          }
+        }, 5000);
+        
+        return () => clearInterval(interval);
+      });
+      
+    }
+  }, [awaitingSubscription]);
+
+  if (awaitingSubscription) {
+    return (
+      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8 text-center">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="w-10 h-10 border-t-2 border-b-2 border-brand/80 rounded-full animate-spin"></div>
+            <h2 className="text-xl font-semibold text-primary/90">Verifying your subscription...</h2>
+            <p className="text-secondary/70">Please keep this window open while we confirm your subscription status.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

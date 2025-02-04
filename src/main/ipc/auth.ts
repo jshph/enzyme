@@ -45,7 +45,7 @@ export function setupAuthIPCRoutes() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       
-      if (data.success && data.session?.access_token) {
+      if (data.session?.access_token) {
         store.set('auth', {
           email,
           access_token: data.session.access_token,
@@ -60,9 +60,9 @@ export function setupAuthIPCRoutes() {
       }
       
       return { 
-        success: true, 
-        message: data.message,
-        pricingUrl: `http://localhost:4321/pricing?email=${encodeURIComponent(email)}`
+        success: true,
+        needsSubscription: data.needsSubscription,
+        pricingUrl: data.pricingUrl
       };
     } catch (error) {
       console.error('Error verifying OTP:', error);
@@ -216,5 +216,16 @@ export function setupAuthIPCRoutes() {
     } catch (error) {
       return { hasSubscription: false };
     }
+  });
+
+  // Add new IPC handler
+  ipcMain.handle('auth:poll-subscription', async () => {
+    const session = await getCurrentSession();
+    const response = await fetch(`${SERVER_URL}/auth/check-subscription`, {
+      headers: { 
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    });
+    return response.json();
   });
 }
