@@ -1,6 +1,14 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { SubscriptionStatusResponse, useAuthManager } from '../hooks/useAuthManager.js';
 
+
+// Add type for OTP verification response
+export type OtpVerificationResult = {
+  success: boolean;
+  needsSubscription?: boolean;
+  pricingUrl?: string;
+};
+
 interface AuthContextProps {
   isAuthenticated: boolean;
   isAuthReady: boolean;
@@ -10,7 +18,7 @@ interface AuthContextProps {
   error: boolean;
   showOtpForm: boolean;
   handleLogin: (email: string) => Promise<void>;
-  handleOtpVerification: (email: string, otpCode: string) => Promise<boolean>;
+  handleOtpVerification: (email: string, otpCode: string) => Promise<OtpVerificationResult>;
   handleLogout: () => Promise<void>;
   clearMessage: () => void;
   isSessionValid: () => Promise<boolean>;

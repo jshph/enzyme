@@ -1,16 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext.js';
+import { OtpVerificationResult, useAuth } from '../../contexts/AuthContext.js';
 
 type LoginProps = {
   setCurrentView: (view: string) => void,
 }
-
-// Add type for OTP verification response
-type OtpVerificationResult = {
-  success: boolean;
-  needsSubscription?: boolean;
-  pricingUrl?: string;
-};
 
 const Login: React.FC<LoginProps> = ({ setCurrentView }) => {
   const [email, setEmail] = useState('');
