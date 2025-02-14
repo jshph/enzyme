@@ -719,6 +719,494 @@ Changed to [[link3]] and [[link4]]`
       expect(updatedLinks).toContain('link3');
       expect(updatedLinks).toContain('link4');
     });
+
+    it('should not index links to excluded files', async () => {
+      // Create test files including some that should be excluded
+      const files = [
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'source.md'),
+          content: `# Source Note
+Links to [[excluded/file]] and [[normal-file]] and [[another-excluded/file]]`
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'normal-file.md'),
+          content: '# Normal File'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'excluded/file.md'),
+          content: '# Excluded File'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'another-excluded/file.md'),
+          content: '# Another Excluded File'
+        }
+      ];
+
+      // Create the files
+      for (const file of files) {
+        await fs.mkdir(path.dirname(file.path), { recursive: true });
+        await fs.writeFile(file.path, file.content);
+      }
+
+      // Initialize indexer with exclusion patterns
+      await indexer.initialize(
+        TEST_RESOURCES_DIR, 
+        ['**/*.md'], 
+        ['excluded/**', 'another-excluded/**'], 
+        [], 
+        false
+      );
+
+      // Index the source file
+      await indexer.indexFileByPath(files[0].path);
+
+      // Check that only links to non-excluded files are indexed
+      const links = Array.from(indexer.getLinks());
+      expect(links).not.toContain('excluded/file');
+      expect(links).not.toContain('another-excluded/file');
+      expect(links).toContain('normal-file');
+    });
+
+    it('should handle links with and without file extensions', async () => {
+      // Create test files
+      const files = [
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'source.md'),
+          content: `# Source Note
+Links to [[excluded/file.md]] and [[normal-file.md]] and [[another/file]]`
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'normal-file.md'),
+          content: '# Normal File'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'another/file.md'),
+          content: '# Another File'
+        }
+      ];
+
+      // Create the files
+      for (const file of files) {
+        await fs.mkdir(path.dirname(file.path), { recursive: true });
+        await fs.writeFile(file.path, file.content);
+      }
+
+      // Initialize indexer with exclusion patterns
+      await indexer.initialize(
+        TEST_RESOURCES_DIR, 
+        ['**/*.md'], 
+        ['excluded/**'], 
+        [], 
+        false
+      );
+
+      // Index the source file
+      await indexer.indexFileByPath(files[0].path);
+
+      // Check that links are normalized (without .md extension)
+      const links = Array.from(indexer.getLinks());
+      expect(links).toContain('normal-file');
+      expect(links).toContain('another/file');
+      expect(links).not.toContain('normal-file.md');
+      expect(links).not.toContain('another/file.md');
+    });
+
+    it('should update link index when excluded patterns change', async () => {
+      // Create test files
+      const files = [
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'source.md'),
+          content: `# Source Note
+Links to [[private/file]] and [[normal-file]] and [[secret/file]]`
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'normal-file.md'),
+          content: '# Normal File'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'private/file.md'),
+          content: '# Private File'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'secret/file.md'),
+          content: '# Secret File'
+        }
+      ];
+
+      // Create the files
+      for (const file of files) {
+        await fs.mkdir(path.dirname(file.path), { recursive: true });
+        await fs.writeFile(file.path, file.content);
+      }
+
+      // Initialize indexer with no exclusions first
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await indexer.indexFileByPath(files[0].path);
+
+      // Initially all links should be indexed
+      let links = Array.from(indexer.getLinks());
+      expect(links).toContain('private/file');
+      expect(links).toContain('normal-file');
+      expect(links).toContain('secret/file');
+
+      // Now reinitialize with exclusions
+      await indexer.initialize(
+        TEST_RESOURCES_DIR, 
+        ['**/*.md'], 
+        ['private/**', 'secret/**'], 
+        [], 
+        false
+      );
+      await indexer.indexFileByPath(files[0].path);
+
+      // Check that excluded links are removed
+      links = Array.from(indexer.getLinks());
+      expect(links).not.toContain('private/file');
+      expect(links).not.toContain('secret/file');
+      expect(links).toContain('normal-file');
+    });
+
+    it('should handle links in any frontmatter field', async () => {
+      // Create test files including some that should be excluded
+      const files = [
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'source.md'),
+          content: `---
+related: "[[excluded/file]]"
+people: 
+  - name: John
+    notes: "[[private/notes]]"
+references:
+  main: "[[normal-file]]"
+  others: 
+    - "[[another-excluded/file]]"
+    - "[[allowed/file]]"
+created: "[[2024-01-01]]"
+---
+# Source Note
+Regular content with [[inline-link]]`
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'normal-file.md'),
+          content: '# Normal File'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'allowed/file.md'),
+          content: '# Allowed File'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'excluded/file.md'),
+          content: '# Excluded File'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'private/notes.md'),
+          content: '# Private Notes'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'another-excluded/file.md'),
+          content: '# Another Excluded File'
+        }
+      ];
+
+      // Create the files
+      for (const file of files) {
+        await fs.mkdir(path.dirname(file.path), { recursive: true });
+        await fs.writeFile(file.path, file.content);
+      }
+
+      // Initialize indexer with exclusion patterns
+      await indexer.initialize(
+        TEST_RESOURCES_DIR, 
+        ['**/*.md'], 
+        ['excluded/**', 'private/**', 'another-excluded/**'], 
+        [], 
+        false
+      );
+
+      // Index the source file
+      await indexer.indexFileByPath(files[0].path);
+
+      // Check that only links to non-excluded files are indexed
+      const links = Array.from(indexer.getLinks());
+      
+      // Links to excluded files should not be present
+      expect(links).not.toContain('excluded/file');
+      expect(links).not.toContain('private/notes');
+      expect(links).not.toContain('another-excluded/file');
+      
+      // Links to allowed files should be present
+      expect(links).toContain('normal-file');
+      expect(links).toContain('allowed/file');
+      expect(links).toContain('inline-link');
+      expect(links).toContain('2024-01-01'); // Date links should be included
+    });
+
+    describe('link exclusion with path resolution', () => {
+      it('should exclude links that resolve to files in excluded patterns', async () => {
+        // Create test directory structure with files in various locations
+        const files = [
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'source.md'),
+            content: `# Source Note
+Links:
+[[note]] - exists in both regular/ and private/, should resolve to regular/
+[[private-note]] - exists only in private/, should be excluded
+[[archive/old-note]] - explicitly in excluded folder
+[[2024-01-01]] - would resolve to daily notes folder
+[[meeting]] - exists in both meetings/ and archive/, should resolve to meetings/`
+          },
+          // Regular files
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'regular/note.md'),
+            content: '# Regular Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'meetings/meeting.md'),
+            content: '# Meeting Note'
+          },
+          // Excluded files
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'private/note.md'),
+            content: '# Private Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'private/private-note.md'),
+            content: '# Private Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'archive/old-note.md'),
+            content: '# Archived Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'archive/meeting.md'),
+            content: '# Archived Meeting'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'daily/2024-01-01.md'),
+            content: '# Daily Note'
+          }
+        ];
+
+        // Create the files
+        for (const file of files) {
+          await fs.mkdir(path.dirname(file.path), { recursive: true });
+          await fs.writeFile(file.path, file.content);
+        }
+
+        // Initialize with exclusion patterns
+        await indexer.initialize(
+          TEST_RESOURCES_DIR, 
+          ['**/*.md'], 
+          ['private/**', 'archive/**', 'daily/**'], 
+          [], 
+          false
+        );
+
+        await indexer.indexFileByPath(files[0].path);
+
+        const links = Array.from(indexer.getLinks());
+        
+        // Should be included (resolves to non-excluded locations)
+        expect(links).toContain('note'); // Resolves to regular/note.md
+        expect(links).toContain('meeting'); // Resolves to meetings/meeting.md
+        
+        // Should be excluded (resolves to excluded locations)
+        expect(links).not.toContain('private-note'); // Only exists in private/
+        expect(links).not.toContain('archive/old-note'); // Explicitly in excluded folder
+        expect(links).not.toContain('2024-01-01'); // Would resolve to daily notes
+      });
+
+      it('should handle ambiguous link resolution with excluded patterns', async () => {
+        const files = [
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'source.md'),
+            content: `# Source Note
+[[ambiguous-note]] - exists in multiple locations
+[[unique-note]] - exists only in excluded folder
+[[nested/note]] - exists in both regular and private nested folders`
+          },
+          // Create multiple instances of the same filename
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'regular/ambiguous-note.md'),
+            content: '# Regular Version'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'private/ambiguous-note.md'),
+            content: '# Private Version'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'private/unique-note.md'),
+            content: '# Unique Private Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'regular/nested/note.md'),
+            content: '# Regular Nested Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'private/nested/note.md'),
+            content: '# Private Nested Note'
+          }
+        ];
+
+        // Create the files
+        for (const file of files) {
+          await fs.mkdir(path.dirname(file.path), { recursive: true });
+          await fs.writeFile(file.path, file.content);
+        }
+
+        await indexer.initialize(
+          TEST_RESOURCES_DIR, 
+          ['**/*.md'], 
+          ['private/**'], 
+          [], 
+          false
+        );
+
+        await indexer.indexFileByPath(files[0].path);
+
+        const links = Array.from(indexer.getLinks());
+        
+        // Should be included (has at least one valid resolution)
+        expect(links).toContain('ambiguous-note'); // Can resolve to regular/
+        expect(links).toContain('nested/note'); // Can resolve to regular/nested/
+        
+        // Should be excluded (only resolves to excluded location)
+        expect(links).not.toContain('unique-note'); // Only exists in private/
+      });
+
+      it('should handle links that would resolve to excluded patterns in frontmatter', async () => {
+        const files = [
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'source.md'),
+            content: `---
+related: "[[private/note]]"
+meeting: "[[2024-01-15]]"
+references:
+  - "[[archive/old]]"
+  - "[[regular/note]]"
+people:
+  - name: "John"
+    file: "[[private/people/john]]"
+---
+# Source Note
+Regular content here`
+          },
+          // Create the referenced files
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'private/note.md'),
+            content: '# Private Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'archive/old.md'),
+            content: '# Archived Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'regular/note.md'),
+            content: '# Regular Note'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'private/people/john.md'),
+            content: '# John'
+          },
+          {
+            path: path.join(TEST_RESOURCES_DIR, 'daily/2024-01-15.md'),
+            content: '# Daily Note'
+          }
+        ];
+
+        // Create the files
+        for (const file of files) {
+          await fs.mkdir(path.dirname(file.path), { recursive: true });
+          await fs.writeFile(file.path, file.content);
+        }
+
+        await indexer.initialize(
+          TEST_RESOURCES_DIR, 
+          ['**/*.md'], 
+          ['private/**', 'archive/**', 'daily/**'], 
+          [], 
+          false
+        );
+
+        await indexer.indexFileByPath(files[0].path);
+
+        const links = Array.from(indexer.getLinks());
+        
+        // Should be excluded (resolve to excluded locations)
+        expect(links).not.toContain('private/note');
+        expect(links).not.toContain('archive/old');
+        expect(links).not.toContain('private/people/john');
+        expect(links).not.toContain('2024-01-15');
+        
+        // Should be included (resolves to non-excluded location)
+        expect(links).toContain('regular/note');
+      });
+    });
+
+    it('should handle basename links that could resolve to excluded folders', async () => {
+      const files = [
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'source.md'),
+          content: `# Source Note
+Links:
+[[note1]] - should be excluded (exists in private/)
+[[note2]] - should be excluded (exists in daily/)
+[[note3]] - should be excluded (exists in archive/)
+[[note4]] - should be included (exists in regular/)
+[[2024-01-01]] - should be excluded (would be in daily/)
+[[just-a-note]] - should be included (not in excluded folders)`
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'private/note1.md'),
+          content: '# Private Note'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'daily/note2.md'),
+          content: '# Daily Note'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'archive/note3.md'),
+          content: '# Archived Note'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'regular/note4.md'),
+          content: '# Regular Note'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'just-a-note.md'),
+          content: '# Regular Note'
+        }
+      ];
+
+      // Create the files
+      for (const file of files) {
+        await fs.mkdir(path.dirname(file.path), { recursive: true });
+        await fs.writeFile(file.path, file.content);
+      }
+
+      // Initialize with multiple folder exclusions
+      await indexer.initialize(
+        TEST_RESOURCES_DIR, 
+        ['**/*.md'], 
+        ['private/**', 'daily/**', 'archive/**'], 
+        [], 
+        false
+      );
+
+      await indexer.indexFileByPath(files[0].path);
+
+      const links = Array.from(indexer.getLinks());
+      
+      // These should be excluded (exist in or would resolve to excluded folders)
+      expect(links).not.toContain('note1');
+      expect(links).not.toContain('note2');
+      expect(links).not.toContain('note3');
+      expect(links).not.toContain('2024-01-01');
+      
+      // These should be included
+      expect(links).toContain('note4');
+      expect(links).toContain('just-a-note');
+    });
   });
 
   describe('linkToFileMap', () => {

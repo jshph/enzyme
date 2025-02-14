@@ -527,6 +527,102 @@ export class FileIndexer {
     }
   }
 
+  private async isLinkExcluded(link: string, sourcePath: string): Promise<boolean> {
+    const cleanLink = link.replace(/\.md$/, '');
+    
+    if (!this.vaultPath) {
+        return false;
+    }
+
+    // Helper to check if a path matches exclusion patterns
+    const isPathExcluded = (pathToCheck: string): boolean => {
+        // Get path relative to vault for pattern matching
+        const relativePath = path.relative(this.vaultPath!, pathToCheck)
+            .split(path.sep)
+            .join('/');
+
+        return this.excludedPatterns.some(pattern => 
+            minimatch(relativePath, pattern, {
+                dot: true,
+                nocase: true,
+                matchBase: true
+            })
+        );
+    };
+
+    // Check if it's a date format that would resolve to daily notes
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (datePattern.test(cleanLink)) {
+        // Check if daily notes folder exists and is excluded
+        const dailyPath = path.join(this.vaultPath, 'daily');
+        if (await fs.access(dailyPath).then(() => true).catch(() => false)) {
+            const dailyNotePath = path.join(dailyPath, `${cleanLink}.md`);
+            if (isPathExcluded(dailyNotePath)) {
+                return true;
+            }
+        }
+    }
+
+    // If the link contains a path, check it directly against exclusion patterns
+    if (cleanLink.includes('/')) {
+        const absolutePath = path.join(this.vaultPath, `${cleanLink}.md`);
+        if (isPathExcluded(absolutePath)) {
+            return true;
+        }
+    }
+
+    // Find all existing files that match this link
+    const existingFiles = new Set<string>();
+    
+    // Check in vault root
+    const rootPath = path.join(this.vaultPath, `${cleanLink}.md`);
+    if (await fs.access(rootPath).then(() => true).catch(() => false)) {
+        existingFiles.add(rootPath);
+    }
+
+    // Check relative to source file
+    const relativePath = path.join(path.dirname(sourcePath), `${cleanLink}.md`);
+    if (await fs.access(relativePath).then(() => true).catch(() => false)) {
+        existingFiles.add(relativePath);
+    }
+
+    // For links without paths, check in all folders
+    if (!cleanLink.includes('/')) {
+        // Read all directories in vault
+        const readDirs = async (dir: string): Promise<string[]> => {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            const files: string[] = [];
+            for (const entry of entries) {
+                if (entry.isDirectory()) {
+                    const fullPath = path.join(dir, entry.name);
+                    const potentialFile = path.join(fullPath, `${cleanLink}.md`);
+                    if (await fs.access(potentialFile).then(() => true).catch(() => false)) {
+                        files.push(potentialFile);
+                    }
+                }
+            }
+            return files;
+        };
+
+        const matchingFiles = await readDirs(this.vaultPath);
+        matchingFiles.forEach(file => existingFiles.add(file));
+    }
+
+    // If we found any existing files
+    if (existingFiles.size > 0) {
+        // If ALL existing files are in excluded paths, exclude the link
+        const allFilesExcluded = Array.from(existingFiles).every(file => 
+            isPathExcluded(file)
+        );
+        return allFilesExcluded;
+    }
+
+    // If no existing files were found:
+    // - For paths, check if the path would be excluded
+    // - For basenames, don't exclude unless we found it in an excluded folder
+    return cleanLink.includes('/') && isPathExcluded(path.join(this.vaultPath, `${cleanLink}.md`));
+  }
+
   private async indexFile(content: string, stats: any, frontmatter: any, tags: string[], links: string[], filePath: string): Promise<void> {
     try {
       // Create variations of the file path for links
@@ -534,11 +630,51 @@ export class FileIndexer {
       const relativePath = this.vaultPath ? path.relative(this.vaultPath, basePath) : basePath;
       const basename = path.basename(basePath);
 
-      // Only index links that are .md files
-      if (filePath.toLowerCase().endsWith('.md')) {
+      // Only index links that are .md files and not excluded
+      if (filePath.toLowerCase().endsWith('.md') && await this.shouldIncludeFile(filePath)) {
         // Map both the basename and the full relative path
         this.linkToFileMap.set(basename, filePath);
         this.linkToFileMap.set(relativePath, filePath);
+      }
+
+      // Helper function to extract links from a frontmatter value
+      const extractFrontmatterLinks = (value: any): string[] => {
+        if (typeof value === 'string') {
+          // Check if it's a markdown link format
+          if (value.startsWith('[[') && value.endsWith(']]')) {
+            return [value.slice(2, -2)];
+          }
+          return [];
+        }
+        if (Array.isArray(value)) {
+          return value.flatMap(v => extractFrontmatterLinks(v));
+        }
+        if (typeof value === 'object' && value !== null) {
+          return Object.values(value).flatMap(v => extractFrontmatterLinks(v));
+        }
+        return [];
+      };
+
+      // Filter out links to excluded files, including those from frontmatter
+      const allLinks = new Set<string>();
+      
+      // Process inline links
+      for (const link of links) {
+        const cleanLink = link.replace(/\.md$/, '');
+        if (!(await this.isLinkExcluded(cleanLink, filePath))) {
+          allLinks.add(cleanLink);
+        }
+      }
+
+      // Process all frontmatter fields for potential links
+      for (const [_, value] of Object.entries(frontmatter)) {
+        const frontmatterLinks = extractFrontmatterLinks(value);
+        for (const link of frontmatterLinks) {
+          const cleanLink = link.replace(/\.md$/, '');
+          if (!(await this.isLinkExcluded(cleanLink, filePath))) {
+            allLinks.add(cleanLink);
+          }
+        }
       }
 
       // Extract metadata
@@ -546,7 +682,7 @@ export class FileIndexer {
         path: filePath,
         createdAt: frontmatter.createdAt,  
         tags: tags, 
-        links: links,
+        links: Array.from(allLinks),
         lastModified: stats.mtimeMs
       };
 
@@ -694,7 +830,8 @@ export class FileIndexer {
       const innerLink = link.slice(2, -2);
       // Handle aliases by taking the part before |
       const parts = innerLink.split('|');
-      return parts[0].trim();
+      // Remove .md extension if present and trim
+      return parts[0].trim().replace(/\.md$/, '');
     }))];
   }
 
