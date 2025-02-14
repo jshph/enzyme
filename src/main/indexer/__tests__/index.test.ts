@@ -102,6 +102,16 @@ jest.mock('electron', () => ({
   Notification: jest.fn()
 }));
 
+// Mock gray-matter to make matter.default act as a function
+jest.mock('gray-matter', () => {
+  const actualMatter = jest.requireActual('gray-matter');
+  const matterFn = actualMatter as Function;
+  return {
+    ...actualMatter,
+    default: (content: string) => matterFn(content)
+  };
+});
+
 // Create test resources directory and files for specific tests
 const TEST_RESOURCES_DIR = path.join(__dirname, 'test-resources');
 

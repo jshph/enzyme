@@ -310,24 +310,24 @@ export class FileIndexer {
       if (skippedFiles > 0) {
         this.logger.info(`Skipped ${skippedFiles} files during indexing`);
       }
-
+      
       return true;
     } catch (error) {
       this.logger.error(`Error during indexing: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return false;
     } finally {
-      
       // Perform validation checks on the index
       this.logger.info('Performing validation checks on the index');
       await this.performValidationChecksOnIndex();
+      
+      // Log index sizes before reinitializing watcher
+      this.logger.info(`Index sizes after indexing - Tags: ${this.tagIndex.size}, Links: ${this.linkIndex.size}, Folders: ${this.folderIndex.size}`);
       
       // Reinitialize the watcher
       if (this.vaultPath) {
         this.logger.info('Reinitializing the file watcher');
         this.watcher = chokidar.watch(this.includedPatterns.map(pattern => path.join(this.vaultPath!, pattern)), {
-          ignored: [
-            ...this.excludedPatterns
-          ],
+          ignored: [...this.excludedPatterns],
           persistent: true,
           awaitWriteFinish: {
             stabilityThreshold: 1000,
@@ -340,12 +340,14 @@ export class FileIndexer {
         this.watcher
           .on('ready', () => {
             isInitialScan = false;
-            this.logger.info('Initial scan complete');
+            this.logger.info(`Initial scan complete. Current index sizes - Tags: ${this.tagIndex.size}, Links: ${this.linkIndex.size}`);
           })
           .on('add', async path => {
             if (!isInitialScan) {
               this.logger.debug(`New file created: ${path}`);
+              const prevSizes = {tags: this.tagIndex.size, links: this.linkIndex.size};
               await this.handleFileChange(path);
+              this.logger.debug(`Index sizes after add - Tags: ${this.tagIndex.size} (was ${prevSizes.tags}), Links: ${this.linkIndex.size} (was ${prevSizes.links})`);
             }
           })
           .on('change', async path => {
@@ -383,7 +385,7 @@ export class FileIndexer {
       let links: string[] = [];
 
       try {
-        const parsedMatter = (matter as any)(content);
+        const parsedMatter = matter.default(content);
         frontmatter = parsedMatter.data;
         tags = this.extractTags(frontmatter, content);
         links = this.extractMarkdownLinks(content);
