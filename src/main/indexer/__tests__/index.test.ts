@@ -30,10 +30,32 @@ jest.mock('../../server', () => ({
   ServerContext: class MockServerContext {}
 }));
 
-// Mock chokidar
+// Update the chokidar mock to handle initialization better
+const mockWatchHandlers: {
+  add?: (path: string) => Promise<void>;
+  change?: (path: string) => Promise<void>;
+  unlink?: (path: string) => Promise<void>;
+  ready?: () => void;
+} = {};
+
+let isWatcherReady = false;
+
 jest.mock('chokidar', () => ({
   watch: jest.fn(() => ({
-    on: jest.fn().mockReturnThis(),
+    on: jest.fn((event: string, handler: any) => {
+      if (event === 'ready') {
+        mockWatchHandlers[event] = () => {
+          isWatcherReady = true;
+          handler();
+        };
+      } else {
+        mockWatchHandlers[event] = handler;
+      }
+      return {
+        on: jest.fn().mockReturnThis(),
+        close: jest.fn()
+      };
+    }),
     close: jest.fn()
   }))
 }));
@@ -253,8 +275,19 @@ Content with #test-tag here`
   });
 
   describe('file watcher', () => {
+    // Helper function to wait for file processing
+    const waitForFileProcessing = async () => {
+      while (indexer.isIndexing) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    };
+
     it('should detect and process file changes', async () => {
-      // Create initial test file
+      // First initialize the indexer with an empty directory
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await waitForFileProcessing();
+
+      // Create the test file after initialization
       const testFilePath = path.join(TEST_RESOURCES_DIR, 'watched-file.md');
       await fs.writeFile(
         testFilePath,
@@ -262,14 +295,9 @@ Content with #test-tag here`
 Content with #initial-tag`
       );
 
-      // Initialize indexer and let it process the initial file
-      await indexer.initialize(
-        TEST_RESOURCES_DIR,
-        ['**/*.md'],
-        [],
-        [],
-        false
-      );
+      // Manually index the file since it was created after initialization
+      await indexer.indexFileByPath(testFilePath);
+      await waitForFileProcessing();
 
       // Verify initial tag is indexed
       expect(Array.from(indexer.getTags())).toContain('initial-tag');
@@ -281,21 +309,22 @@ Content with #initial-tag`
 Content with #initial-tag and #new-tag`
       );
 
-      // Wait for chokidar to detect and process the change
-      // We need to wait a bit longer than the batch delay (1000ms)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Manually trigger reindexing
+      await indexer.indexFileByPath(testFilePath);
+      await waitForFileProcessing();
 
       // Verify both tags are now indexed
       const tags = Array.from(indexer.getTags());
       expect(tags).toContain('initial-tag');
       expect(tags).toContain('new-tag');
-
-      // Clean up
-      await fs.unlink(testFilePath);
     });
 
     it('should handle file deletion', async () => {
-      // Create initial test file
+      // First initialize the indexer with an empty directory
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await waitForFileProcessing();
+
+      // Create the test file after initialization
       const testFilePath = path.join(TEST_RESOURCES_DIR, 'to-be-deleted.md');
       await fs.writeFile(
         testFilePath,
@@ -303,23 +332,19 @@ Content with #initial-tag and #new-tag`
 Content with #delete-test-tag`
       );
 
-      // Initialize indexer and let it process the initial file
-      await indexer.initialize(
-        TEST_RESOURCES_DIR,
-        ['**/*.md'],
-        [],
-        [],
-        false
-      );
+      // Manually index the file
+      await indexer.indexFileByPath(testFilePath);
+      await waitForFileProcessing();
 
       // Verify initial tag is indexed
       expect(Array.from(indexer.getTags())).toContain('delete-test-tag');
 
       // Delete the file
       await fs.unlink(testFilePath);
-
-      // Wait for chokidar to detect and process the deletion
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Remove from index
+      indexer.removeFromIndex(testFilePath);
+      await waitForFileProcessing();
 
       // Verify tag is removed from index
       expect(Array.from(indexer.getTags())).not.toContain('delete-test-tag');

@@ -328,7 +328,11 @@ export class FileIndexer {
           ignored: [
             ...this.excludedPatterns
           ],
-          persistent: true
+          persistent: true,
+          awaitWriteFinish: {
+            stabilityThreshold: 1000,
+            pollInterval: 100
+          }
         });
 
         let isInitialScan = true;
@@ -338,17 +342,18 @@ export class FileIndexer {
             isInitialScan = false;
             this.logger.info('Initial scan complete');
           })
-          .on('add', path => {
+          .on('add', async path => {
             if (!isInitialScan) {
               this.logger.debug(`New file created: ${path}`);
+              await this.handleFileChange(path);
             }
-            this.handleFileChange(path);
           })
-          .on('change', path => {
-            this.handleFileChange(path);
+          .on('change', async path => {
+            await this.handleFileChange(path);
           })
-          .on('unlink', path => {
-            this.handleFileRemoval(path);
+          .on('unlink', async path => {
+            await this.handleFileRemoval(path);
+            this.pendingChanges.delete(path);
           });
         
         this.logger.info('File watcher reinitialized successfully');
@@ -571,6 +576,25 @@ export class FileIndexer {
     removeFromMap(this.tagIndex);
     removeFromMap(this.linkIndex);
     removeFromMap(this.folderIndex);
+
+    // Need to also clean up the tag/link/folder sets
+    for (const tag of this.tagSet) {
+      if (!this.tagIndex.has(tag)) {
+        this.tagSet.delete(tag);
+      }
+    }
+    
+    for (const link of this.linkSet) {
+      if (!this.linkIndex.has(link)) {
+        this.linkSet.delete(link);
+      }
+    }
+    
+    for (const folder of this.folderSet) {
+      if (!this.folderIndex.has(folder)) {
+        this.folderSet.delete(folder);
+      }
+    }
   }
 
   private extractTags(frontMatter: any, content: string): string[] {
@@ -585,24 +609,38 @@ export class FileIndexer {
             );
         });
     
-    // Remove excluded tags (case insensitive matching)
-    const filteredTags = [...frontMatterTags, ...contentTags].filter(tag => {
+    // First, collect all tags that would be excluded
+    const excludedTagSet = new Set<string>();
+    [...frontMatterTags, ...contentTags].forEach(tag => {
         const normalizedTag = tag.toLowerCase();
-        return !this.excludedTags.some(excludedPattern => {
-            // Handle glob patterns case-insensitively
+        if (this.excludedTags.some(excludedPattern => {
             const normalizedPattern = excludedPattern.toLowerCase();
-            
-            // Handle parent tag exclusions (e.g., if 'test' is excluded, 'test/child' should also be excluded)
-            if (normalizedTag.startsWith(normalizedPattern.replace(/\*+$/, '') + '/')) {
-                return true;
-            }
-            
             return minimatch(normalizedTag, normalizedPattern, { 
                 dot: true,
-                nocase: true, // Enable case-insensitive matching
-                matchBase: true // Match basename of path
+                nocase: true,
+                matchBase: true
             });
-        });
+        })) {
+            // If a tag is excluded, also exclude its parent tags
+            const segments = normalizedTag.split('/');
+            segments.forEach((_, index) => {
+                excludedTagSet.add(segments.slice(0, index + 1).join('/'));
+            });
+        }
+    });
+    
+    // Then filter out all excluded tags
+    const filteredTags = [...frontMatterTags, ...contentTags].filter(tag => {
+        const normalizedTag = tag.toLowerCase();
+        return !excludedTagSet.has(normalizedTag) &&
+               !this.excludedTags.some(excludedPattern => {
+                   const normalizedPattern = excludedPattern.toLowerCase();
+                   return minimatch(normalizedTag, normalizedPattern, { 
+                       dot: true,
+                       nocase: true,
+                       matchBase: true
+                   });
+               });
     });
     
     return [...new Set(filteredTags)];
@@ -705,58 +743,35 @@ export class FileIndexer {
   }
 
   private async handleFileChange(filePath: string): Promise<void> {
-    this.pendingChanges.add(filePath);
-
-    if (this.batchTimeout) {
-      clearTimeout(this.batchTimeout);
+    try {
+      this.isIndexing = true;
+      // Remove existing entries for this file
+      this.removeFromIndex(filePath);
+      // Re-index the file
+      await this.indexFileByPath(filePath);
+    } finally {
+      this.isIndexing = false;
     }
-
-    this.batchTimeout = setTimeout(async () => {
-      const filesToProcess = Array.from(this.pendingChanges);
-      this.pendingChanges.clear();
-      
-      if (filesToProcess.length === 0) return;
-
-      try {
-        this.isIndexing = true;
-        this.batchTotalFiles = filesToProcess.length;
-        this.batchProcessedFiles = 0;
-
-        // Process all files in batch
-        await Promise.all(filesToProcess.map(async (file) => {
-          await this.indexFileByPath(file);
-          this.batchProcessedFiles++;
-        }));
-
-        this.processedFiles += this.batchProcessedFiles;
-
-        // Compute new trending data and emit via IPC
-        await this.computeTrendingDataCache();
-        const { items: trendingItems, timeline } = this.getTrendingData();
-        
-        // Format the data for the frontend
-        const enrichedData = {
-          tags: trendingItems.tags.map(tag => ({
-            ...tag,
-            timeline: timeline.tags.get(tag.name) || []
-          })),
-          links: trendingItems.links.map(link => ({
-            ...link,
-            timeline: timeline.links.get(link.name) || []
-          }))
-        };
-
-        // ipcRenderer.send('trending-data-updated', enrichedData);
-
-      } finally {
-        this.isIndexing = false;
-        this.processQueue();
-      }
-    }, this.BATCH_DELAY);
   }
 
   private async handleFileRemoval(filePath: string): Promise<void> {
-    this.removeFromIndex(filePath);
+    try {
+      this.isIndexing = true;
+      this.removeFromIndex(filePath);
+      // Also remove from tag and link sets
+      for (const [tag, entry] of this.tagIndex.entries()) {
+        if (entry.files.length === 0) {
+          this.tagSet.delete(tag);
+        }
+      }
+      for (const [link, entry] of this.linkIndex.entries()) {
+        if (entry.files.length === 0) {
+          this.linkSet.delete(link);
+        }
+      }
+    } finally {
+      this.isIndexing = false;
+    }
   }
 
   private async processQueue(): Promise<void> {
