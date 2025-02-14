@@ -154,8 +154,17 @@ export class FileIndexer {
     }
   }
 
-  setExcludedTags(tags: string[]): void {
-    this.excludedTags = tags.map(tag => tag.toLowerCase());
+  public setExcludedTags(tags: string[]): void {
+    // Store excluded tags in lowercase and normalize patterns
+    this.excludedTags = tags.map(tag => {
+      // Convert to lowercase and ensure proper glob pattern format
+      const normalizedTag = tag.toLowerCase();
+      // If it ends with a wildcard, ensure proper format
+      if (normalizedTag.endsWith('*')) {
+        return normalizedTag.replace(/\*+$/, '*');
+      }
+      return normalizedTag;
+    });
   }
 
   setExcludedPatterns(patterns: string[]): void {
@@ -567,17 +576,34 @@ export class FileIndexer {
   private extractTags(frontMatter: any, content: string): string[] {
     const frontMatterTags = frontMatter.tags || [];
     const contentTags = (content.match(/#[\w-\/]+/g) || [])
-      .map(tag => tag.substring(1))
-      .flatMap(tag => {
-        // Split hierarchical tags into all parent levels
-        const segments = tag.split('/');
-        return segments.map((_, i) => 
-          segments.slice(0, i+1).join('/')
-        );
-      });
+        .map(tag => tag.substring(1))
+        .flatMap(tag => {
+            // Split hierarchical tags into all parent levels
+            const segments = tag.split('/');
+            return segments.map((_, i) => 
+                segments.slice(0, i+1).join('/')
+            );
+        });
     
-    // Remove excluded tags
-    const filteredTags = [...frontMatterTags, ...contentTags].filter(tag => !this.excludedTags.some(excludedTag => minimatch(tag, excludedTag, { dot: true })));
+    // Remove excluded tags (case insensitive matching)
+    const filteredTags = [...frontMatterTags, ...contentTags].filter(tag => {
+        const normalizedTag = tag.toLowerCase();
+        return !this.excludedTags.some(excludedPattern => {
+            // Handle glob patterns case-insensitively
+            const normalizedPattern = excludedPattern.toLowerCase();
+            
+            // Handle parent tag exclusions (e.g., if 'test' is excluded, 'test/child' should also be excluded)
+            if (normalizedTag.startsWith(normalizedPattern.replace(/\*+$/, '') + '/')) {
+                return true;
+            }
+            
+            return minimatch(normalizedTag, normalizedPattern, { 
+                dot: true,
+                nocase: true, // Enable case-insensitive matching
+                matchBase: true // Match basename of path
+            });
+        });
+    });
     
     return [...new Set(filteredTags)];
   }
@@ -590,16 +616,33 @@ export class FileIndexer {
 
   private updateTagIndex(metadata: FileMetadata): void {
     metadata.tags.forEach(tag => {
-      const normalizedTag = tag.toLowerCase();
-      const entry = this.tagIndex.get(normalizedTag) || { files: [] };
-      entry.files = entry.files.filter(f => f.path !== metadata.path);
-      entry.files.push(metadata);
-      entry.files.sort((a, b) => {
-        if (!a.createdAt || !b.createdAt) return 0;
-        return b.createdAt.getTime() - a.createdAt.getTime();
-      });
-      this.tagIndex.set(normalizedTag, entry);
-      this.tagSet.add(normalizedTag);
+        // Skip tags that match exclusion patterns
+        const normalizedTag = tag.toLowerCase();
+        if (this.excludedTags.some(pattern => {
+            const normalizedPattern = pattern.toLowerCase();
+            return minimatch(normalizedTag, normalizedPattern, { 
+                dot: true,
+                nocase: true,
+                matchBase: true
+            }) || normalizedTag.startsWith(normalizedPattern.replace(/\*+$/, '') + '/');
+        })) {
+            return;
+        }
+
+        // Store original tag case in metadata for display purposes
+        const entry = this.tagIndex.get(normalizedTag) || { files: [] };
+        entry.files = entry.files.filter(f => f.path !== metadata.path);
+        entry.files.push({
+            ...metadata,
+            // Preserve original case in the metadata
+            tags: metadata.tags.map(t => t.toLowerCase() === normalizedTag ? tag : t)
+        });
+        entry.files.sort((a, b) => {
+            if (!a.createdAt || !b.createdAt) return 0;
+            return b.createdAt.getTime() - a.createdAt.getTime();
+        });
+        this.tagIndex.set(normalizedTag, entry);
+        this.tagSet.add(normalizedTag);
     });
   }
 
@@ -640,7 +683,9 @@ export class FileIndexer {
     if (this.isIndexing) {
       throw new Error('Indexing in progress');
     }
-    return this.tagIndex.get(tag.toLowerCase())?.files || [];
+    // Always look up tags case-insensitively
+    const normalizedTag = tag.toLowerCase();
+    return this.tagIndex.get(normalizedTag)?.files || [];
   }
 
   getFilesForLink(link: string): FileMetadata[] {
@@ -866,6 +911,7 @@ export class FileIndexer {
   private fuzzyMatch(pattern: string, str: string, fileCount: number): number | null {
     if (pattern.length > str.length) return null;
     
+    // Convert both strings to lowercase for case-insensitive matching
     pattern = pattern.toLowerCase();
     str = str.toLowerCase();
     

@@ -80,102 +80,42 @@ jest.mock('electron', () => ({
   Notification: jest.fn()
 }));
 
-// Create test resources directory and files before tests
+// Create test resources directory and files for specific tests
 const TEST_RESOURCES_DIR = path.join(__dirname, 'test-resources');
-
-async function setupTestFiles() {
-  // Ensure test resources directory exists
-  await fs.mkdir(TEST_RESOURCES_DIR, { recursive: true });
-
-  // Create test files with different tag scenarios
-  await fs.writeFile(
-    path.join(TEST_RESOURCES_DIR, 'inline-tags.md'),
-    `# Test Note
-This is a test note with #tag1 and #tag2/subtag and #tag3-with-dash`
-  );
-
-  await fs.writeFile(
-    path.join(TEST_RESOURCES_DIR, 'frontmatter-tags.md'),
-    `---
-tags:
-  - frontmatter-tag1
-  - frontmatter-tag2
-  - nested/tag
----
-# Test Note
-Regular content here`
-  );
-
-  await fs.writeFile(
-    path.join(TEST_RESOURCES_DIR, 'mixed-tags.md'),
-    `---
-tags:
-  - frontmatter-tag1
-  - nested/tag
----
-# Test Note
-Content with #inline-tag1 and #parent/child`
-  );
-
-  await fs.writeFile(
-    path.join(TEST_RESOURCES_DIR, 'excluded-tags.md'),
-    `---
-tags:
-  - excluded-tag
-  - private/secret
-  - normal-tag
----
-# Test Note
-Content with #excluded-inline and #private/hidden and #regular-tag`
-  );
-
-  await fs.writeFile(
-    path.join(TEST_RESOURCES_DIR, 'malformed-frontmatter.md'),
-    `---
-tags:
-  - valid-tag
-  malformed: {
----
-# Test Note
-Content with #inline-tag`
-  );
-}
 
 describe('FileIndexer', () => {
   let indexer: FileIndexer;
-
-  beforeAll(async () => {
-    await setupTestFiles();
-  });
 
   beforeEach(async () => {
     // Reset all mocks
     jest.clearAllMocks();
     
+    // Create test directory
+    await fs.mkdir(TEST_RESOURCES_DIR, { recursive: true });
+    
     // Create new indexer instance
     indexer = new FileIndexer();
-    await indexer.initialize(
-      TEST_RESOURCES_DIR,  // Use test resources directory instead of mock path
-      ['**/*.md'],
-      [],
-      [],
-      false
-    );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Clear the indexer after each test
     indexer.clearIndex();
-  });
-
-  afterAll(async () => {
-    // Clean up test files
+    
+    // Clean up test files after each test
     await fs.rm(TEST_RESOURCES_DIR, { recursive: true, force: true });
   });
 
   describe('indexFileByPath', () => {
     it('should extract inline tags correctly', async () => {
+      // Create test file for this specific test
       const testFilePath = path.join(TEST_RESOURCES_DIR, 'inline-tags.md');
+      await fs.writeFile(
+        testFilePath,
+        `# Test Note
+This is a test note with #tag1 and #tag2/subtag and #tag3-with-dash`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
       await indexer.indexFileByPath(testFilePath);
 
       const tags = Array.from(indexer.getTags());
@@ -187,6 +127,19 @@ describe('FileIndexer', () => {
 
     it('should extract frontmatter tags correctly', async () => {
       const testFilePath = path.join(TEST_RESOURCES_DIR, 'frontmatter-tags.md');
+      await fs.writeFile(
+        testFilePath,
+        `---
+tags:
+  - frontmatter-tag1
+  - frontmatter-tag2
+  - nested/tag
+---
+# Test Note
+Regular content here`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
       await indexer.indexFileByPath(testFilePath);
 
       const tags = Array.from(indexer.getTags());
@@ -197,6 +150,18 @@ describe('FileIndexer', () => {
 
     it('should handle mixed frontmatter and inline tags', async () => {
       const testFilePath = path.join(TEST_RESOURCES_DIR, 'mixed-tags.md');
+      await fs.writeFile(
+        testFilePath,
+        `---
+tags:
+  - frontmatter-tag1
+  - nested/tag
+---
+# Test Note
+Content with #inline-tag1 and #parent/child`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
       await indexer.indexFileByPath(testFilePath);
 
       const tags = Array.from(indexer.getTags());
@@ -208,10 +173,21 @@ describe('FileIndexer', () => {
     });
 
     it('should handle excluded tags', async () => {
-      // Create new indexer with excluded tags
-      indexer.setExcludedTags(['excluded*', 'private/**', 'private']);
-
       const testFilePath = path.join(TEST_RESOURCES_DIR, 'excluded-tags.md');
+      await fs.writeFile(
+        testFilePath,
+        `---
+tags:
+  - excluded-tag
+  - private/secret
+  - normal-tag
+---
+# Test Note
+Content with #excluded-inline and #private/hidden and #regular-tag`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      indexer.setExcludedTags(['excluded*', 'private/**', 'private']);
       await indexer.indexFileByPath(testFilePath);
 
       const tags = Array.from(indexer.getTags());
@@ -221,12 +197,22 @@ describe('FileIndexer', () => {
       expect(tags).not.toContain('private/hidden');
       expect(tags).toContain('normal-tag');
       expect(tags).toContain('regular-tag');
-
-      indexer.setExcludedTags([]);
     });
 
     it('should handle malformed frontmatter gracefully', async () => {
       const testFilePath = path.join(TEST_RESOURCES_DIR, 'malformed-frontmatter.md');
+      await fs.writeFile(
+        testFilePath,
+        `---
+tags:
+  - valid-tag
+  malformed: {
+---
+# Test Note
+Content with #inline-tag`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
       await expect(indexer.indexFileByPath(testFilePath)).resolves.not.toThrow();
 
       const tags = Array.from(indexer.getTags());
@@ -236,7 +222,7 @@ describe('FileIndexer', () => {
 
   describe('getFilesForTag', () => {
     it('should retrieve files with both frontmatter and inline tags', async () => {
-      // Create test files with different tag formats
+      // Create test files for this specific test
       await fs.writeFile(
         path.join(TEST_RESOURCES_DIR, 'frontmatter-tag.md'),
         `---
@@ -252,43 +238,210 @@ tags:
 Content with #test-tag here`
       );
 
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      
       // Index both files
       await indexer.indexFileByPath(path.join(TEST_RESOURCES_DIR, 'frontmatter-tag.md'));
       await indexer.indexFileByPath(path.join(TEST_RESOURCES_DIR, 'inline-tag.md'));
 
-      // Get files for the tag
       const files = indexer.getFilesForTag('test-tag');
-
-      // Verify both files are retrieved
       expect(files).toHaveLength(2);
       expect(files.map(f => path.basename(f.path))).toEqual(
         expect.arrayContaining(['frontmatter-tag.md', 'inline-tag.md'])
       );
     });
+  });
 
-    it('should handle case-insensitive tag matching', async () => {
+  describe('file watcher', () => {
+    it('should detect and process file changes', async () => {
+      // Create initial test file
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'watched-file.md');
       await fs.writeFile(
-        path.join(TEST_RESOURCES_DIR, 'mixed-case.md'),
-        `---
-tags:
-  - Test-TAG
----
-# Test Note with Mixed Case
-Content with #TEST-tag here`
+        testFilePath,
+        `# Test Note
+Content with #initial-tag`
       );
 
-      await indexer.indexFileByPath(path.join(TEST_RESOURCES_DIR, 'mixed-case.md'));
+      // Initialize indexer and let it process the initial file
+      await indexer.initialize(
+        TEST_RESOURCES_DIR,
+        ['**/*.md'],
+        [],
+        [],
+        false
+      );
 
-      // Try retrieving with different cases
-      const filesLower = indexer.getFilesForTag('test-tag');
-      const filesUpper = indexer.getFilesForTag('TEST-TAG');
-      const filesMixed = indexer.getFilesForTag('Test-TAG');
+      // Verify initial tag is indexed
+      expect(Array.from(indexer.getTags())).toContain('initial-tag');
 
-      expect(filesLower).toHaveLength(1);
-      expect(filesUpper).toHaveLength(1);
-      expect(filesMixed).toHaveLength(1);
-      expect(filesLower).toEqual(filesUpper);
-      expect(filesUpper).toEqual(filesMixed);
+      // Modify the file with new content
+      await fs.writeFile(
+        testFilePath,
+        `# Test Note
+Content with #initial-tag and #new-tag`
+      );
+
+      // Wait for chokidar to detect and process the change
+      // We need to wait a bit longer than the batch delay (1000ms)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Verify both tags are now indexed
+      const tags = Array.from(indexer.getTags());
+      expect(tags).toContain('initial-tag');
+      expect(tags).toContain('new-tag');
+
+      // Clean up
+      await fs.unlink(testFilePath);
+    });
+
+    it('should handle file deletion', async () => {
+      // Create initial test file
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'to-be-deleted.md');
+      await fs.writeFile(
+        testFilePath,
+        `# Test Note
+Content with #delete-test-tag`
+      );
+
+      // Initialize indexer and let it process the initial file
+      await indexer.initialize(
+        TEST_RESOURCES_DIR,
+        ['**/*.md'],
+        [],
+        [],
+        false
+      );
+
+      // Verify initial tag is indexed
+      expect(Array.from(indexer.getTags())).toContain('delete-test-tag');
+
+      // Delete the file
+      await fs.unlink(testFilePath);
+
+      // Wait for chokidar to detect and process the deletion
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Verify tag is removed from index
+      expect(Array.from(indexer.getTags())).not.toContain('delete-test-tag');
+    });
+  });
+
+  describe('case-insensitive tag handling', () => {
+    it('should handle case-insensitive tag exclusions', async () => {
+        // Clear any existing index and initialize with the exclusions
+        indexer.clearIndex();
+        await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [
+            'Test-*',    // Should exclude all tags starting with test- regardless of case
+            'UPPER/*',   // Should exclude all hierarchical tags under UPPER/
+            'quiet*'     // Should exclude tags starting with quiet
+        ], false);
+
+        const testFilePath = path.join(TEST_RESOURCES_DIR, 'excluded-case.md');
+        await fs.writeFile(
+            testFilePath,
+            `---
+tags:
+    - test-tag
+    - TEST-other
+    - upper/something
+    - UPPER/else
+    - quiet-case
+    - QUIET-VOICE
+    - allowed-tag
+---
+Content with #Test-Tag and #UPPER/thing and #QuietTime`
+        );
+
+        await indexer.indexFileByPath(testFilePath);
+
+        const tags = Array.from(indexer.getTags());
+        
+        // These should all be excluded
+        expect(tags).not.toContain('test-tag');
+        expect(tags).not.toContain('test-other');
+        expect(tags).not.toContain('upper/something');
+        expect(tags).not.toContain('upper/else');
+        expect(tags).not.toContain('quiet-case');
+        expect(tags).not.toContain('quiet-voice');
+        
+        // Parent tags of excluded hierarchical tags should also be excluded
+        expect(tags).not.toContain('upper');
+        
+        // This should be allowed
+        expect(tags).toContain('allowed-tag');
+        
+        // Test that new files also respect the exclusions
+        const anotherFile = path.join(TEST_RESOURCES_DIR, 'another-excluded.md');
+        await fs.writeFile(
+            anotherFile,
+            `# Test Note
+Content with #TEST-new and #UPPER/more and #QuietTag`
+        );
+        
+        await indexer.indexFileByPath(anotherFile);
+        
+        const updatedTags = Array.from(indexer.getTags());
+        expect(updatedTags).not.toContain('test-new');
+        expect(updatedTags).not.toContain('upper/more');
+        expect(updatedTags).not.toContain('quiettag');
+    });
+
+    // Move other case-sensitivity tests to their own describe block
+    describe('case matching', () => {
+        beforeEach(async () => {
+            const testFilePath = path.join(TEST_RESOURCES_DIR, 'case-test.md');
+            await fs.writeFile(
+                testFilePath,
+                `---
+tags:
+  - Test-TAG
+  - UPPER/CASE
+  - lower/case
+---
+# Test Note
+Content with #MixedCase and #SCREAMING-CASE and #quiet-case`
+            );
+
+            await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+            await indexer.indexFileByPath(testFilePath);
+        });
+
+        it('should match tags regardless of case', () => {
+            const variations = [
+                'test-tag',
+                'TEST-TAG',
+                'Test-TAG',
+                'test-TAG'
+            ];
+
+            // All variations should return the same files
+            const results = variations.map(tag => indexer.getFilesForTag(tag));
+            results.forEach(files => {
+                expect(files).toHaveLength(1);
+            });
+
+            // All results should be identical
+            const firstResult = results[0];
+            results.forEach(files => {
+                expect(files).toEqual(firstResult);
+            });
+        });
+
+        it('should handle case-insensitive hierarchical tag matching', () => {
+            const variations = [
+                'upper/case',
+                'UPPER/CASE',
+                'Upper/Case',
+                'lower/case',
+                'LOWER/case',
+                'lower/CASE'
+            ];
+
+            variations.forEach(tag => {
+                const files = indexer.getFilesForTag(tag);
+                expect(files).toHaveLength(1);
+            });
+        });
     });
   });
 }); 
