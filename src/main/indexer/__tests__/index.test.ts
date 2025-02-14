@@ -233,4 +233,62 @@ describe('FileIndexer', () => {
       expect(tags).toContain('inline-tag');
     });
   });
+
+  describe('getFilesForTag', () => {
+    it('should retrieve files with both frontmatter and inline tags', async () => {
+      // Create test files with different tag formats
+      await fs.writeFile(
+        path.join(TEST_RESOURCES_DIR, 'frontmatter-tag.md'),
+        `---
+tags:
+  - test-tag
+---
+# Test Note with Frontmatter Tag`
+      );
+
+      await fs.writeFile(
+        path.join(TEST_RESOURCES_DIR, 'inline-tag.md'),
+        `# Test Note with Inline Tag
+Content with #test-tag here`
+      );
+
+      // Index both files
+      await indexer.indexFileByPath(path.join(TEST_RESOURCES_DIR, 'frontmatter-tag.md'));
+      await indexer.indexFileByPath(path.join(TEST_RESOURCES_DIR, 'inline-tag.md'));
+
+      // Get files for the tag
+      const files = indexer.getFilesForTag('test-tag');
+
+      // Verify both files are retrieved
+      expect(files).toHaveLength(2);
+      expect(files.map(f => path.basename(f.path))).toEqual(
+        expect.arrayContaining(['frontmatter-tag.md', 'inline-tag.md'])
+      );
+    });
+
+    it('should handle case-insensitive tag matching', async () => {
+      await fs.writeFile(
+        path.join(TEST_RESOURCES_DIR, 'mixed-case.md'),
+        `---
+tags:
+  - Test-TAG
+---
+# Test Note with Mixed Case
+Content with #TEST-tag here`
+      );
+
+      await indexer.indexFileByPath(path.join(TEST_RESOURCES_DIR, 'mixed-case.md'));
+
+      // Try retrieving with different cases
+      const filesLower = indexer.getFilesForTag('test-tag');
+      const filesUpper = indexer.getFilesForTag('TEST-TAG');
+      const filesMixed = indexer.getFilesForTag('Test-TAG');
+
+      expect(filesLower).toHaveLength(1);
+      expect(filesUpper).toHaveLength(1);
+      expect(filesMixed).toHaveLength(1);
+      expect(filesLower).toEqual(filesUpper);
+      expect(filesUpper).toEqual(filesMixed);
+    });
+  });
 }); 
