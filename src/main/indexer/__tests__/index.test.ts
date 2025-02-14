@@ -102,16 +102,6 @@ jest.mock('electron', () => ({
   Notification: jest.fn()
 }));
 
-// Mock gray-matter to make matter.default act as a function
-jest.mock('gray-matter', () => {
-  const actualMatter = jest.requireActual('gray-matter');
-  const matterFn = actualMatter as Function;
-  return {
-    ...actualMatter,
-    default: (content: string) => matterFn(content)
-  };
-});
-
 // Create test resources directory and files for specific tests
 const TEST_RESOURCES_DIR = path.join(__dirname, 'test-resources');
 
@@ -249,6 +239,90 @@ Content with #inline-tag`
 
       const tags = Array.from(indexer.getTags());
       expect(tags).toContain('inline-tag');
+    });
+
+    it('should extract single frontmatter tag correctly', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'single-frontmatter-tag.md');
+      await fs.writeFile(
+        testFilePath,
+        `---
+tags: single-tag
+---
+# Test Note
+Regular content here without any inline tags`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await indexer.indexFileByPath(testFilePath);
+
+      const tags = Array.from(indexer.getTags());
+      expect(tags).toContain('single-tag');
+    });
+
+    it('should extract frontmatter tag when specified as string instead of array', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'string-frontmatter-tag.md');
+      await fs.writeFile(
+        testFilePath,
+        `---
+tags: "test-tag"
+---
+# Test Note
+Regular content here`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await indexer.indexFileByPath(testFilePath);
+
+      const tags = Array.from(indexer.getTags());
+      expect(tags).toContain('test-tag');
+    });
+    
+    it('should extract frontmatter tags with indented array format', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'indented-array-tag.md');
+      await fs.writeFile(
+        testFilePath,
+        `---
+tags:
+  - enzyme/pmf
+reflectionType: personal
+people: 
+created: "[[2025-02-13]]"
+---
+# Test Note
+Regular content here`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await indexer.indexFileByPath(testFilePath);
+
+      const tags = Array.from(indexer.getTags());
+      expect(tags).toContain('enzyme/pmf');
+      expect(tags).toContain('enzyme'); // Should also extract parent tag
+    });
+
+    it('should handle frontmatter tags with # prefix', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'hash-prefix-tags.md');
+      await fs.writeFile(
+        testFilePath,
+        `---
+tags:
+  - "#enzyme/pmf"
+  - "#test-tag"
+  - normal/tag
+---
+# Test Note
+Regular content here`
+      );
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await indexer.indexFileByPath(testFilePath);
+
+      const tags = Array.from(indexer.getTags());
+      expect(tags).toContain('enzyme/pmf');
+      expect(tags).toContain('enzyme'); // Should also extract parent tag
+      expect(tags).toContain('test-tag');
+      expect(tags).toContain('normal/tag');
+      expect(tags).toContain('normal');
     });
   });
 

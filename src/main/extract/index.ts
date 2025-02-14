@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import * as matter from 'gray-matter';
+const matter = require('gray-matter');
 import { LRU } from 'tiny-lru';
 import { getFileCreationDate } from '../utils.js';
 import { getFileIndexer } from '../indexer/index.js';
@@ -43,12 +43,16 @@ async function readFilesInBatch(files: string[]): Promise<Map<string, { frontmat
       const file = uncachedFiles[i];
       const content = fileContents[i];
       try {
-        const { data: frontmatter, content: fileContent } = matter.default(content);
+        const { data: frontmatter, content: fileContent } = matter(content);
 
-        // Check if its a list or string of csv's
-        frontmatter.tags = Array.isArray(frontmatter.tags) 
+        // Process tags to remove '#' prefix if present
+        let tags = Array.isArray(frontmatter.tags) 
           ? frontmatter.tags 
           : frontmatter.tags?.split(',').map(tag => tag.trim()) || [];
+
+        // Remove '#' prefix from tags if present
+        tags = tags.map(tag => tag.startsWith('#') ? tag.slice(1) : tag);
+        frontmatter.tags = tags;
 
         const result = { frontmatter, contents: fileContent };
         cache.set(file, result);
@@ -183,7 +187,7 @@ async function applyPatternModifiers(
   return filteredFiles;
 }
 
-function extractContentForMatch(
+export function extractContentForMatch(
   contents: string,
   match: Match,
   frontmatter: any
@@ -191,7 +195,7 @@ function extractContentForMatch(
   const extractedContents: string[] = [];
 
   if (match.type === MatchType.Tag) {
-    const frontMatterTags = frontmatter.tags?.map(tag => tag.includes("#") ? tag : `#${tag}`) || [];
+    const frontMatterTags = frontmatter.tags || [];
     if (frontMatterTags.some((tag: string) => tag.toLowerCase() === match.value.toLowerCase())) {
       extractedContents.push(contents);
     } else {
@@ -237,9 +241,14 @@ export async function extractPatterns(
 
     const { frontmatter, contents } = fileContent;
 
-    // Augment the tags from frontmatter with the tags from the file contents
-    const fileTags = contents.match(/#[\w-\/]+/g) || [];
-    const frontmatterTags = frontmatter.tags ? frontmatter.tags.map(tag => tag.includes("#") ? tag : `#${tag}`) : [];
+    // Extract tags from file contents and normalize them (remove # prefix)
+    const fileTags = (contents.match(/#[\w-\/]+/g) || [])
+      .map(tag => tag.slice(1)); // Remove # prefix
+
+    // Get frontmatter tags (already normalized in readFilesInBatch)
+    const frontmatterTags = frontmatter.tags || [];
+
+    // Combine all tags
     const augmentedTags = [...new Set([...frontmatterTags, ...fileTags])];
 
     const fileLinks = [...new Set(contents.match(/\[\[([^\]]+)\]\]/g) || [])];

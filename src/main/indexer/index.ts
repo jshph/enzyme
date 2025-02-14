@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import * as matter from 'gray-matter';
+const matter = require('gray-matter');
 import * as chokidar from 'chokidar';
 import { getFileCreationDate } from '../utils.js';
 import * as winston from 'winston';
@@ -310,7 +310,7 @@ export class FileIndexer {
       if (skippedFiles > 0) {
         this.logger.info(`Skipped ${skippedFiles} files during indexing`);
       }
-      
+
       return true;
     } catch (error) {
       this.logger.error(`Error during indexing: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -385,7 +385,7 @@ export class FileIndexer {
       let links: string[] = [];
 
       try {
-        const parsedMatter = matter.default(content);
+        const parsedMatter = matter(content);
         frontmatter = parsedMatter.data;
         tags = this.extractTags(frontmatter, content);
         links = this.extractMarkdownLinks(content);
@@ -600,52 +600,88 @@ export class FileIndexer {
   }
 
   private extractTags(frontMatter: any, content: string): string[] {
-    const frontMatterTags = frontMatter.tags || [];
-    const contentTags = (content.match(/#[\w-\/]+/g) || [])
-        .map(tag => tag.substring(1))
-        .flatMap(tag => {
-            // Split hierarchical tags into all parent levels
-            const segments = tag.split('/');
-            return segments.map((_, i) => 
-                segments.slice(0, i+1).join('/')
-            );
-        });
+    // Handle frontmatter tags
+    let frontMatterTags: string[] = [];
     
-    // First, collect all tags that would be excluded
+    if (frontMatter.tags) {
+        // Convert to array if it's a string or array notation string
+        if (typeof frontMatter.tags === 'string') {
+            try {
+                // Handle JSON array notation
+                if (frontMatter.tags.startsWith('[') && frontMatter.tags.endsWith(']')) {
+                    frontMatterTags = JSON.parse(frontMatter.tags);
+                } else {
+                    // Single string tag
+                    frontMatterTags = [frontMatter.tags.trim()];
+                }
+            } catch {
+                frontMatterTags = [frontMatter.tags.trim()];
+            }
+        } else if (Array.isArray(frontMatter.tags)) {
+            // Already an array
+            frontMatterTags = frontMatter.tags.map(tag => 
+                typeof tag === 'string' ? tag.trim() : String(tag)
+            );
+        }
+    }
+
+    // Handle inline tags
+    const contentTags = (content.match(/#[\w-\/]+/g) || [])
+        .map(tag => tag.substring(1).trim());
+
+    // First collect all excluded tags and their parents
     const excludedTagSet = new Set<string>();
     [...frontMatterTags, ...contentTags].forEach(tag => {
         const normalizedTag = tag.toLowerCase();
-        if (this.excludedTags.some(excludedPattern => {
-            const normalizedPattern = excludedPattern.toLowerCase();
-            return minimatch(normalizedTag, normalizedPattern, { 
+        if (this.excludedTags.some(pattern => {
+            const normalizedPattern = pattern.toLowerCase();
+            return minimatch(normalizedTag, normalizedPattern, {
                 dot: true,
                 nocase: true,
                 matchBase: true
             });
         })) {
-            // If a tag is excluded, also exclude its parent tags
+            // If a tag is excluded, also exclude all its parent tags
             const segments = normalizedTag.split('/');
-            segments.forEach((_, index) => {
-                excludedTagSet.add(segments.slice(0, index + 1).join('/'));
-            });
+            for (let i = 0; i < segments.length; i++) {
+                excludedTagSet.add(segments.slice(0, i + 1).join('/'));
+            }
         }
     });
+
+    // Combine all tags and generate parent tags
+    const allTags = new Set<string>();
     
-    // Then filter out all excluded tags
-    const filteredTags = [...frontMatterTags, ...contentTags].filter(tag => {
+    // Helper function to add tag and its parents
+    const addTagAndParents = (tag: string) => {
+        const segments = tag.split('/');
+        for (let i = 0; i < segments.length; i++) {
+            const parentTag = segments.slice(0, i + 1).join('/');
+            allTags.add(parentTag);
+        }
+    };
+
+    // Process all tags
+    [...frontMatterTags, ...contentTags].forEach(tag => {
+        if (typeof tag === 'string' && tag.trim()) {
+            addTagAndParents(tag.trim());
+        }
+    });
+
+    // Convert to array and filter excluded tags
+    return Array.from(allTags).filter(tag => {
         const normalizedTag = tag.toLowerCase();
+        // Check both the exclusion patterns and the excluded tag set
         return !excludedTagSet.has(normalizedTag) &&
-               !this.excludedTags.some(excludedPattern => {
-                   const normalizedPattern = excludedPattern.toLowerCase();
-                   return minimatch(normalizedTag, normalizedPattern, { 
+               !this.excludedTags.some(pattern => {
+                   const normalizedPattern = pattern.toLowerCase();
+                   return minimatch(normalizedTag, normalizedPattern, {
                        dot: true,
                        nocase: true,
                        matchBase: true
-                   });
+                   }) || normalizedTag.startsWith(normalizedPattern.replace(/\*+$/, '') + '/');
                });
     });
-    
-    return [...new Set(filteredTags)];
   }
 
   // Extracts links from the content using regex and returns the link without the brackets
