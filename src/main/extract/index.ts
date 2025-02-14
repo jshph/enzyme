@@ -43,7 +43,7 @@ async function readFilesInBatch(files: string[]): Promise<Map<string, { frontmat
       const file = uncachedFiles[i];
       const content = fileContents[i];
       try {
-        const { data: frontmatter, content: fileContent } = matter.default(content);
+        const { data: frontmatter, content: fileContent } = (matter as any)(content);
 
         // CHeck if its a list or string of csv's
         frontmatter.tags = Array.isArray(frontmatter.tags) ? frontmatter.tags : frontmatter.tags.split(',').map(tag => tag.trim());

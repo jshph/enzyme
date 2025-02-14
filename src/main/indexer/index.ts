@@ -6,8 +6,9 @@ import { getFileCreationDate } from '../utils.js';
 import * as winston from 'winston';
 import { ServerContext } from '../server.js';
 import { app } from 'electron';
-import minimatch from 'minimatch';
+const minimatch = require('minimatch');
 import { initializeLogger } from '../utils/logger.js';
+
 
 export interface FileMetadata {
   path: string;
@@ -151,6 +152,18 @@ export class FileIndexer {
       this.notify('Indexing Error', error instanceof Error ? error.message : 'Unknown error');
       return false;
     }
+  }
+
+  setExcludedTags(tags: string[]): void {
+    this.excludedTags = tags.map(tag => tag.toLowerCase());
+  }
+
+  setExcludedPatterns(patterns: string[]): void {
+    this.excludedPatterns = patterns.map(pattern => pattern.toLowerCase());
+  }
+
+  setIncludedPatterns(patterns: string[]): void {
+    this.includedPatterns = patterns.map(pattern => pattern.toLowerCase());
   }
 
   async stop(): Promise<void> {
@@ -338,6 +351,9 @@ export class FileIndexer {
     this.tagIndex = new Map();
     this.linkIndex = new Map();
     this.folderIndex = new Map();
+    this.tagSet = new Set();
+    this.linkSet = new Set();
+    this.folderSet = new Set();
   }
 
   public getFileFromLink(link: string): string | null {
@@ -353,7 +369,7 @@ export class FileIndexer {
       let links: string[] = [];
 
       try {
-        const parsedMatter = matter.default(content);
+        const parsedMatter = (matter as any)(content);
         frontmatter = parsedMatter.data;
         tags = this.extractTags(frontmatter, content);
         links = this.extractMarkdownLinks(content);
@@ -484,7 +500,7 @@ export class FileIndexer {
     }
   }
 
-  private async indexFileByPath(filePath: string): Promise<void> {
+  async indexFileByPath(filePath: string): Promise<void> {
     try {
       const { content, stats, frontmatter, tags, links } = await this.getFileData(filePath);
       
@@ -560,7 +576,10 @@ export class FileIndexer {
         );
       });
     
-    return [...new Set([...frontMatterTags, ...contentTags])];
+    // Remove excluded tags
+    const filteredTags = [...frontMatterTags, ...contentTags].filter(tag => !this.excludedTags.some(excludedTag => minimatch(tag, excludedTag, { dot: true })));
+    
+    return [...new Set(filteredTags)];
   }
 
   // Extracts links from the content using regex and returns the link without the brackets
