@@ -553,4 +553,277 @@ Content with #MixedCase and #SCREAMING-CASE and #quiet-case`
         });
     });
   });
+
+  describe('link extraction and retrieval', () => {
+    beforeEach(async () => {
+      // Create test directory
+      await fs.mkdir(TEST_RESOURCES_DIR, { recursive: true });
+      indexer = new FileIndexer();
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+    });
+
+    it('should extract markdown links correctly', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'links.md');
+      await fs.writeFile(
+        testFilePath,
+        `# Test Note
+Here are some [[basic-link]] and [[nested/link]] references.
+Also testing [[multi word link]] and [[Special-Characters!]]`
+      );
+
+      await indexer.indexFileByPath(testFilePath);
+
+      const links = Array.from(indexer.getLinks());
+      expect(links).toContain('basic-link');
+      expect(links).toContain('nested/link');
+      expect(links).toContain('multi word link');
+      expect(links).toContain('Special-Characters!');
+    });
+
+    it('should handle links with various formats', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'complex-links.md');
+      await fs.writeFile(
+        testFilePath,
+        `# Test Note
+[[link-with-alias|Displayed differently]]
+[[folder/nested/deep-link]]
+[[2023-12-25]] date link
+[[link with spaces]]
+Multiple links in one line: [[link1]] and [[link2]] here`
+      );
+
+      await indexer.indexFileByPath(testFilePath);
+
+      const links = Array.from(indexer.getLinks());
+      expect(links).toContain('link-with-alias');
+      expect(links).toContain('folder/nested/deep-link');
+      expect(links).toContain('2023-12-25');
+      expect(links).toContain('link with spaces');
+      expect(links).toContain('link1');
+      expect(links).toContain('link2');
+    });
+
+    it('should retrieve files by link reference', async () => {
+      // Create two files that reference each other
+      const file1Path = path.join(TEST_RESOURCES_DIR, 'source.md');
+      const file2Path = path.join(TEST_RESOURCES_DIR, 'target.md');
+
+      await fs.writeFile(
+        file1Path,
+        `# Source Note
+This links to [[target]]`
+      );
+
+      await fs.writeFile(
+        file2Path,
+        `# Target Note
+This links back to [[source]]`
+      );
+
+      await indexer.indexFileByPath(file1Path);
+      await indexer.indexFileByPath(file2Path);
+
+      const filesLinkingToTarget = indexer.getFilesForLink('target');
+      const filesLinkingToSource = indexer.getFilesForLink('source');
+
+      expect(filesLinkingToTarget).toHaveLength(1);
+      expect(filesLinkingToSource).toHaveLength(1);
+      expect(filesLinkingToTarget[0].path).toBe(file1Path);
+      expect(filesLinkingToSource[0].path).toBe(file2Path);
+    });
+
+    it('should handle multiple files linking to the same target', async () => {
+      // Create multiple files that link to the same target
+      const files = [
+        ['file1.md', '# File 1\nLinks to [[common-target]]'],
+        ['file2.md', '# File 2\nAlso links to [[common-target]]'],
+        ['file3.md', '# File 3\nAnother [[common-target]] reference']
+      ];
+
+      for (const [filename, content] of files) {
+        const filePath = path.join(TEST_RESOURCES_DIR, filename);
+        await fs.writeFile(filePath, content);
+        await indexer.indexFileByPath(filePath);
+      }
+
+      const filesWithLink = indexer.getFilesForLink('common-target');
+      expect(filesWithLink).toHaveLength(3);
+      expect(filesWithLink.map(f => path.basename(f.path))).toEqual(
+        expect.arrayContaining(['file1.md', 'file2.md', 'file3.md'])
+      );
+    });
+
+    it('should handle link removal when file is deleted', async () => {
+      // Create two files, then delete one
+      const file1Path = path.join(TEST_RESOURCES_DIR, 'staying.md');
+      const file2Path = path.join(TEST_RESOURCES_DIR, 'leaving.md');
+
+      await fs.writeFile(
+        file1Path,
+        `# Staying File
+Links to [[shared-link]]`
+      );
+
+      await fs.writeFile(
+        file2Path,
+        `# Leaving File
+Also links to [[shared-link]]`
+      );
+
+      await indexer.indexFileByPath(file1Path);
+      await indexer.indexFileByPath(file2Path);
+
+      // Verify both files are indexed
+      let filesWithLink = indexer.getFilesForLink('shared-link');
+      expect(filesWithLink).toHaveLength(2);
+
+      // Remove one file
+      indexer.removeFromIndex(file2Path);
+      await fs.unlink(file2Path);
+
+      // Verify only one file remains
+      filesWithLink = indexer.getFilesForLink('shared-link');
+      expect(filesWithLink).toHaveLength(1);
+      expect(filesWithLink[0].path).toBe(file1Path);
+    });
+
+    it('should handle file updates that change links', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'updating.md');
+      
+      // Initial content
+      await fs.writeFile(
+        testFilePath,
+        `# Test Note
+Initial [[link1]] and [[link2]]`
+      );
+
+      await indexer.indexFileByPath(testFilePath);
+
+      // Verify initial links
+      expect(Array.from(indexer.getLinks())).toContain('link1');
+      expect(Array.from(indexer.getLinks())).toContain('link2');
+
+      // Update file content
+      await fs.writeFile(
+        testFilePath,
+        `# Test Note
+Changed to [[link3]] and [[link4]]`
+      );
+
+      await indexer.indexFileByPath(testFilePath);
+
+      // Verify updated links
+      const updatedLinks = Array.from(indexer.getLinks());
+      expect(updatedLinks).not.toContain('link1');
+      expect(updatedLinks).not.toContain('link2');
+      expect(updatedLinks).toContain('link3');
+      expect(updatedLinks).toContain('link4');
+    });
+  });
+
+  describe('linkToFileMap', () => {
+    it('should correctly map file basenames to full paths', async () => {
+      // Create test files with nested paths
+      const files = [
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'folder1/note1.md'),
+          content: '# Note 1\nSome content'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'folder2/subfolder/note2.md'),
+          content: '# Note 2\nOther content'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'note3.md'),
+          content: '# Note 3\nMore content'
+        }
+      ];
+
+      // Create the directory structure and files
+      for (const file of files) {
+        await fs.mkdir(path.dirname(file.path), { recursive: true });
+        await fs.writeFile(file.path, file.content);
+      }
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+
+      // Index each file
+      for (const file of files) {
+        await indexer.indexFileByPath(file.path);
+      }
+
+      // Test that basenames map to full paths
+      expect(indexer.getFileFromLink('note1')).toBe(files[0].path);
+      expect(indexer.getFileFromLink('note2')).toBe(files[1].path);
+      expect(indexer.getFileFromLink('note3')).toBe(files[2].path);
+
+      // Test that paths without .md extension also work
+      expect(indexer.getFileFromLink('folder1/note1')).toBe(files[0].path);
+      expect(indexer.getFileFromLink('folder2/subfolder/note2')).toBe(files[1].path);
+    });
+
+    it('should handle files with same basenames in different folders', async () => {
+      // Create test files with same basenames in different folders
+      const files = [
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'folder1/note.md'),
+          content: '# Note in folder1'
+        },
+        {
+          path: path.join(TEST_RESOURCES_DIR, 'folder2/note.md'),
+          content: '# Note in folder2'
+        }
+      ];
+
+      // Create the directory structure and files
+      for (const file of files) {
+        await fs.mkdir(path.dirname(file.path), { recursive: true });
+        await fs.writeFile(file.path, file.content);
+      }
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+
+      // Index each file
+      for (const file of files) {
+        await indexer.indexFileByPath(file.path);
+      }
+
+      // Test that full paths map correctly
+      expect(indexer.getFileFromLink('folder1/note')).toBe(files[0].path);
+      expect(indexer.getFileFromLink('folder2/note')).toBe(files[1].path);
+
+      // Test that basename maps to one of the files (implementation dependent)
+      const noteResult = indexer.getFileFromLink('note');
+      expect([files[0].path, files[1].path]).toContain(noteResult);
+    });
+
+    it('should handle links with and without .md extension', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'test-note.md');
+      await fs.writeFile(testFilePath, '# Test Note\nSome content');
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await indexer.indexFileByPath(testFilePath);
+
+      // Both with and without .md extension should work
+      expect(indexer.getFileFromLink('test-note')).toBe(testFilePath);
+      expect(indexer.getFileFromLink('test-note.md')).toBe(testFilePath);
+    });
+
+    it('should update linkToFileMap when files are removed', async () => {
+      const testFilePath = path.join(TEST_RESOURCES_DIR, 'to-remove.md');
+      await fs.writeFile(testFilePath, '# Test Note\nSome content');
+
+      await indexer.initialize(TEST_RESOURCES_DIR, ['**/*.md'], [], [], false);
+      await indexer.indexFileByPath(testFilePath);
+
+      // Verify file is mapped
+      expect(indexer.getFileFromLink('to-remove')).toBe(testFilePath);
+
+      // Remove file from index
+      indexer.removeFromIndex(testFilePath);
+
+      // Verify mapping is removed
+      expect(indexer.getFileFromLink('to-remove')).toBeNull();
+    });
+  });
 }); 

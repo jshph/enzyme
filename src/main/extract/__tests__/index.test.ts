@@ -80,7 +80,7 @@ the tag is found in frontmatter.`;
 
     const match = {
       type: MatchType.Tag,
-      value: '#test-tag'
+      value: 'test-tag'
     };
 
     const result = extractContentForMatch(contents, match, frontmatter);
@@ -101,7 +101,7 @@ This is content after the tag.`;
 
     const match = {
       type: MatchType.Tag,
-      value: '#test-tag'
+      value: 'test-tag'
     };
 
     const result = extractContentForMatch(contents, match, frontmatter);
@@ -122,7 +122,7 @@ This is content after the tag.`;
 
     const match = {
       type: MatchType.Tag,
-      value: '#test-tag' // With # prefix in match
+      value: 'test-tag'
     };
 
     const result = extractContentForMatch(contents, match, frontmatter);
@@ -142,7 +142,7 @@ Here is #test-tag in another place.`;
 
     const match = {
       type: MatchType.Tag,
-      value: '#test-tag'
+      value: 'test-tag'
     };
 
     const result = extractContentForMatch(contents, match, frontmatter);

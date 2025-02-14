@@ -284,8 +284,6 @@ export class FileIndexer {
 
           const { content, stats, frontmatter, tags, links } = await this.getFileData(file);
           
-          this.linkToFileMap.set(path.basename(file), file);
-          
           const isIncluded = await this.shouldIncludeFile(file);
 
           if (isIncluded) {
@@ -373,7 +371,8 @@ export class FileIndexer {
   }
 
   public getFileFromLink(link: string): string | null {
-    const cleanLink = link.replace(/\[\[|\]\]/g, '');
+    // Remove any .md extension from the link if present
+    const cleanLink = link.replace(/\.md$/, '');
     return this.linkToFileMap.get(cleanLink) || null;
   }
 
@@ -532,17 +531,14 @@ export class FileIndexer {
     try {
       // Create variations of the file path for links
       const basePath = filePath.replace(/\.md$/, '');
+      const relativePath = this.vaultPath ? path.relative(this.vaultPath, basePath) : basePath;
+      const basename = path.basename(basePath);
 
       // Only index links that are .md files
       if (filePath.toLowerCase().endsWith('.md')) {
-        const linkVariations = [
-          basePath, // The whole file path
-          path.basename(basePath), // The file name by itself
-        ];
-
-        linkVariations.forEach(variation => {
-          this.linkToFileMap.set(variation, filePath);
-        });
+        // Map both the basename and the full relative path
+        this.linkToFileMap.set(basename, filePath);
+        this.linkToFileMap.set(relativePath, filePath);
       }
 
       // Extract metadata
@@ -561,11 +557,18 @@ export class FileIndexer {
       this.processedFiles++;
 
     } catch (error) {
-      // console.error(`Error indexing file ${filePath}:`, error);
+      this.logger.error(`Error indexing file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   private removeFromIndex(filePath: string): void {
+    // First find and remove all keys in linkToFileMap that point to this file
+    for (const [key, value] of this.linkToFileMap.entries()) {
+      if (value === filePath) {
+        this.linkToFileMap.delete(key);
+      }
+    }
+
     const removeFromMap = (map: Map<string, IndexEntry>) => {
       for (const [key, entry] of map.entries()) {
         entry.files = entry.files.filter(f => f.path !== filePath);
@@ -684,10 +687,15 @@ export class FileIndexer {
     });
   }
 
-  // Extracts links from the content using regex and returns the link without the brackets
   private extractMarkdownLinks(content: string): string[] {
     const links = content.match(/\[\[(.*?)\]\]/g) || [];
-    return [...new Set(links.map(link => link.slice(2, -2)))];
+    return [...new Set(links.map(link => {
+      // Remove the brackets
+      const innerLink = link.slice(2, -2);
+      // Handle aliases by taking the part before |
+      const parts = innerLink.split('|');
+      return parts[0].trim();
+    }))];
   }
 
   private updateTagIndex(metadata: FileMetadata): void {
@@ -723,19 +731,32 @@ export class FileIndexer {
   }
 
   private updateLinkIndex(metadata: FileMetadata): void {
-    metadata.links.forEach(link => {
-      const path = this.getFileFromLink(link);
-      if (!path) return;
-      if (this.excludedPatterns.some(regex => this.matchPattern(path, regex))) {
-        return;
+    // First, get any existing entry for this file to remove old links
+    for (const [oldLink, entry] of this.linkIndex.entries()) {
+      // Remove this file from the entry
+      entry.files = entry.files.filter(f => f.path !== metadata.path);
+      
+      // If no more files reference this link, remove it from both index and set
+      if (entry.files.length === 0) {
+        this.linkIndex.delete(oldLink);
+        this.linkSet.delete(oldLink);
+      } else {
+        this.linkIndex.set(oldLink, entry);
       }
+    }
+
+    // Now add the new links
+    metadata.links.forEach(link => {
       const entry = this.linkIndex.get(link) || { files: [] };
       entry.files = entry.files.filter(f => f.path !== metadata.path);
       entry.files.push(metadata);
+      
+      // Sort by creation date
       entry.files.sort((a, b) => {
         if (!a.createdAt || !b.createdAt) return 0;
         return b.createdAt.getTime() - a.createdAt.getTime();
       });
+      
       this.linkIndex.set(link, entry);
       this.linkSet.add(link);
     });
