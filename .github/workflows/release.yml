@@ -108,6 +108,10 @@ jobs:
       - name: Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Explicitly disable Windows code signing
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          WIN_CSC_LINK: ''
+          CSC_FOR_WIN_AUTO_DISCOVERY: false
           # Mac-specific variables
           CSC_LINK: ${{ matrix.platform == 'mac' && secrets.BUILD_CERTIFICATE_BASE64 || '' }}
           CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.P12_PASSWORD || '' }}
@@ -117,8 +121,6 @@ jobs:
           NOTARIZE_APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
           NOTARIZE_APPLE_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           NOTARIZE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
-          # Disable Windows code signing
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform != 'win' }}
         run: |
           pnpm run build
           pnpm run build:${{ matrix.platform }}

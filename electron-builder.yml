@@ -21,6 +21,10 @@ win:
   signingHashAlgorithms: null
   certificateFile: null
   certificatePassword: null
+  publisherName: null
+  verifyUpdateCodeSignature: false
+  signAndEditExecutable: false
+  signDlls: false
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
