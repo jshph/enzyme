@@ -96,7 +96,6 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm
           sudo apt-get install -y --no-install-recommends \
             libopenjp2-tools \
             rpm \
@@ -105,10 +104,6 @@ jobs:
             ruby-dev \
             gcc \
             make
-          # Install snapcraft via snap
-          sudo snap install snapcraft --classic
-          # Required for snapcraft to work in CI
-          sudo chown root:root /
 
       - name: Build
         env:
@@ -124,8 +119,6 @@ jobs:
           NOTARIZE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
           # Disable Windows code signing
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform != 'win' }}
-          # Linux-specific variables
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
         run: |
           pnpm run build
           pnpm run build:${{ matrix.platform }}

@@ -46,7 +46,6 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
   maintainer: Joshua Pham
   category: Utility
