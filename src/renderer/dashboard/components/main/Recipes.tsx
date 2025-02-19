@@ -4,14 +4,14 @@ import RecipeBuilder from "./recipes/RecipeBuilder.js";
 import ScheduledRecipes from "./recipes/ScheduledRecipes.js";
 
 const Recipes: React.FC<{ currentView: string, setCurrentView: (view: string) => void }> = ({ currentView, setCurrentView }) => {
-  const { isAuthenticated } = useAuth();
+  // const { isAuthenticated } = useAuth();
 
   return (
     <div className="space-y-6">
       <RecipeBuilder currentView={currentView} setCurrentView={setCurrentView} />
 
       {/* Only show scheduled recipes for authenticated users */}
-      {isAuthenticated && <ScheduledRecipes currentView={currentView} />}
+      {/* {isAuthenticated && <ScheduledRecipes currentView={currentView} />} */}
     </div>
   );
 }
