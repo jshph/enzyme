@@ -728,6 +728,10 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
               className="flex flex-wrap gap-2 text-xs"
             >
               {[...trendingData.tags, ...trendingData.links].map((ingredient: Ingredient, index) => {
+                const displayName = ingredient.type === 'tag' && !ingredient.name.startsWith('#')
+                  ? `#${ingredient.name}`
+                  : ingredient.name;
+                
                 const selectedEntity = selectedEntities.get(ingredient.name);
                 const isSelected = !!selectedEntity;
                 const isBeingDragged = isDragging && draggedEntity?.name === ingredient.name;
@@ -769,7 +773,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
                   >
                     <div className="flex items-center space-x-2">
                       <span>
-                        {ingredient.name}
+                        {displayName}
                       </span>
                         <div 
                           className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center

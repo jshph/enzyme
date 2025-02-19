@@ -196,10 +196,13 @@ export function extractContentForMatch(
 
   if (match.type === MatchType.Tag) {
     const frontMatterTags = frontmatter.tags || [];
-    if (frontMatterTags.some((tag: string) => tag.toLowerCase() === match.value.toLowerCase())) {
+    if (frontMatterTags.some((tag: string) => 
+      tag.toLowerCase() === match.value.toLowerCase() ||
+      tag.toLowerCase() === match.value.toLowerCase().replace(/^#/, '')
+    )) {
       extractedContents.push(contents);
     } else {
-      extractedContents.push(...getLassoContext(contents, match.value, 250));
+      extractedContents.push(...getLassoContext(contents, `#${match.value}`, 250));
     }
   } else {
     getLassoContext(contents, match.value, 250).forEach(context => {
@@ -241,12 +244,13 @@ export async function extractPatterns(
 
     const { frontmatter, contents } = fileContent;
 
-    // Extract tags from file contents and normalize them (remove # prefix)
-    const fileTags = (contents.match(/#[\w-\/]+/g) || [])
-      .map(tag => tag.slice(1)); // Remove # prefix
-
-    // Get frontmatter tags (already normalized in readFilesInBatch)
-    const frontmatterTags = frontmatter.tags || [];
+    // Extract tags from file contents while preserving # prefix
+    const fileTags = (contents.match(/#[\w-\/]+/g) || []);
+    
+    // Get frontmatter tags and add # prefix if missing
+    const frontmatterTags = (frontmatter.tags || []).map((tag: string) => 
+      tag.startsWith('#') ? tag : `#${tag}`
+    );
 
     // Combine all tags
     const augmentedTags = [...new Set([...frontmatterTags, ...fileTags])];

@@ -351,11 +351,15 @@ function renderNodes(
           if (d.type === 'mention') {
             return selectedMentionDocCounts.has(d.id) ? 1 : 0.3;
           }
-          // Text opacity will be updated in updateDocCountForMention
           return 0.05;
         });
 
-      const words = d.name.split(' ');
+      // For tag mentions, ensure # prefix is displayed
+      const displayName = d.type === 'mention' && !d.name.startsWith('#') && !d.name.startsWith('[[') 
+        ? `#${d.name}` 
+        : d.name;
+      
+      const words = displayName.split(' ');
       if (words.length > 7) {
         // Split into chunks of 5 words
         const chunkSize = 7;
@@ -373,7 +377,7 @@ function renderNodes(
         });
       } else {
         text.attr("dy", "0.35em")
-            .text(d.name);
+            .text(displayName);
       }
     });
   }
