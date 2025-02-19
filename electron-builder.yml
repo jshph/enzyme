@@ -17,6 +17,10 @@ asarUnpack:
   - resources/**
 win:
   executableName: Enzyme
+  sign: false
+  signingHashAlgorithms: null
+  certificateFile: null
+  certificatePassword: null
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

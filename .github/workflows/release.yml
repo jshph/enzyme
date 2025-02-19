@@ -92,6 +92,21 @@ jobs:
           # Clean up
           rm certificate.p12
 
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm snapcraft
+          sudo snap install snapcraft --classic
+          sudo apt-get install -y --no-install-recommends \
+            libopenjp2-tools \
+            rpm \
+            fakeroot \
+            dpkg \
+            ruby-dev \
+            gcc \
+            make
+
       - name: Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -106,6 +121,8 @@ jobs:
           NOTARIZE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
           # Disable Windows code signing
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform != 'win' }}
+          # Linux-specific variables
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
         run: |
           pnpm run build
           pnpm run build:${{ matrix.platform }}

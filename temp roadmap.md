@@ -122,6 +122,9 @@ implementation notes:
 
 TODO before launch
 
+- tags showing up on enzyme are duplicate of with hashtag and not. Fix that
+- make sure the built mac version displays the tag entities, idk what's happening with my local
+
 - clear log file on every restart
 
 - handle vault changes - should update trending data
