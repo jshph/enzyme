@@ -36,8 +36,8 @@ jobs:
             platform: mac
           - os: ubuntu-latest
             platform: linux
-          - os: windows-latest
-            platform: win
+          # - os: windows-latest
+          #   platform: win
     
     runs-on: ${{ matrix.os }}
     
