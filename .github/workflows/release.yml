@@ -11,10 +11,33 @@ permissions:
   packages: write
 
 jobs:
-  release:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          draft: true
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
+
+  build:
+    needs: create-release
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
     
     runs-on: ${{ matrix.os }}
     
@@ -49,9 +72,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # Code signing setup for macOS
       - name: Install the Apple certificate
-        if: matrix.os == 'macos-latest'
+        if: matrix.platform == 'mac'
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
@@ -70,40 +92,28 @@ jobs:
           # Clean up
           rm certificate.p12
 
-      # Build and release
-      - name: Build and release macOS
-        if: matrix.os == 'macos-latest'
+      - name: Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Mac-specific variables
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.BUILD_CERTIFICATE_BASE64 || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.P12_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
+          NOTARIZE_APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
+          NOTARIZE_APPLE_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          NOTARIZE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
         run: |
           pnpm run build
-          pnpm run build:mac
+          pnpm run build:${{ matrix.platform }}
 
-      - name: Build and release Linux
-        if: matrix.os == 'ubuntu-latest'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pnpm run build
-          pnpm run build:linux
-
-      - name: Build and release Windows
-        if: matrix.os == 'windows-latest'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pnpm run build
-          pnpm run build:win
-
-      - name: Release
+      - name: Upload artifacts
         uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          draft: false
+          draft: true
           files: |
             dist/*.dmg
             dist/latest-mac.yml
@@ -114,5 +124,14 @@ jobs:
             dist/*.AppImage
             dist/*.snap
             dist/latest-linux.yml
+
+  publish-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          draft: false 
