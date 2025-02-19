@@ -96,8 +96,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm snapcraft
-          sudo snap install snapcraft --classic
+          sudo apt-get install -y rpm
           sudo apt-get install -y --no-install-recommends \
             libopenjp2-tools \
             rpm \
@@ -106,6 +105,10 @@ jobs:
             ruby-dev \
             gcc \
             make
+          # Install snapcraft via snap
+          sudo snap install snapcraft --classic
+          # Required for snapcraft to work in CI
+          sudo chown root:root /
 
       - name: Build
         env:
