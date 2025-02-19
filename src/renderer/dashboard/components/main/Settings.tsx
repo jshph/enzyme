@@ -30,9 +30,7 @@ const Settings: React.FC = () => {
       setError(false);
       
       setTimeout(() => {
-        if (saveState === 'saved') {
-          setSaveState('idle');
-        }
+        setSaveState('idle');
       }, 2000);
     } catch (err) {
       setSaveState('error');
@@ -41,9 +39,7 @@ const Settings: React.FC = () => {
       console.error('Error saving settings:', err);
       
       setTimeout(() => {
-        if (saveState === 'error') {
-          setSaveState('idle');
-        }
+        setSaveState('idle');
       }, 3000);
     }
   };
@@ -166,17 +162,18 @@ const Settings: React.FC = () => {
           <div className="flex space-x-4 pt-4">
             <button 
               onClick={handleSave}
-              className={`bg-brand/80 text-primary/90 px-4 py-2 rounded-md hover:bg-brand/90 transition-colors duration-200 text-sm ${
-                !hasChanges() || saveState === 'saving' ? 'opacity-30 cursor-not-allowed' : ''
+              className={`bg-brand/80 text-primary/90 px-4 py-2 rounded-md transition-colors duration-200 text-sm ${
+                !hasChanges() || saveState === 'saving' ? 'opacity-30 cursor-not-allowed' : 
+                saveState === 'saved' ? 'opacity-30 cursor-not-allowed bg-green-500/80' :
+                'hover:bg-brand/90'
               }`}
-              disabled={!hasChanges() || saveState === 'saving'}
+              disabled={!hasChanges() || saveState === 'saving' || saveState === 'saved'}
             >
               <span>
-                {!hasChanges() ? 'No changes to save' :
-                saveState === 'saving' ? 'Saving...' : 
-                saveState === 'saved' ? 'Saved!' :
-                saveState === 'error' ? 'Error!' :
-                'Save Settings'}
+                {saveState === 'saving' ? 'Saving...' : 
+                 saveState === 'saved' ? 'Saved!' :
+                 saveState === 'error' ? 'Error!' :
+                 hasChanges() ? 'Save Settings' : 'No Changes'}
               </span>
             </button>
           </div>
