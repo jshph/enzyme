@@ -14,7 +14,7 @@ jobs:
   release:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
     
     runs-on: ${{ matrix.os }}
     
@@ -85,6 +85,10 @@ jobs:
       - name: Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Explicitly disable Windows code signing
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          WIN_CSC_LINK: ''
+          CSC_FOR_WIN_AUTO_DISCOVERY: false
           # Mac-specific variables
           CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.BUILD_CERTIFICATE_BASE64 || '' }}
           CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.P12_PASSWORD || '' }}
@@ -96,7 +100,7 @@ jobs:
           NOTARIZE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         run: |
           pnpm run build
-          pnpm run build:${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}
+          pnpm run build:${{ matrix.os == 'macos-latest' && 'mac' || matrix.os == 'windows-latest' && 'win' || 'linux' }}
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -108,6 +112,8 @@ jobs:
             ${{ matrix.os == 'macos-latest' && 'dist/latest-mac.yml' || '' }}
             ${{ matrix.os == 'macos-latest' && 'dist/*.zip' || '' }}
             ${{ matrix.os == 'macos-latest' && 'dist/*.blockmap' || '' }}
+            ${{ matrix.os == 'windows-latest' && 'dist/*.exe' || '' }}
+            ${{ matrix.os == 'windows-latest' && 'dist/latest.yml' || '' }}
             ${{ matrix.os == 'ubuntu-latest' && 'dist/*.AppImage' || '' }}
             ${{ matrix.os == 'ubuntu-latest' && 'dist/*.snap' || '' }}
             ${{ matrix.os == 'ubuntu-latest' && 'dist/latest-linux.yml' || '' }}

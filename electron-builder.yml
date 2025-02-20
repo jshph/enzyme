@@ -17,19 +17,15 @@ asarUnpack:
   - resources/**
 win:
   executableName: Enzyme
+  target: 
+    - target: nsis
+      arch: [x64]
+  artifactName: "${productName}-${version}-setup.${ext}"
   sign: false
-  signingHashAlgorithms: null
-  certificateFile: null
-  certificatePassword: null
-  publisherName: null
   verifyUpdateCodeSignature: false
-  signAndEditExecutable: false
-  signDlls: false
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
+  oneClick: true
+  perMachine: false
 mac:
   category: public.app-category.developer-tools
   hardenedRuntime: true
