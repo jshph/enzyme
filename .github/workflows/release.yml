@@ -28,6 +28,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
 
   release:
+    needs: create-release
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
