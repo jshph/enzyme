@@ -87,7 +87,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Explicitly disable Windows code signing
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          WIN_CSC_LINK: ''
           CSC_FOR_WIN_AUTO_DISCOVERY: false
           # Mac-specific variables
           CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.BUILD_CERTIFICATE_BASE64 || '' }}
