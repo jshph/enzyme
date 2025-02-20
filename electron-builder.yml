@@ -18,7 +18,7 @@ asarUnpack:
 win:
   executableName: Enzyme
   target: 
-    - target: nsis
+    - target: portable
       arch: [x64]
   artifactName: "${productName}-${version}-setup.${ext}"
   sign: false
