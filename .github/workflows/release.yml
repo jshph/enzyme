@@ -11,24 +11,7 @@ permissions:
   packages: write
 
 jobs:
-  # First job: Create the release
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          draft: true
-          name: Release ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
-
   release:
-    needs: create-release
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
@@ -118,7 +101,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          draft: true
+          draft: false
           tag_name: ${{ github.ref_name }}
           files: |
             ${{ matrix.os == 'macos-latest' && 'dist/*.dmg' || '' }}
@@ -129,15 +112,4 @@ jobs:
             ${{ matrix.os == 'ubuntu-latest' && 'dist/*.snap' || '' }}
             ${{ matrix.os == 'ubuntu-latest' && 'dist/latest-linux.yml' || '' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-release:
-    needs: release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish Release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          draft: false 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
