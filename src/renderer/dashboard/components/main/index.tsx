@@ -6,9 +6,10 @@ import Login from './Login.js'
 interface MainProps {
   currentView: string;
   setCurrentView: (view: string) => void;
+  isVaultInitialized?: boolean;
 }
 
-const Main: React.FC<MainProps> = ({ currentView, setCurrentView }) => {
+const Main: React.FC<MainProps> = ({ currentView, setCurrentView, isVaultInitialized }) => {
   return (
     <div className="flex-1 ml-64 min-h-screen overflow-y-auto bg-surface/70">
       <div className="p-8 rounded-lg h-screen">

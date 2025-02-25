@@ -20,24 +20,6 @@ let mainWindow: BrowserWindow | null = null;
 const serverContext = new ServerContext();
 const DEFAULT_PORT = 3000;
 
-// Function to open the chat UI in a browser
-function openChatUI() {
-  logger.info('Opening chat UI in browser');
-  const port = store.get('localSettings.port', DEFAULT_PORT);
-  
-  // Check if we're in development mode
-  const isDev = !app.isPackaged;
-  
-  if (isDev) {
-    // In development, open the Vite dev server URL
-    const viteUrl = process.env.VITE_ELECTRON_RENDERER_URL || 'http://localhost:5173';
-    shell.openExternal(`${viteUrl}/chat.html`);
-  } else {
-    // In production, open the Express server URL
-    shell.openExternal(`http://localhost:${port}/chat`);
-  }
-}
-
 // Add this helper at the top of your file
 const getPlatform = () => {
   logger.debug('Detecting platform...', {
@@ -166,10 +148,6 @@ function initializeMain() {
     createWindow();
   });
 
-  ipcMain.on('open-chat-ui', () => {
-    openChatUI();
-  });
-
   setupDashboard();
   setupIPC();
   logger.info('Main initialization completed');
@@ -243,8 +221,8 @@ function createWindow(): void {
       return { action: 'deny' }
     })
 
-    // mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
-    mainWindow.loadURL(import.meta.env.VITE_ELECTRON_RENDERER_URL + '/dashboard.html')
+    mainWindow.loadFile(fileURLToPath(new URL("../renderer/dashboard.html", import.meta.url)))
+    // mainWindow.loadURL(import.meta.env.VITE_ELECTRON`_RENDERER_URL + '/dashboard.html')
 
 
     // Add this event handler

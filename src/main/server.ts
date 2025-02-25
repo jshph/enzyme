@@ -158,15 +158,14 @@ export class ServerContext {
         message: 'Chat API is available',
         endpoints: {
           chat: '/api/chat',
-          models: '/api/models',
           health: '/api/health'
         }
       });
     });
     
-    // Proxy endpoint for forwarding requests to port 11434
+    // API endpoint for local processing
     app.post('/api/chat', (async (req: express.Request, res: express.Response) => {
-      const { messages, model } = req.body;
+      const { messages } = req.body;
       
       if (!messages || !Array.isArray(messages)) {
         res.status(400).json({ error: "Messages array is required" });
@@ -174,61 +173,6 @@ export class ServerContext {
       }
       
       try {
-        // Check if we should use the external API
-        if (model && model !== 'default') {
-          this.logger.info(`Proxying request to external API with model: ${model}`);
-          
-          try {
-            // Get the last user message
-            const lastUserMessage = messages.filter(m => m.role === 'user').pop();
-            
-            if (!lastUserMessage) {
-              res.status(400).json({ error: "No user message found" });
-              return;
-            }
-            
-            // Format the request for Ollama API
-            // According to https://github.com/ollama/ollama/blob/main/docs/api.md
-            const ollamaRequest = {
-              model: model,
-              prompt: lastUserMessage.content,
-              stream: false,
-              options: {
-                temperature: 0.7,
-                top_p: 0.9,
-                top_k: 40
-              }
-            };
-            
-            // Forward the request to the Ollama API
-            const response = await axios.post('http://localhost:11434/api/generate', ollamaRequest, {
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            // Format the response for the Vercel AI SDK
-            return res.json({
-              role: 'assistant',
-              content: response.data.response || "No response from model"
-            });
-          } catch (error: any) {
-            this.logger.error(`Error proxying to Ollama API: ${error.message}`);
-            
-            if (error.response?.data?.error) {
-              this.logger.error(`Ollama API error: ${error.response.data.error}`);
-              return res.status(500).json({
-                role: 'assistant',
-                content: `Error from Ollama: ${error.response.data.error}`
-              });
-            }
-            
-            // Fall back to local processing if proxy fails
-            this.logger.info('Falling back to local processing');
-          }
-        }
-        
-        // If not using external API or if proxy failed, process locally
         // Get the last user message
         const lastUserMessage = messages.filter(m => m.role === 'user').pop();
         
@@ -251,13 +195,7 @@ export class ServerContext {
           responseContent = "I couldn't find any relevant information in your notes. Please try a different query.";
         }
         
-        // Log the model being used (if provided)
-        if (model && model !== 'default') {
-          this.logger.info(`Using model: ${model} for chat request`);
-          responseContent = `[Using model: ${model}]\n\n${responseContent}`;
-        }
-        
-        // Return the response in the format expected by the Vercel AI SDK
+        // Return the response in the format expected by the client
         res.json({
           role: 'assistant',
           content: responseContent
@@ -267,105 +205,6 @@ export class ServerContext {
         res.status(500).json({ error: "An error occurred while processing your request" });
       }
     }) as express.RequestHandler);
-    
-    // Generic proxy endpoint for any other requests to the external API
-    app.all('/proxy/:path(*)', (async (req: express.Request, res: express.Response) => {
-      const targetPath = req.params.path;
-      const targetUrl = `http://localhost:11434/${targetPath}`;
-      
-      this.logger.info(`Proxying request to: ${targetUrl}`);
-      
-      try {
-        const response = await axios({
-          method: req.method,
-          url: targetUrl,
-          data: req.method !== 'GET' ? req.body : undefined,
-          headers: {
-            'Content-Type': 'application/json',
-            ...req.headers as any
-          },
-          params: req.query
-        });
-        
-        // Set response headers
-        Object.entries(response.headers).forEach(([key, value]) => {
-          res.setHeader(key, value as string);
-        });
-        
-        // Send response
-        res.status(response.status).send(response.data);
-      } catch (error: any) {
-        this.logger.error(`Error proxying request: ${error.message}`);
-        
-        if (error.response) {
-          // Forward the error response from the target server
-          res.status(error.response.status).send(error.response.data);
-        } else {
-          res.status(500).json({ 
-            error: "Failed to proxy request", 
-            message: error.message 
-          });
-        }
-      }
-    }) as express.RequestHandler);
-    
-    // Specific endpoint for fetching available models from Ollama
-    app.get('/api/models', (async (req: express.Request, res: express.Response) => {
-      try {
-        // Forward the request to the Ollama API
-        const response = await axios.get('http://localhost:11434/api/tags', {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        // Return the response from the Ollama API
-        return res.json(response.data);
-      } catch (error: any) {
-        this.logger.error(`Error fetching models from Ollama API: ${error.message}`);
-        
-        // Return an empty list if the request fails
-        if (error.response) {
-          // Forward the error response from Ollama
-          res.status(error.response.status).send(error.response.data);
-        } else {
-          res.status(500).json({ 
-            error: "Failed to fetch models", 
-            message: error.message,
-            models: [] 
-          });
-        }
-      }
-    }) as express.RequestHandler);
-  
-    // Serve the chat UI
-    app.use('/chat', (req, res, next) => {
-      // Check if we're in development mode
-      const isDev = !electronApp.isPackaged;
-      
-      if (isDev) {
-        // In development, proxy to the Vite dev server
-        const viteUrl = process.env.VITE_ELECTRON_RENDERER_URL || 'http://localhost:5173';
-        res.redirect(`${viteUrl}/chat.html`);
-      } else {
-        // In production, serve static files
-        express.static(path.join(electronApp.getAppPath(), 'out/renderer'))(req, res, next);
-      }
-    });
-    
-    // Redirect to chat UI
-    app.get('/chat', (req, res) => {
-      const isDev = !electronApp.isPackaged;
-      
-      if (isDev) {
-        // In development, proxy to the Vite dev server
-        const viteUrl = process.env.VITE_ELECTRON_RENDERER_URL || 'http://localhost:5173';
-        res.redirect(`${viteUrl}/chat.html`);
-      } else {
-        // In production, serve the chat.html file
-        res.sendFile(path.join(electronApp.getAppPath(), 'out/renderer/chat.html'));
-      }
-    });
   
     server = app.listen(port, () => {
       this.logger.info(`Context server listening at http://localhost:${port}`);

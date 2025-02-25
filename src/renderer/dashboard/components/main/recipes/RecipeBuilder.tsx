@@ -6,8 +6,9 @@ import { useAuth } from '../../../contexts/AuthContext.js';
 import { GraphView, GraphViewRef } from "../../GraphView.js";
 import path from 'path';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Info, ArrowUpRight } from 'lucide-react';
+import { Info, ArrowUpRight, ChevronDown } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import { ChatModal } from '../../../../chat/ChatModal.js';
 
 interface SelectedEntity {
   type: 'tag' | 'link';
@@ -87,6 +88,26 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   
   const [isOutputExpanded, setIsOutputExpanded] = useState(false);
 
+  // Add new state for chat modal
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // Add a ref for the dropdown
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Add click-away handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Add this helper function to keep selectedIdsRef in sync
   const updateSelectedEntity = useCallback((name: string, doAdd: boolean) => {
@@ -665,6 +686,57 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
     };
   }, []);
 
+  // Add function to open chat modal
+  const openChatModal = async () => {
+    // Only fetch context if we have selected entities and don't already have context
+    if (selectedEntities.size > 0 && generationContextRef.current.length === 0) {
+      try {
+        // Use the same query format as in submitPrompt
+        const query = makeQuery();
+        const context = await window.electron.ipcRenderer.invoke('get-context', query);
+        
+        if (context.length > 0) {
+          // Store the context in the ref for use by the ChatModal
+          generationContextRef.current = context;
+        } else {
+          console.warn('No context found for selected entities');
+        }
+      } catch (error) {
+        console.error('Error fetching context for chat:', error);
+      }
+    }
+    
+    // Open the modal regardless of whether we successfully fetched context
+    setIsChatModalOpen(true);
+    setShowDropdown(false);
+  };
+
+  // Add effect to close modals and dropdowns when view changes
+  useEffect(() => {
+    setShowDropdown(false);
+    setIsChatModalOpen(false);
+  }, [currentView]);
+
+  // Add state for dropdown position
+  const [dropdownPosition, setDropdownPosition] = useState<'top' | 'bottom'>('bottom');
+
+  // Add effect to determine dropdown position
+  useEffect(() => {
+    if (showDropdown && dropdownRef.current) {
+      const buttonRect = dropdownRef.current.parentElement?.getBoundingClientRect();
+      const dropdownHeight = dropdownRef.current.offsetHeight || 40; // Get actual height or use estimate
+      
+      if (buttonRect) {
+        const spaceBelow = window.innerHeight - buttonRect.bottom;
+        if (spaceBelow < dropdownHeight + 20) { // Add more buffer space
+          setDropdownPosition('top');
+        } else {
+          setDropdownPosition('bottom');
+        }
+      }
+    }
+  }, [showDropdown]);
+
   return (
     <>
       <div
@@ -856,30 +928,85 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
                     </select>
                   </div>
 
-                  <button
-                    disabled={
-                      !hasVaultInitialized || 
-                      !isIndexerReady ||
-                      (selectedEntities.size === 0 && generationsRemaining > 0) || 
-                      generationState.status === 'generating' || 
-                      generationState.status === 'awaiting_first_token'
-                    }
-                    className={`
-                      bg-brand/40 py-2.5 px-4 text-sm rounded-md shadow-md 
-                      cursor-pointer hover:bg-brand/60 transition-colors font-medium 
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
-                    `}
-                    onClick={generationsRemaining <= 0 && !isAuthenticated ? switchToLogin : submitPrompt}
-                  >
-                    {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
-                      !isAuthReady ? 'Checking Authentication...' :
-                      generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
-                        ? 'Generating...' : 
-                      generationsRemaining > 0 || isAuthenticated ? 
-                        `Generate Recipe` : 
-                        'Login to generate more recipes'}
-                  </button>
+                  <div className="relative">
+                    <div className="flex items-center">
+                      <button
+                        disabled={
+                          !hasVaultInitialized || 
+                          !isIndexerReady ||
+                          (selectedEntities.size === 0 && generationsRemaining > 0) || 
+                          generationState.status === 'generating' || 
+                          generationState.status === 'awaiting_first_token'
+                        }
+                        className={`
+                          bg-brand/40 py-2.5 px-4 text-sm rounded-l-md shadow-md 
+                          cursor-pointer hover:bg-brand/60 transition-colors font-medium 
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
+                        `}
+                        onClick={generationsRemaining <= 0 && !isAuthenticated ? switchToLogin : submitPrompt}
+                      >
+                        {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
+                          !isAuthReady ? 'Checking Authentication...' :
+                          generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
+                            ? 'Generating...' : 
+                          generationsRemaining > 0 || isAuthenticated ? 
+                            `Generate Recipe` : 
+                            'Login to generate more recipes'}
+                      </button>
+                      
+                      <button
+                        onClick={() => setShowDropdown(!showDropdown)}
+                        disabled={
+                          !hasVaultInitialized || 
+                          !isIndexerReady ||
+                          selectedEntities.size === 0 || 
+                          generationState.status === 'generating' || 
+                          generationState.status === 'awaiting_first_token'
+                        }
+                        className={`
+                          bg-brand/40 py-2.5 px-3 text-sm rounded-r-md shadow-md border-l border-brand/30
+                          cursor-pointer hover:bg-brand/60 transition-colors
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          flex items-center justify-center
+                        `}
+                      >
+                        <ChevronDown className="w-5 h-5" />
+                      </button>
+                    </div>
+                    
+                    {showDropdown && (
+                      <div 
+                        ref={dropdownRef}
+                        className={`absolute ${dropdownPosition === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 w-64 bg-surface rounded-md shadow-lg z-10 border border-primary/20`}
+                      >
+                        <div className="py-1">
+                          <button
+                            onClick={openChatModal}
+                            className="w-full text-left px-4 py-2 text-sm text-primary hover:bg-brand/20 rounded-md"
+                          >
+                            Start Local Chat Session
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowDropdown(false);
+                              submitPrompt();
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-primary hover:bg-brand/20 rounded-md"
+                            disabled={
+                              !hasVaultInitialized || 
+                              !isIndexerReady ||
+                              selectedEntities.size === 0 || 
+                              generationState.status === 'generating' || 
+                              generationState.status === 'awaiting_first_token'
+                            }
+                          >
+                            Generate Recipe
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {(suggestedOutputs?.[0] || generationState.status === 'generating') && !settings.mcpEnabled && (
                     <Tooltip.Provider>
@@ -981,6 +1108,14 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
           </div>
         </div>
       </div>
+      
+      {/* Chat Modal */}
+      <ChatModal 
+        isOpen={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+        selectedEntities={selectedEntities}
+        context={generationContextRef.current}
+      />
     </>
   )
 }

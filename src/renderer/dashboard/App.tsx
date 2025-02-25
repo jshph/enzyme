@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.js'
 import Main from './components/main/index.js'
 import { useAuth } from './contexts/AuthContext.js'
 import { RecipeExecutor } from './components/RecipeExecutor.js'
+import { ChatModal } from '../chat/ChatModal.js'
 
 interface AppState {
   isAppReady: boolean;
@@ -12,6 +13,7 @@ interface AppState {
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState('recipes')
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false)
   const [appState, setAppState] = useState<AppState>({ 
     isAppReady: false, 
     isVaultInitialized: false 
@@ -19,14 +21,38 @@ const AppContent: React.FC = () => {
   const { refreshSettings } = useSettingsContext()
   const { isAuthReady } = useAuth()
 
+  // Function to open the chat modal
+  const openChatModal = () => {
+    setIsChatModalOpen(true)
+  }
+
+  // Function to close the chat modal
+  const closeChatModal = () => {
+    setIsChatModalOpen(false)
+  }
+
   // Listen for app state updates
   useEffect(() => {
     // Get initial state
-    window.electron.ipcRenderer.getAppState().then(setAppState)
+    const getAppState = async () => {
+      try {
+        const state = await window.electron.ipcRenderer.invoke('get-app-state')
+        setAppState(state)
+      } catch (err) {
+        console.error('Failed to get app state:', err)
+      }
+    }
+    getAppState()
 
     // Set up subscription to state changes
-    const unsubscribe = window.electron.ipcRenderer.onAppStateChange(setAppState)
-    return () => unsubscribe()
+    const handleAppStateChange = (newState: AppState) => {
+      setAppState(newState)
+    }
+    
+    window.electron.ipcRenderer.on('app-state-update', handleAppStateChange)
+    return () => {
+      window.electron.ipcRenderer.removeListener('app-state-update', handleAppStateChange)
+    }
   }, [])
 
   // Initialize vault when app is ready and auth state is known
@@ -77,6 +103,7 @@ const AppContent: React.FC = () => {
           currentView={currentView}
           setCurrentView={setCurrentView}
           quitApp={quitApp}
+          openChatModal={openChatModal}
         />
         <Main 
           currentView={currentView}
@@ -86,6 +113,14 @@ const AppContent: React.FC = () => {
       </div>
       
       <RecipeExecutor />
+      
+      {/* Global chat modal that can be accessed from sidebar */}
+      <ChatModal 
+        isOpen={isChatModalOpen} 
+        onClose={closeChatModal}
+        selectedEntities={new Map()}
+        context={[]}
+      />
     </div>
   )
 }

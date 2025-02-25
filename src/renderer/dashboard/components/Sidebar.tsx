@@ -6,14 +6,11 @@ interface SidebarProps {
   currentView: string;
   setCurrentView: (view: string) => void;
   quitApp: () => Promise<void>;
+  openChatModal?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp, openChatModal }) => {
   const { isAuthenticated, email, handleLogout } = useAuth();
-
-  const openChatUI = () => {
-    window.electron.ipcRenderer.send('open-chat-ui');
-  };
 
   return (
     <div className="w-64 bg-surface shadow-lg fixed h-screen draggable">
@@ -31,12 +28,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp 
               }`}
           >
               <span className="ml-2">Settings</span>
-          </a>
-
-          <a onClick={openChatUI} 
-              className="flex items-center px-4 py-3 cursor-pointer hover:bg-input text-sm text-primary">
-              <MessageSquare className="h-4 w-4 text-brand" />
-              <span className="ml-2">Chat UI</span>
           </a>
 
           {!isAuthenticated && (

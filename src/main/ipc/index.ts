@@ -11,6 +11,7 @@ import { setupVaultIPCRoutes } from './vault.js';
 import { setupSpaceRoutes } from './space.js';
 import { setupRecipeRoutes } from './recipe.js';
 import { setupUserIPCRoutes } from "./user.js";
+import { setupChatIPCRoutes } from "./chat.js";
 import nodeMachineId from 'node-machine-id';
 import { initializeLogger } from '../utils/logger.js';
 
@@ -143,13 +144,11 @@ export function setupIPC() {
     }
   });
   
-
-
-
   setupAuthIPCRoutes();
   setupDigestIPCRoutes();
   setupVaultIPCRoutes();
-  setupUserIPCRoutes();
   setupSpaceRoutes();
   setupRecipeRoutes();
+  setupUserIPCRoutes();
+  setupChatIPCRoutes();
 }

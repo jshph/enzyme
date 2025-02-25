@@ -36,7 +36,9 @@ interface AppState {
           return () => {
             ipcRenderer.removeListener('app-state-update', subscription)
           }
-        }
+        },
+        quitApp: () => ipcRenderer.send('quit-app'),
+        openDashboard: () => ipcRenderer.send('open-dashboard'),
       }
     })
   } catch (error) {
