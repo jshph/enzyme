@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ChatApp } from './ChatApp.js';
-import './ChatApp.css';
+import '../index.css'; // Import Tailwind CSS
 
 // Create root outside of render function to preserve it between HMR updates
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);

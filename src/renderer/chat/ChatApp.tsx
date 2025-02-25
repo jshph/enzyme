@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useChat } from 'ai/react';
-import './ChatApp.css';
 
 interface OllamaModel {
   name: string;
@@ -232,18 +231,18 @@ export function ChatApp() {
   const isCurrentlyLoading = selectedModel === 'default' ? isLoading : isOllamaLoading;
 
   return (
-    <div className="chat-container">
-      <div className="chat-header">
-        <h1>Enzyme Chat</h1>
-        <p>Ask questions about your notes and documents</p>
+    <div className="flex flex-col h-screen max-w-4xl mx-auto font-sans">
+      <div className="text-center mb-6 pb-4 border-b border-gray-200">
+        <h1 className="m-0 text-2xl font-semibold text-gray-900">Enzyme Chat</h1>
+        <p className="mt-2 text-gray-500 text-sm">Ask questions about your notes and documents</p>
         
-        <div className="model-selector">
-          <label htmlFor="model-select">Model:</label>
+        <div className="flex items-center justify-center mt-3 gap-2">
+          <label htmlFor="model-select" className="text-sm text-gray-500">Model:</label>
           <select 
             id="model-select" 
             value={selectedModel} 
             onChange={handleModelChange}
-            className="model-select"
+            className="py-1.5 px-3 rounded-md border border-gray-300 bg-white text-sm text-gray-900 outline-none transition-colors focus:border-blue-600 focus:shadow-outline-blue disabled:opacity-70 disabled:cursor-not-allowed"
             disabled={isCurrentlyLoading}
           >
             <option value="default">Default (Local Processing)</option>
@@ -264,20 +263,20 @@ export function ChatApp() {
           
           <button 
             onClick={handleRefreshModels} 
-            className="refresh-button"
+            className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 bg-white text-base text-gray-500 cursor-pointer transition-all hover:bg-gray-100 hover:text-blue-600 focus:border-blue-600 focus:shadow-outline-blue focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed"
             disabled={isLoadingModels || isCurrentlyLoading}
             title="Refresh models list"
           >
             ↻
           </button>
           
-          <label htmlFor="port-input" className="ml-4">Port:</label>
+          <label htmlFor="port-input" className="ml-4 text-sm text-gray-500">Port:</label>
           <input
             id="port-input"
             type="number"
             value={port}
             onChange={(e) => setPort(Number(e.target.value))}
-            className="port-input"
+            className="w-20 py-1.5 px-2 rounded-md border border-gray-300 bg-white text-sm text-gray-900 text-center outline-none transition-colors focus:border-blue-600 focus:shadow-outline-blue disabled:opacity-70 disabled:cursor-not-allowed"
             min="1"
             max="65535"
             disabled={isCurrentlyLoading}
@@ -285,17 +284,17 @@ export function ChatApp() {
         </div>
         
         {modelError && (
-          <div className="model-error">
+          <div className="mt-2 p-2 rounded-md bg-red-100 text-red-700 text-sm text-center">
             {modelError}
           </div>
         )}
         
         {serverStatus && (
-          <div className={serverStatus.includes('Error') ? 'model-error' : 'server-status'}>
+          <div className={`mt-2 p-2 rounded-md text-sm text-center flex items-center justify-center gap-2 ${serverStatus.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-50 text-green-700'}`}>
             {serverStatus}
             <button 
               onClick={() => setServerStatus(null)} 
-              className="close-button"
+              className="bg-transparent border-none text-xl leading-none p-0 cursor-pointer opacity-70 hover:opacity-100"
               title="Dismiss"
             >
               ×
@@ -303,17 +302,17 @@ export function ChatApp() {
           </div>
         )}
         
-        <div className="debug-controls">
+        <div className="flex justify-center mt-2 gap-2">
           <button 
             onClick={checkServerConnection} 
-            className="debug-button"
+            className="py-1.5 px-3 rounded-md border border-gray-300 bg-gray-100 text-xs text-gray-600 cursor-pointer transition-all hover:bg-gray-200 hover:text-gray-900"
             title="Check server connection"
           >
             Check Server
           </button>
           <button 
             onClick={checkOllamaConnection} 
-            className="debug-button"
+            className="py-1.5 px-3 rounded-md border border-gray-300 bg-gray-100 text-xs text-gray-600 cursor-pointer transition-all hover:bg-gray-200 hover:text-gray-900"
             title="Check Ollama connection"
           >
             Check Ollama
@@ -321,9 +320,9 @@ export function ChatApp() {
         </div>
       </div>
       
-      <div className="messages-container">
+      <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-4">
         {displayMessages.length === 0 ? (
-          <div className="empty-state">
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center p-8">
             <p>Start a conversation by typing a message below.</p>
             <p className="text-xs mt-2 text-gray-500">
               {selectedModel !== 'default' 
@@ -331,13 +330,13 @@ export function ChatApp() {
                 : 'Using default local processing'}
             </p>
             {availableModels.length > 0 && (
-              <div className="available-models">
+              <div className="mt-4 w-full max-w-md">
                 <p className="text-xs mt-2 font-medium">Available models:</p>
-                <ul className="model-list">
+                <ul className="list-none p-0 mt-2 flex flex-col gap-1">
                   {availableModels.map(model => (
-                    <li key={model.digest} className="model-item">
-                      <span className="model-name">{model.name}</span>
-                      <span className="model-size">{formatSize(model.size)}</span>
+                    <li key={model.digest} className="flex justify-between items-center p-1.5 rounded-md bg-gray-100 text-xs">
+                      <span className="font-medium text-gray-900">{model.name}</span>
+                      <span className="text-gray-500">{formatSize(model.size)}</span>
                     </li>
                   ))}
                 </ul>
@@ -348,30 +347,36 @@ export function ChatApp() {
           displayMessages.map(message => (
             <div 
               key={message.id} 
-              className={`message ${message.role === 'user' ? 'user-message' : 'assistant-message'}`}
+              className={`flex mb-4 animate-fadeIn ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >  
-              <div className="message-content">
+              <div 
+                className={`max-w-[80%] p-3 rounded-lg whitespace-pre-wrap break-words text-[0.9375rem] leading-6 ${
+                  message.role === 'user' 
+                    ? 'bg-blue-600 text-white rounded-tr-2xl rounded-tl-2xl rounded-bl-none' 
+                    : 'bg-gray-100 text-gray-900 rounded-tl-2xl rounded-tr-2xl rounded-br-none'
+                }`}
+              >
                 {message.content}
               </div>
             </div>
           ))
         )}
         {isCurrentlyLoading && (
-          <div className="message assistant-message">
-            <div className="message-content loading">
-              <div className="loading-dots">
-                <span></span>
-                <span></span>
-                <span></span>
+          <div className="flex justify-start mb-4">
+            <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none max-w-[80%] p-3">
+              <div className="flex gap-1 items-center justify-center h-6">
+                <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.32s]"></span>
+                <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.16s]"></span>
+                <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"></span>
               </div>
             </div>
           </div>
         )}
       </div>
       
-      <form onSubmit={handleFormSubmit} className="input-form">
+      <form onSubmit={handleFormSubmit} className="flex gap-2 py-4 border-t border-gray-200">
         <input
-          className="chat-input"
+          className="flex-1 py-3 px-4 rounded-lg border border-gray-300 text-[0.9375rem] outline-none transition-colors focus:border-blue-600 focus:shadow-outline-blue disabled:opacity-70 disabled:cursor-not-allowed"
           value={selectedModel === 'default' ? input : inputValue}
           onChange={handleInputValueChange}
           placeholder="Ask a question about your notes..."
@@ -379,7 +384,7 @@ export function ChatApp() {
         />
         <button 
           type="submit" 
-          className="send-button"
+          className="py-3 px-5 rounded-lg bg-blue-600 text-white border-none font-medium cursor-pointer transition-colors hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
           disabled={isCurrentlyLoading || (selectedModel === 'default' ? !input.trim() : !inputValue.trim())}
         >
           Send
