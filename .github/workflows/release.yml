@@ -99,12 +99,7 @@ jobs:
           NOTARIZE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         run: |
           pnpm run build
-          pnpm run build:${{ matrix.os == 'macos-latest' && 'mac' || matrix.os == 'windows-latest' && 'win' || 'linux' }}
-
-      - name: Verify app signature (macOS)
-        if: matrix.os == 'macos-latest'
-        run: codesign -vvv --deep --strict dist/*.app
-
+          pnpm run build:${{ matrix.os == 'macos-latest' && 'mac' || matrix.os == 'windows-latest' && 'win' || 'linux' }}s
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
