@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext.js';
-import { Info, MessageSquare } from 'lucide-react';
+import { Info, MessageSquare, Shield } from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
@@ -62,13 +62,22 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp,
       )}
 
       <div className="absolute bottom-0 left-0 w-full p-4 border-t border-input bg-surface no-drag">
-          <a href="https://enzyme.garden/support" 
-             target="_blank" 
-             rel="noopener noreferrer"
-             className="font-medium flex items-center text-sm cursor-pointer group no-drag">
-            <Info className="h-5 w-5 inline-block text-brand/90 group-hover:text-primary transition-colors duration-50" />
-            <span className="ml-2 inline-block text-brand/90 group-hover:text-primary transition-colors duration-50">Get support</span>
-          </a>
+          <div className="flex flex-col space-y-3">
+            <a href="https://enzyme.garden/support" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               className="font-medium flex items-center text-sm cursor-pointer group no-drag">
+              <Info className="h-5 w-5 inline-block text-brand/90 group-hover:text-primary transition-colors duration-50" />
+              <span className="ml-2 inline-block text-brand/90 group-hover:text-primary transition-colors duration-50">Get support</span>
+            </a>
+            <a href="https://enzyme.garden/privacy" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               className="font-medium flex items-center text-sm cursor-pointer group no-drag">
+              <Shield className="h-5 w-5 inline-block text-brand/90 group-hover:text-primary transition-colors duration-50" />
+              <span className="ml-2 inline-block text-brand/90 group-hover:text-primary transition-colors duration-50">Privacy Policy</span>
+            </a>
+          </div>
       </div>
     </div>
   );

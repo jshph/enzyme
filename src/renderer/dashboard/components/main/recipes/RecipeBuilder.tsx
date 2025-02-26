@@ -986,30 +986,45 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
 
                   <div className="relative">
                     <div className="flex items-center">
-                      <button
-                        disabled={
-                          !hasVaultInitialized || 
-                          !isIndexerReady ||
-                          (selectedEntities.size === 0 && generationsRemaining > 0) || 
-                          generationState.status === 'generating' || 
-                          generationState.status === 'awaiting_first_token'
-                        }
-                        className={`
-                          bg-brand/40 py-2.5 px-4 text-sm rounded-l-md shadow-md 
-                          cursor-pointer hover:bg-brand/60 transition-colors font-medium 
-                          disabled:opacity-50 disabled:cursor-not-allowed
-                          ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
-                        `}
-                        onClick={generationsRemaining <= 0 && !isAuthenticated ? switchToLogin : submitPrompt}
-                      >
-                        {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
-                          !isAuthReady ? 'Checking Authentication...' :
-                          generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
-                            ? 'Generating...' : 
-                          generationsRemaining > 0 || isAuthenticated ? 
-                            `Generate Recipe` : 
-                            'Login to generate more recipes'}
-                      </button>
+                      <Tooltip.Provider>
+                        <Tooltip.Root delayDuration={200}>
+                          <Tooltip.Trigger asChild>
+                            <button
+                              disabled={
+                                !hasVaultInitialized || 
+                                !isIndexerReady ||
+                                (selectedEntities.size === 0 && generationsRemaining > 0) || 
+                                generationState.status === 'generating' || 
+                                generationState.status === 'awaiting_first_token'
+                              }
+                              className={`
+                                bg-brand/40 py-2.5 px-4 text-sm rounded-l-md shadow-md 
+                                cursor-pointer hover:bg-brand/60 transition-colors font-medium 
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                                ${generationState.status === 'generating' || generationState.status === 'awaiting_first_token' ? 'animate-pulse' : ''}
+                              `}
+                              onClick={generationsRemaining <= 0 && !isAuthenticated ? switchToLogin : submitPrompt}
+                            >
+                              {!hasVaultInitialized || !isIndexerReady ? 'Initializing Vault...' :
+                                !isAuthReady ? 'Checking Authentication...' :
+                                generationState.status === 'generating' || generationState.status === 'awaiting_first_token' 
+                                  ? 'Generating...' : 
+                                generationsRemaining > 0 || isAuthenticated ? 
+                                  `Generate Recipe` : 
+                                  'Login to generate more recipes'}
+                            </button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              className="max-w-xs bg-surface text-white px-3 py-2 rounded text-xs"
+                              side="top"
+                            >
+                              <p>When generating recipes, only the specific content needed is sent to our AI service. Your files never leave your computer otherwise.</p>
+                              <Tooltip.Arrow className="fill-surface" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </Tooltip.Provider>
                       
                       <button
                         onClick={() => setShowDropdown(!showDropdown)}
@@ -1091,6 +1106,14 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
                     </Tooltip.Provider>
                   )}
                 </div>
+              </div>
+
+              {/* Privacy notice */}
+              <div className="text-xs text-primary/50 mt-1 ml-2">
+                <span className="flex items-center">
+                  <Info className="w-3 h-3 mr-1" />
+                  Your data stays on your device. Only selected content is sent for recipe generation.
+                </span>
               </div>
 
               {/* Expand/Collapse Button - Only show when there's output */}
