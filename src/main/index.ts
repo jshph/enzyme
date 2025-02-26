@@ -273,7 +273,15 @@ function setupDashboard() {
 
     // Add update setup
     if (!process.defaultApp) {
-      setupIpcUpdater();
+      // Only setup updater if app is ready (which it should be here, but adding as a safeguard)
+      if (app.isReady()) {
+        setupIpcUpdater();
+      } else {
+        logger.warn('App not ready when trying to setup updater');
+        app.whenReady().then(() => {
+          setupIpcUpdater();
+        });
+      }
     }
   }).catch(error => {
     logger.error('Error in dashboard setup:', error);

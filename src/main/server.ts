@@ -208,10 +208,22 @@ export class ServerContext {
   
     server = app.listen(port, () => {
       this.logger.info(`Context server listening at http://localhost:${port}`);
-      new Notification({
-        title: 'Enzyme MCP Server',
-        body: `Model Context Protocol server available at http://localhost:${port}`
-      }).show();
+      
+      // Check if app is ready before creating notification
+      if (electronApp.isReady()) {
+        new Notification({
+          title: 'Enzyme MCP Server',
+          body: `Model Context Protocol server available at http://localhost:${port}`
+        }).show();
+      } else {
+        this.logger.info('App not ready, queueing notification for when app is ready');
+        electronApp.whenReady().then(() => {
+          new Notification({
+            title: 'Enzyme MCP Server',
+            body: `Model Context Protocol server available at http://localhost:${port}`
+          }).show();
+        });
+      }
     });
   
     return server;

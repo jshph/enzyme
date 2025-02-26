@@ -70,10 +70,21 @@ export function setupIpcUpdater() {
     if (error.message.includes('retry')) {
       logger.info('Retrying update download...');
       setTimeout(() => {
-        autoUpdater.checkForUpdatesAndNotify({
-          title: 'Update Available',
-          body: 'A new version of Enzyme is available. Click to download.'
-        });
+        // Only check for updates if app is ready
+        if (app.isReady()) {
+          autoUpdater.checkForUpdatesAndNotify({
+            title: 'Update Available',
+            body: 'A new version of Enzyme is available. Click to download.'
+          });
+        } else {
+          logger.info('App not ready, will check for updates when ready');
+          app.whenReady().then(() => {
+            autoUpdater.checkForUpdatesAndNotify({
+              title: 'Update Available',
+              body: 'A new version of Enzyme is available. Click to download.'
+            });
+          });
+        }
       }, 5000);
     }
   });
@@ -100,12 +111,28 @@ export async function checkForUpdates(ghToken?: string) {
     autoUpdater.forceDevUpdateConfig = false;
     
     logger.info('Checking for update');
-    const result = await autoUpdater.checkForUpdatesAndNotify({
-      title: 'Update Available',
-      body: 'A new version of Enzyme is available. Click to download.'
-    });
-    logger.debug('Update check result:', result);
-    return result;
+    
+    // Only check for updates if app is ready
+    if (app.isReady()) {
+      const result = await autoUpdater.checkForUpdatesAndNotify({
+        title: 'Update Available',
+        body: 'A new version of Enzyme is available. Click to download.'
+      });
+      logger.debug('Update check result:', result);
+      return result;
+    } else {
+      logger.info('App not ready, will check for updates when ready');
+      return new Promise((resolve) => {
+        app.whenReady().then(async () => {
+          const result = await autoUpdater.checkForUpdatesAndNotify({
+            title: 'Update Available',
+            body: 'A new version of Enzyme is available. Click to download.'
+          });
+          logger.debug('Update check result:', result);
+          resolve(result);
+        });
+      });
+    }
   } catch (error) {
     logger.error('Error:', error);
     throw error;

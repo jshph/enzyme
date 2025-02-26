@@ -1,5 +1,5 @@
 import { FileIndexer } from "./index.js";
-import { BrowserWindow, Notification } from 'electron';
+import { BrowserWindow, Notification, app } from 'electron';
 
 export class ElectronFileIndexer extends FileIndexer {
   constructor() {
@@ -14,7 +14,17 @@ export class ElectronFileIndexer extends FileIndexer {
   }
 
   override async notify(title: string, body: string) {
-    new Notification({ title, body }).show();
+    // Only create notification if app is ready
+    if (app.isReady()) {
+      new Notification({ title, body }).show();
+    } else {
+      // Log the notification instead
+      console.log(`Notification (app not ready): ${title} - ${body}`);
+      // Optionally queue the notification to show when app is ready
+      app.whenReady().then(() => {
+        new Notification({ title, body }).show();
+      });
+    }
   }
 }
 
