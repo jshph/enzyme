@@ -42,9 +42,12 @@ jobs:
         uses: actions/cache@v4.1.2
         with:
           path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ github.run_id }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
+
+      - name: Clear updater cache
+        run: rm -rf ~/.cache/enzyme-updater || true
 
       - name: Install dependencies
         run: pnpm install
@@ -100,6 +103,10 @@ jobs:
         run: |
           pnpm run build
           pnpm run build:${{ matrix.os == 'macos-latest' && 'mac' || matrix.os == 'windows-latest' && 'win' || 'linux' }}
+
+      - name: Verify app signature (macOS)
+        if: matrix.os == 'macos-latest'
+        run: codesign -vvv --deep --strict dist/*.app
 
       - name: Release
         uses: softprops/action-gh-release@v1
