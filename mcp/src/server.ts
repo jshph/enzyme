@@ -1,187 +1,193 @@
-const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
+const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
   ListToolsRequestSchema,
   CallToolRequestSchema,
+  ListOfferingsRequestSchema,
+  GetServerInfoRequestSchema,
 } = require("@modelcontextprotocol/sdk/types.js");
+const { z } = require("zod");
 
-// Read port from environment variable or use default
+// Create the server with proper metadata
+const server = new McpServer({
+  name: "enzyme-context-server",
+  version: "1.1.0",
+  description: "MCP server for retrieving and managing notes from Enzyme vault",
+  publisher: "Enzyme",
+  homepage: "https://github.com/jshph/enzyme",
+  license: "MIT"
+});
 
-const server = new Server(
+// Define tools using the server.tool method
+server.tool(
+  "retrieve_by_tag",
   {
-    name: "enzyme-context-server",
-    version: "1.1.0",
+    tag: z.string().describe("Tag to retrieve notes. Must start with #"),
+    limit: z.number().optional().describe("Number of notes to retrieve, defaults to 10")
   },
+  async ({ tag, limit = 10 }) => {
+    return await retrieveByQuery(tag, limit);
+  }
+);
+
+server.tool(
+  "retrieve_by_link",
   {
-    capabilities: {
-      resources: {},
-      tools: {
-        retrieve_by_tag: {
-          description: "Retrieve the latest notes from the user's vault by tag, i.e. when the syntax #tag is used in the prompt or when the user asks to gather the latest thoughts for a tag",
-        },
-        retrieve_by_link: {
-          description: "Retrieve the latest notes from the user's vault by link, i.e. when the syntax [[link]] is used in the prompt or when the user asks to gather the latest thoughts for a link",
-        },
-        retrieve_by_folder: {
-          description: "Retrieve the latest notes from the user's vault by folder, i.e. when the syntax folder/ is used in the prompt or when the user asks to gather the latest thoughts for a folder",
-        }
-      },
-      prompts: {
-        enz: {
-          description: "Retrieve notes from the Enzyme context server",
-          arguments: [
-            {
-              name: "query",
-              type: "string",
-              description: "Query to retrieve notes"
+    link: z.string().describe("Link to retrieve notes. Must start with [[ and end with ]]"),
+    limit: z.number().optional().describe("Number of notes to retrieve, defaults to 10")
+  },
+  async ({ link, limit = 10 }) => {
+    return await retrieveByQuery(link, limit);
+  }
+);
+
+server.tool(
+  "retrieve_by_folder",
+  {
+    folder: z.string().describe("Folder to retrieve notes. Must end with /"),
+    limit: z.number().optional().describe("Number of notes to retrieve, defaults to 10")
+  },
+  async ({ folder, limit = 10 }) => {
+    return await retrieveByQuery(folder, limit);
+  }
+);
+
+// Define prompts using the server.prompt method
+server.prompt(
+  "enz",
+  { 
+    query: z.string().describe("Query to retrieve notes") 
+  },
+  async ({ query }) => {
+    try {
+      const response = await fetch(`http://localhost:3779/context?query=${encodeURIComponent(query)}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch context: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      let data;
+      try {
+        const responseText = await response.text();
+        data = JSON.parse(responseText);
+      } catch (jsonError) {
+        throw new Error(`Invalid JSON response: ${jsonError.message}`);
+      }
+
+      if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
+        return {
+          messages: [{
+            role: "user",
+            content: {
+              type: "text",
+              text: "No notes found for the given query."
             }
-          ]
-        }
-      },
-    },
+          }]
+        };
+      }
+
+      return {
+        messages: [{
+          role: "user",
+          content: {
+            type: "text",
+            text: data.content.map((c) => c.text).join('\n\n')
+          }
+        }]
+      };
+    } catch (error) {
+      throw new Error(`Error executing prompt: ${error.message}`);
+    }
   }
 );
 
 /**
- * Handler that lists available prompts.
- * Exposes a single "summarize_notes" prompt that summarizes all notes.
+ * Helper function to retrieve notes by query.
+ * @param query The query string to search for
+ * @param limit Optional limit on number of results
+ * @returns The query results
  */
-server.setRequestHandler(ListPromptsRequestSchema, async () => {
-  return {
-    prompts: [
-      {
-        name: "enz",
-        description: "Retrieve notes from the Enzyme context server",
-        arguments: [
+const retrieveByQuery = async (query, limit = 10) => {
+  try {
+    const queryParam = limit ? `${encodeURIComponent(query)}<${limit}` : encodeURIComponent(query);
+    const response = await fetch(`http://localhost:3779/context?query=${queryParam}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        isError: true,
+        content: [
           {
-            name: "query",
-            type: "string",
-            description: "Query to retrieve notes"
+            type: "text",
+            text: `Failed to fetch context: ${response.status} ${response.statusText} - ${errorText}`
           }
         ]
+      };
+    }
+    
+    let data;
+    try {
+      const responseText = await response.text();
+      data = JSON.parse(responseText);
+      
+      if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No notes found for the given query."
+            }
+          ]
+        };
       }
-    ]
-  };
-});
-
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: "retrieve_by_tag",
-        description: "Retrieve the latest notes from the user's vault by tag, i.e. when the syntax #tag is used in the query",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tag: {
-              type: "string",
-              description: "Tag to retrieve notes. Must start with #"
-            },
-            limit: {
-              type: "number",
-              description: "Number of notes to retrieve, defaults to 10"
-            }
-          },
-          required: ["tag"]
+      
+      return {
+        content: data.content.map(c => ({
+          type: "text",
+          text: c.text
+        }))
+      };
+    } catch (jsonError) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Invalid JSON response: ${jsonError.message}`
+          }
+        ]
+      };
+    }
+  } catch (error) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: "text",
+          text: `Error retrieving by query: ${error.message}`
         }
-      },
-      {
-        name: "retrieve_by_link",
-        description: "Retrieve the latest notes from the user's vault by link, i.e. when the syntax [[link]] is used in the query",
-        inputSchema: {
-          type: "object",
-          properties: {
-            link: {
-              type: "string",
-              description: "Link to retrieve notes. Must start with [[ and end with ]]"
-            },
-            limit: {
-              type: "number",
-              description: "Number of notes to retrieve, defaults to 10"
-            }
-          },
-          required: ["link"]
-        }
-      },
-      {
-        name: "retrieve_by_folder",
-        description: "Retrieve the latest notes from the user's vault by folder, i.e. when the syntax folder/ is used in the query or when the user explicitly asks for a folder",
-        inputSchema: {
-          type: "object",
-          properties: {
-            folder: {
-              type: "string",
-            description: "Folder to retrieve notes. Must end with /"
-            },
-            limit: {
-              type: "number",
-              description: "Number of notes to retrieve, defaults to 10"
-            }
-          },
-          required: ["folder"]
-        }
-      }
-    ]
-  };
-});
-
-server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
-  if (request.params.name === "retrieve_by_tag") {
-    return await retrieveByQuery(request.params.arguments.tag, request.params.arguments.limit);
+      ]
+    };
   }
-  if (request.params.name === "retrieve_by_link") {
-    return await retrieveByQuery(request.params.arguments.link, request.params.arguments.limit);
-  }
-  if (request.params.name === "retrieve_by_folder") {
-    return await retrieveByQuery(request.params.arguments.folder, request.params.arguments.limit);
-  }
-});
-
-const retrieveByQuery = async (query: string, limit: number) => {
-  const response = await fetch(`http://localhost:3779/context?query=${encodeURIComponent(query)}<${limit}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch context: ${response.statusText} ${await response.text()}`);
-  }
-  const data = await response.json();
-  return data;
 };
 
-server.setRequestHandler(GetPromptRequestSchema, async (request: any) => {
-  if (request.params.name !== "enz") {
-    throw new Error("Unknown prompt");
-  }
 
-  const query = request.params.arguments?.query;
-
-  if (!query) {
-    throw new Error("Query is required");
-  }
-
-  const response = await fetch(`http://localhost:3779/context?query=${encodeURIComponent(query)}`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch context: ${response.statusText} ${await response.text()}`);
-  }
-
-  const data = await response.json();
-
-  return {
-    messages: [{
-      role: "user",
-      content: {
-        type: "text",
-        text: data.content.map((c: any) => c.text).join('\n\n')
-      }
-    }]
-  };
-});
-
+// Initialize transport and connect
 const transport = new StdioServerTransport();
 
 async function main() {
-  await server.connect(transport);
+  try {
+    // Connect to the transport
+    await server.connect(transport);
+    // console.log("Enzyme MCP server started successfully");
+  } catch (error) {
+    // console.error("Failed to start Enzyme MCP server:", error);
+    process.exit(1);
+  }
 }
 
+// Start the server
 main();
