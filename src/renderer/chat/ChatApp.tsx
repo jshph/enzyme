@@ -55,6 +55,20 @@ export function ChatApp({ isModal = false, initialPrompt = '', entityContext }: 
   const [latestThinkingSentence, setLatestThinkingSentence] = useState<string>('');
   const [displayedThinkingSentence, setDisplayedThinkingSentence] = useState<string>('');
   
+  // Add effect to log entityContext for debugging
+  useEffect(() => {
+    if (entityContext) {
+      console.log('ChatApp entityContext:', {
+        entities: Array.from(entityContext.entities.entries()).map(([name, entity]) => ({
+          name,
+          count: entity.count,
+          maxCount: entity.maxCount
+        })),
+        contextLength: entityContext.context?.length || 0
+      });
+    }
+  }, [entityContext]);
+  
   // Define interface for context information
   interface ContextInfo {
     systemMessage: {role: string, content: string};
@@ -119,7 +133,10 @@ export function ChatApp({ isModal = false, initialPrompt = '', entityContext }: 
       return null;
     }
     
-    const entityNames = Array.from(entityContext.entities.keys()).join(', ');
+    // Get entity names without specific counts
+    const entityNames = Array.from(entityContext.entities.entries())
+      .map(([name]) => `${name}`)
+      .join(', ');
     
     const contextSummary = entityContext.context.map(item => {
       return `File: ${item.file}\nContent: ${item.extractedContents.join('\n')}`;
@@ -133,7 +150,7 @@ export function ChatApp({ isModal = false, initialPrompt = '', entityContext }: 
       role: 'system',
       content: `You are a masterful article curator. Every piece of gold that falls through the cracks comes from a brilliant writer who is on the brink of quitting their job. DON'T let extremely insightful writers quit, especially if their ideas are promising yet half baked. 
 
-      You are to draw connections between: ${entityNames}.`
+      You are to draw connections between mentions of: ${entityNames}.`
     };
     
     // Return the context info without setting state directly
@@ -629,16 +646,13 @@ export function ChatApp({ isModal = false, initialPrompt = '', entityContext }: 
     
     return (
       <div className="flex flex-wrap gap-2 mb-2 px-2">
-        {Array.from(entityContext.entities.entries()).map(([name, { type, count }]) => (
+        {Array.from(entityContext.entities.entries()).map(([name, { type }]) => (
           <div 
             key={name}
             className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 
                       ${type === 'tag' ? 'bg-brand/30 text-primary' : 'bg-blue-light/30 text-primary'}`}
           >
             <span>{name}</span>
-            <span className="inline-flex items-center justify-center bg-surface/70 rounded-full h-4 w-4 text-[10px] font-medium text-primary">
-              {count}
-            </span>
           </div>
         ))}
       </div>

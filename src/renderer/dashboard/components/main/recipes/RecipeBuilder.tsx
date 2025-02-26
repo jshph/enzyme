@@ -632,7 +632,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
       direction: deltaX < 0 ? 'left' : 'right'
     });
     
-    // Use debounced update
+    // Use debounced update for timeline
     const updatedEntities = new Map(selectedEntities);
     updatedEntities.set(draggedEntity.name, { ...entity, count: newCount });
     updateTimelineDebounced(Array.from(updatedEntities.entries()));
@@ -641,7 +641,19 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   // Create a single handler for ending drags
   const handleDragEnd = useCallback(() => {
     if (draggedEntity && dragCountRef.current) {
+      // Update the document count for the mention
       updateDocCountForMention(draggedEntity.name, dragCountRef.current);
+      
+      // Also update the selectedEntities state with the new count
+      setSelectedEntities(prev => {
+        const next = new Map(prev);
+        const entity = next.get(draggedEntity.name);
+        if (entity) {
+          next.set(draggedEntity.name, { ...entity, count: dragCountRef.current });
+        }
+        return next;
+      });
+      
       wasRecentlyDragging.current = true;
       
       setTimeout(() => {
@@ -686,8 +698,22 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
     };
   }, []);
 
+  // Add state for modal entities
+  const [modalEntities, setModalEntities] = useState<Map<string, { type: 'tag' | 'link', count: number, maxCount: number }>>(new Map());
+
   // Add function to open chat modal
   const openChatModal = async () => {
+    // Create a fresh copy of the selectedEntities for the modal with explicit count values
+    const freshModalEntities = new Map();
+    selectedEntities.forEach((entity, name) => {
+      freshModalEntities.set(name, {
+        type: entity.type,
+        count: entity.count, // Explicitly copy the count
+        maxCount: entity.maxCount
+      });
+    });
+    setModalEntities(freshModalEntities);
+    
     // Only fetch context if we have selected entities and don't already have context
     if (selectedEntities.size > 0 && generationContextRef.current.length === 0) {
       try {
@@ -736,6 +762,36 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
       }
     }
   }, [showDropdown]);
+
+  // Add effect to log selectedEntities for debugging
+  useEffect(() => {
+    console.log('selectedEntities updated:', Array.from(selectedEntities.entries()));
+  }, [selectedEntities]);
+
+  // Add effect to update modalEntities when selectedEntities changes
+  useEffect(() => {
+    if (isChatModalOpen) {
+      // Create a fresh copy with explicit count values
+      const freshModalEntities = new Map();
+      selectedEntities.forEach((entity, name) => {
+        freshModalEntities.set(name, {
+          type: entity.type,
+          count: entity.count, // Explicitly copy the count
+          maxCount: entity.maxCount
+        });
+      });
+      setModalEntities(freshModalEntities);
+    }
+  }, [selectedEntities, isChatModalOpen]);
+
+  // Add effect to log modalEntities for debugging
+  useEffect(() => {
+    console.log('modalEntities updated:', Array.from(modalEntities.entries()).map(([name, entity]) => ({
+      name,
+      count: entity.count,
+      maxCount: entity.maxCount
+    })));
+  }, [modalEntities]);
 
   return (
     <>
@@ -1113,7 +1169,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
       <ChatModal 
         isOpen={isChatModalOpen}
         onClose={() => setIsChatModalOpen(false)}
-        selectedEntities={selectedEntities}
+        selectedEntities={modalEntities}
         context={generationContextRef.current}
       />
     </>

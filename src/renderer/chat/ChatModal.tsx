@@ -30,8 +30,44 @@ export const ChatModal: React.FC<ChatModalProps> = ({
     }
   }, [isOpen, selectedEntities]);
 
+  // Add effect to log selectedEntities for debugging
+  useEffect(() => {
+    if (isOpen) {
+      console.log('ChatModal selectedEntities:', Array.from(selectedEntities.entries()).map(([name, entity]) => ({
+        name,
+        count: entity.count,
+        maxCount: entity.maxCount
+      })));
+    }
+  }, [isOpen, selectedEntities]);
+
   // If the modal isn't open, don't render anything to save resources
   if (!isOpen) return null;
+
+  // Create a fresh copy of selectedEntities with explicit count values
+  const entityContextForChat = {
+    entities: new Map(
+      Array.from(selectedEntities.entries()).map(([name, entity]) => [
+        name,
+        {
+          type: entity.type,
+          count: entity.count, // Explicitly copy the count
+          maxCount: entity.maxCount
+        }
+      ])
+    ),
+    context: context
+  };
+
+  // Log the entityContextForChat for debugging
+  console.log('ChatModal entityContextForChat:', {
+    entities: Array.from(entityContextForChat.entities.entries()).map(([name, entity]) => ({
+      name,
+      count: entity.count,
+      maxCount: entity.maxCount
+    })),
+    contextLength: entityContextForChat.context?.length || 0
+  });
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -56,10 +92,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
           <ChatApp 
             isModal={true}
             initialPrompt={initialPrompt} 
-            entityContext={{
-              entities: selectedEntities,
-              context: context
-            }} 
+            entityContext={entityContextForChat} 
           />
         </div>
       </div>
