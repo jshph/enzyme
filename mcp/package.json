@@ -1,6 +1,6 @@
 {
   "name": "enzyme-mcp",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Model Context Protocol implementation for Enzyme",
   "main": "dist/server.bundle.cjs",
   "type": "module",
@@ -16,13 +16,14 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.6.0",
-    "node-fetch": "^3.3.0"
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "esbuild": "^0.19.12",
     "jest": "^29.7.0",
-    "ts-jest": "^29.2.5",
-    "typescript": "^5.7.2"
+    "ts-jest": "^29.2.6",
+    "typescript": "^5.8.2",
+    "zod": "^3.24.2"
   },
   "author": "Joshua Pham",
   "license": "ISC",
