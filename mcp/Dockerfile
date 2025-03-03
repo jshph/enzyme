@@ -6,13 +6,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN pnpm install
+RUN npm install
 
 # Copy application code
 COPY . .
 
 # Build the application
-RUN pnpm run build
+RUN npm run build
 
 # Command will be provided by smithery.yaml
 CMD ["node", "dist/server.bundle.cjs"]
