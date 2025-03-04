@@ -207,7 +207,7 @@ export function setupVaultIPCRoutes() {
           ...config.mcpServers,
           enzyme: {
             command: 'npx',
-            args: ['-y', 'enzyme-mcp@1.1.3']
+            args: ['-y', 'enzyme-mcp']
           }
         };
       }

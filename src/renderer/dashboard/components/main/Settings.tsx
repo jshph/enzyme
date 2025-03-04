@@ -193,8 +193,11 @@ const Settings: React.FC = () => {
               className="mt-1 block w-full p-2 rounded-md input-base bg-input/50 text-sm" 
             />
             <p className="mt-2 text-sm text-secondary/70">
-            The port number Enzyme will use. Only change this if you have port conflicts.
+            The port number Enzyme will use for Model Context Protocol (MCP). Only change this if you have port conflicts.
             Server URL: <span>{`http://localhost:${settings.port || 3779}`}</span>
+            </p>
+            <p className="mt-2 text-sm text-secondary/70">
+            Install the MCP Server with the command: <code className="bg-input/50 p-1 rounded-md text-sm">npx -y enzyme-mcp</code>
             </p>
           </div>
           <div>
@@ -216,7 +219,7 @@ const Settings: React.FC = () => {
             )}
             <p className="mt-2 text-sm text-secondary/70">
               One-click setup for Model Context Protocol (MCP) in Claude Desktop. 
-              <a href="https://www.claudemcp.com/docs/" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-400">
+              <a href="https://modelcontextprotocol.io/introduction" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-400">
                 Learn more
               </a>
             </p>
