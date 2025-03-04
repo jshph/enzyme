@@ -641,18 +641,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   // Create a single handler for ending drags
   const handleDragEnd = useCallback(() => {
     if (draggedEntity && dragCountRef.current) {
-      // Update the document count for the mention
       updateDocCountForMention(draggedEntity.name, dragCountRef.current);
-      
-      // Also update the selectedEntities state with the new count
-      setSelectedEntities(prev => {
-        const next = new Map(prev);
-        const entity = next.get(draggedEntity.name);
-        if (entity) {
-          next.set(draggedEntity.name, { ...entity, count: dragCountRef.current });
-        }
-        return next;
-      });
       
       wasRecentlyDragging.current = true;
       
@@ -699,7 +688,7 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
   }, []);
 
   // Add state for modal entities
-  const [modalEntities, setModalEntities] = useState<Map<string, { type: 'tag' | 'link', count: number, maxCount: number }>>(new Map());
+  const [modalEntities, setModalEntities] = useState<Map<string, { type: 'tag' | 'link' }>>(new Map());
 
   // Add function to open chat modal
   const openChatModal = async () => {
@@ -708,8 +697,6 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
     selectedEntities.forEach((entity, name) => {
       freshModalEntities.set(name, {
         type: entity.type,
-        count: entity.count, // Explicitly copy the count
-        maxCount: entity.maxCount
       });
     });
     setModalEntities(freshModalEntities);
@@ -763,11 +750,6 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
     }
   }, [showDropdown]);
 
-  // Add effect to log selectedEntities for debugging
-  useEffect(() => {
-    console.log('selectedEntities updated:', Array.from(selectedEntities.entries()));
-  }, [selectedEntities]);
-
   // Add effect to update modalEntities when selectedEntities changes
   useEffect(() => {
     if (isChatModalOpen) {
@@ -775,24 +757,13 @@ const RecipeBuilder: React.FC<{ currentView: string, setCurrentView: (view: stri
       const freshModalEntities = new Map();
       selectedEntities.forEach((entity, name) => {
         freshModalEntities.set(name, {
-          type: entity.type,
-          count: entity.count, // Explicitly copy the count
-          maxCount: entity.maxCount
+          type: entity.type
         });
       });
       setModalEntities(freshModalEntities);
     }
   }, [selectedEntities, isChatModalOpen]);
-
-  // Add effect to log modalEntities for debugging
-  useEffect(() => {
-    console.log('modalEntities updated:', Array.from(modalEntities.entries()).map(([name, entity]) => ({
-      name,
-      count: entity.count,
-      maxCount: entity.maxCount
-    })));
-  }, [modalEntities]);
-
+  
   return (
     <>
       <div
