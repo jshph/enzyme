@@ -6,6 +6,11 @@ import { getServerUrl } from "./index.js";
 
 const SERVER_URL = getServerUrl();
 
+export interface TagSummary {
+  tag: string;
+  summary: string;
+}
+
 export interface Settings {
   vaultPath: string;
   port: number;
@@ -14,6 +19,7 @@ export interface Settings {
   doCache: boolean;
   defaultPatternLimit: number;
   excludedTags: string[];
+  tagSummaries?: TagSummary[];
 }
   
 const DEFAULT_SETTINGS: Settings = {
@@ -24,6 +30,7 @@ const DEFAULT_SETTINGS: Settings = {
   doCache: false,
   defaultPatternLimit: 10,
   excludedTags: [],
+  tagSummaries: [],
 };
 
 

@@ -37,12 +37,31 @@ const TEMPLATE_RESULT = `## File: {file}
 let server: Server | null = null;
 const app: Express = express();
 
+// Create a singleton instance of ServerContext
+let serverContextInstance: ServerContext | null = null;
+let instanceCounter = 0;
+
 export class ServerContext {
   indexer: ElectronFileIndexer | null = null;
   private logger: winston.Logger;
   private config: ServerConfig | null = null;
+  private instanceId: string;
+  private running: boolean = false;
+  
   constructor() {
     this.logger = initializeLogger('server');
+    this.instanceId = `server-${++instanceCounter}-${Date.now()}`;
+    this.logger.info(`ServerContext instance created with ID: ${this.instanceId}`);
+  }
+
+  // Add method to get the instance ID
+  public getInstanceId(): string {
+    return this.instanceId;
+  }
+  
+  // Add method to check if server is running
+  public isRunning(): boolean {
+    return this.running && server !== null;
   }
 
   public async getContext(query: string, format: 'json' | 'md' = 'md'): Promise<string[] | MatchResult[]> {
@@ -68,12 +87,21 @@ export class ServerContext {
     return formattedResults as string[] | MatchResult[];
   }
 
-  async getTrendingEntities(): Promise<string[]> {
-    const trendingData = await this.indexer?.getTrendingData();
+  async getTrendingEntities({limitPerType = 25, type = 'all'}: {limitPerType?: number, type?: 'all' | 'tags' | 'links'}): Promise<string[]> {
+    const indexer = getFileIndexer();
+    const trendingData = await indexer.getTrendingData();
     const items = trendingData?.items;
-    const tags = items?.tags.map(item => item.name) ?? [];
-    const links = items?.links.map(item => item.name) ?? [];
-    return [...tags, ...links];
+    if (type === 'all') {
+      const tags = items?.tags.map(item => item.name).slice(0, limitPerType) ?? [];
+      const links = items?.links.map(item => item.name).slice(0, limitPerType) ?? [];
+      return [...tags, ...links];
+    } else if (type === 'tags') {
+      return items?.tags.map(item => item.name).slice(0, limitPerType) ?? [];
+    } else if (type === 'links') {
+      return items?.links.map(item => item.name).slice(0, limitPerType) ?? [];
+    } else {
+      return [];
+    }
   }
 
   async startServer(port: number) {
@@ -144,7 +172,9 @@ export class ServerContext {
     }) as express.RequestHandler);
 
     app.get('/trending-entities', (async (req: express.Request, res: express.Response) => {
-      const trendingEntities = await this.getTrendingEntities();
+      const limitPerType = req.query.limitPerType ? parseInt(req.query.limitPerType as string) : 25;
+      const type = req.query.type as 'all' | 'tags' | 'links' || 'all';
+      const trendingEntities = await this.getTrendingEntities({ limitPerType, type });
       res.json({
         entities: trendingEntities
       });
@@ -161,7 +191,7 @@ export class ServerContext {
           health: '/api/health'
         }
       });
-    });
+    }) as express.RequestHandler;
     
     // API endpoint for local processing
     app.post('/api/chat', (async (req: express.Request, res: express.Response) => {
@@ -208,6 +238,7 @@ export class ServerContext {
   
     server = app.listen(port, () => {
       this.logger.info(`Context server listening at http://localhost:${port}`);
+      this.running = true;
       
       // Check if app is ready before creating notification
       if (electronApp.isReady()) {
@@ -234,11 +265,22 @@ export class ServerContext {
       await this.indexer?.stop();
       await new Promise<void>((resolve) => server!.close(() => resolve()));
       server = null;
+      this.running = false;
+      this.logger.info(`Server with ID ${this.instanceId} stopped`);
     }
   } 
 }
 
-export const useContextServer = () => {
-  const contextServer = new ServerContext();
-  return contextServer;
+/**
+ * Returns a singleton instance of ServerContext
+ * This ensures we only have one server running throughout the application
+ */
+export const useContextServer = (): ServerContext => {
+  if (!serverContextInstance) {
+    serverContextInstance = new ServerContext();
+    console.log('Created new ServerContext singleton instance');
+  } else {
+    console.log('Reusing existing ServerContext singleton instance');
+  }
+  return serverContextInstance;
 }

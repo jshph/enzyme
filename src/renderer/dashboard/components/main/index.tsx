@@ -2,6 +2,7 @@ import React from 'react'
 import Settings from './Settings.js'
 import Recipes from './Recipes.js'
 import Login from './Login.js'
+import TagSummaries from './TagSummaries.js'
 
 interface MainProps {
   currentView: string;
@@ -19,6 +20,10 @@ const Main: React.FC<MainProps> = ({ currentView, setCurrentView, isVaultInitial
 
         <div style={{ display: currentView === 'recipes' ? 'block' : 'none' }}>
           <Recipes currentView={currentView} setCurrentView={setCurrentView} />
+        </div>
+        
+        <div style={{ display: currentView === 'tag-summaries' ? 'block' : 'none' }}>
+          <TagSummaries />
         </div>
         
         {/* {hiddenFeatures} */}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext.js';
-import { Info, MessageSquare, Shield } from 'lucide-react';
+import { Info, MessageSquare, Shield, Tag } from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
@@ -20,6 +20,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, quitApp,
                 currentView === 'recipes' ? 'bg-brand/10 text-brand' : 'text-primary'
               }`}>
               <span className="ml-2">Recipe Home</span>
+          </a>
+
+          <a onClick={() => setCurrentView('tag-summaries')} 
+              className={`flex items-center px-4 py-3 cursor-pointer hover:bg-input text-sm ${
+                currentView === 'tag-summaries' ? 'bg-brand/10 text-brand' : 'text-primary'
+              }`}>
+              <span className="ml-2">Tag Summaries</span>
           </a>
 
           <a onClick={() => setCurrentView('settings')} 

@@ -3,7 +3,6 @@ import Store from "electron-store";
 import dotenv from 'dotenv';
 import path from 'path';
 import os from 'os';
-import winston from 'winston';
 import { SpaceInfo } from "./space.js";
 import { setupAuthIPCRoutes } from './auth.js';
 import { setupDigestIPCRoutes } from './digest.js';
@@ -12,6 +11,7 @@ import { setupSpaceRoutes } from './space.js';
 import { setupRecipeRoutes } from './recipe.js';
 import { setupUserIPCRoutes } from "./user.js";
 import { setupChatIPCRoutes } from "./chat.js";
+import { setupTagSummaryIPCRoutes } from "./tagSummary.js";
 import nodeMachineId from 'node-machine-id';
 import { initializeLogger } from '../utils/logger.js';
 
@@ -23,6 +23,7 @@ interface Auth {
 
 export interface LocalSettings {
   vaultPath: string;
+  tagSummaries?: any[];
 }
 
 export const store = new Store<{
@@ -102,8 +103,8 @@ function loadEnvironment() {
 export const logger = initializeLogger('main');
 
 export function getServerUrl() {
-  // return "http://localhost:3129";
-  return "https://enzyme-server-production.up.railway.app";
+  return "http://localhost:3129";
+  // return "https://enzyme-server-production.up.railway.app";
 }
 
 // Add a new function to check if vault is configured
@@ -151,4 +152,5 @@ export function setupIPC() {
   setupRecipeRoutes();
   setupUserIPCRoutes();
   setupChatIPCRoutes();
+  setupTagSummaryIPCRoutes();
 }
