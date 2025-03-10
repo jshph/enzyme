@@ -102,11 +102,6 @@ function loadEnvironment() {
 
 export const logger = initializeLogger('main');
 
-export function getServerUrl() {
-  return "http://localhost:3129";
-  // return "https://enzyme-server-production.up.railway.app";
-}
-
 // Add a new function to check if vault is configured
 function isVaultConfigured() {
   const localSettings = store.get('localSettings');

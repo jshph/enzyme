@@ -1,7 +1,8 @@
 import { ipcMain } from "electron";
-import { getServerUrl, store } from "./index.js";
+import { store } from "./index.js";
 import { getFileIndexer } from "../indexer/electron.js";
 import { getCurrentSession } from './user.js';
+import { getServerUrl } from "../server.js";
 
 const SERVER_URL = getServerUrl();
 

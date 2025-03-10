@@ -1,9 +1,10 @@
 import { ipcMain } from "electron";
-import { getServerUrl, store as configStore, logger } from "./index.js";
+import { store as configStore, logger } from "./index.js";
 import { getCurrentSession } from "./user.js";
-import { useContextServer } from "../server.js";
+import { getServerUrl, useContextServer } from "../server.js";
 import { getFileIndexer } from "../indexer/electron.js";
 import Store from 'electron-store';
+
 
 const SERVER_URL = getServerUrl();
 const contextServer = useContextServer();

@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import { store, logger } from "./index.js";
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { getServerUrl } from "./index.js";
+import { getServerUrl } from "../server.js";
 
 const SERVER_URL = getServerUrl();
 

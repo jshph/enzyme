@@ -1,8 +1,10 @@
 import { ipcMain } from "electron";
 import { TokenManager } from "../auth.js";
-import { getServerUrl, logger, store } from "./index.js";
+import { logger, store } from "./index.js";
 import { getCurrentSession } from "./user.js";
 import { checkForUpdates } from '../updater.js';
+import { getServerUrl } from "../server.js";
+
 
 export function setupAuthIPCRoutes() {
   ipcMain.handle('login', async (event, email: string, password: string) => {

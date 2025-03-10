@@ -54,6 +54,73 @@ server.tool(
   }
 );
 
+server.tool(
+  "get_tag_summaries",
+  {
+    limit: z.number().optional().describe("Number of tag summaries to retrieve, defaults to 10")
+  },
+  /**
+   * Tool to retrieve summaries for the top trending tags.
+   * These summaries provide concise descriptions of what each tag represents,
+   * which can be used to determine appropriate tags for new notes.
+   */
+  async ({ limit = 10 }) => {
+    try {
+      const response = await fetch(`http://localhost:3779/tag-summaries?limit=${limit}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to fetch tag summaries: ${response.status} ${response.statusText} - ${errorText}`
+            }
+          ]
+        };
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success || !data.summaries || !Array.isArray(data.summaries)) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: "Invalid response format from tag summaries endpoint"
+            }
+          ]
+        };
+      }
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: "# Tag Summaries\n\nHere are summaries of the top tags in your knowledge base:"
+          },
+          ...data.summaries.map(summary => ({
+            type: "text",
+            text: `## #${summary.tag}\n${summary.summary}`
+          }))
+        ]
+      };
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving tag summaries: ${error.message}`
+          }
+        ]
+      };
+    }
+  }
+);
+
 // Define prompts using the server.prompt method
 server.prompt(
   "enz",

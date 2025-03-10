@@ -20,6 +20,10 @@ interface ServerConfig {
   defaultPatternLimit: number;
 }
 
+interface TagSummary {
+  tag: string;
+  summary: string;
+}
 
 const TEMPLATE_RESULT = `## File: {file}
 * Folder: {folder}
@@ -40,6 +44,14 @@ const app: Express = express();
 // Create a singleton instance of ServerContext
 let serverContextInstance: ServerContext | null = null;
 let instanceCounter = 0;
+
+
+export function getServerUrl() {
+  return "http://localhost:3129";
+  // return "https://enzyme-server-production.up.railway.app";
+}
+
+const SERVER_URL = getServerUrl();
 
 export class ServerContext {
   indexer: ElectronFileIndexer | null = null;
@@ -101,6 +113,72 @@ export class ServerContext {
       return items?.links.map(item => item.name).slice(0, limitPerType) ?? [];
     } else {
       return [];
+    }
+  }
+
+  /**
+   * Get summaries for the top trending tags.
+   * This method retrieves the top tags, gets context for each tag,
+   * and then uses the server-side tag summary API to generate summaries.
+   * These summaries can be used to help determine what tags to assign to new notes.
+   * 
+   * @param limit The maximum number of tag summaries to retrieve
+   * @returns An array of TagSummary objects
+   */
+  async getTagSummaries(limit: number = 10): Promise<TagSummary[]> {
+    try {
+      // Get the top tags
+      const topTags = await this.getTrendingEntities({ limitPerType: limit, type: 'tags' });
+      
+      if (!topTags || topTags.length === 0) {
+        this.logger.warn('No tags found for generating summaries');
+        return [];
+      }
+
+      this.logger.info(`Selected ${topTags.length} trending tags: ${topTags.join(', ')}`);
+      
+      // Get context for each tag
+      this.logger.debug('Fetching contexts for each tag...');
+      const tagsContexts: {tag: string, contexts: string[]}[] = [];
+      
+      for (const tag of topTags) {
+        try {
+          this.logger.debug(`Fetching context for tag: #${tag}`);
+          const context = await this.getContext(`#${tag}`, 'json') as MatchResult[];
+          this.logger.debug(`Retrieved ${context.length} context items for tag #${tag}`);
+          
+          // Extract the contents from each context item
+          const contextContents = context.map(c => c.extractedContents.join('\n'));
+          tagsContexts.push({ tag, contexts: contextContents });
+        } catch (error) {
+          this.logger.error(`Error getting context for tag #${tag}:`, error);
+          tagsContexts.push({ tag, contexts: [] }); // Push empty context if error
+        }
+      }
+      
+      // Send request to server to generate summaries
+      this.logger.info(`Sending request to server to generate summaries for ${topTags.length} tags`);
+      
+      try {
+        // Use the correct server URL - this should match what's used in the IPC implementation
+        const response = await axios.post(`${SERVER_URL}/tag-summary/generate-batch`, {
+          tagsContexts
+        });
+        
+        if (response.data && response.data.success && response.data.summaries) {
+          this.logger.info(`Successfully generated ${response.data.summaries.length} tag summaries`);
+          return response.data.summaries;
+        } else {
+          this.logger.error('Invalid response from tag summary API');
+          throw new Error('Invalid response from tag summary API');
+        }
+      } catch (error) {
+        this.logger.error(`Error calling tag summary API: ${error}`);
+        throw error;
+      }
+    } catch (error) {
+      this.logger.error(`Error getting tag summaries: ${error}`);
+      throw error;
     }
   }
 
@@ -178,6 +256,25 @@ export class ServerContext {
       res.json({
         entities: trendingEntities
       });
+    }) as express.RequestHandler);
+    
+    // Endpoint to get tag summaries
+    app.get('/tag-summaries', (async (req: express.Request, res: express.Response) => {
+      try {
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+        const summaries = await this.getTagSummaries(limit);
+        
+        res.json({
+          success: true,
+          summaries
+        });
+      } catch (error) {
+        this.logger.error(`Error retrieving tag summaries: ${error}`);
+        res.status(500).json({ 
+          success: false, 
+          error: 'Failed to retrieve tag summaries' 
+        });
+      }
     }) as express.RequestHandler);
     
     // Add a test endpoint for the chat API

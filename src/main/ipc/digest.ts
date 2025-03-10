@@ -1,8 +1,8 @@
 import { ipcMain } from "electron";
-import { getServerUrl, store, logger } from "./index.js";
+import { store, logger } from "./index.js";
 import { getCurrentSession } from "./user.js";
 import { MatchResult } from '../extract/index.js';
-import { useContextServer } from "../server.js";
+import { getServerUrl, useContextServer } from "../server.js";
 import { shell } from "electron";
 import path from 'path';
 

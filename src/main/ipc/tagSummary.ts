@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
-import { getServerUrl, store, logger } from "./index.js";
+import {  store, logger } from "./index.js";
 import { getCurrentSession } from "./user.js";
-import { useContextServer } from "../server.js";
+import { getServerUrl, useContextServer } from "../server.js";
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { MatchResult } from "../extract/index.js";
