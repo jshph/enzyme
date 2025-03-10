@@ -58,6 +58,25 @@ const TagSummaries: React.FC = () => {
     fetchSummaries();
   }, []);
   
+  // Render loading visualization
+  const renderLoadingState = () => {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-8 bg-brand/20 rounded-lg w-3/4"></div>
+        <div className="space-y-3">
+          <div className="h-4 bg-brand/20 rounded w-1/2"></div>
+          <div className="h-4 bg-brand/20 rounded w-full"></div>
+          <div className="h-4 bg-brand/20 rounded w-3/4"></div>
+        </div>
+        <div className="space-y-2">
+          <div className="h-20 bg-brand/10 rounded-lg"></div>
+          <div className="h-20 bg-brand/10 rounded-lg"></div>
+          <div className="h-20 bg-brand/10 rounded-lg"></div>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div className="card space-y-4 bg-surface/50 p-8 rounded-sm">
       <h3 className="text-lg font-medium text-primary/90">Tag Summaries</h3>
@@ -83,7 +102,10 @@ const TagSummaries: React.FC = () => {
             generateSummaries();
           }}
           disabled={isLoading || !isAuthenticated}
-          className="px-4 py-2 bg-brand/80 text-white rounded-md disabled:opacity-50"
+          className={`
+            px-4 py-2 bg-brand/80 text-white rounded-md disabled:opacity-50
+            ${isLoading ? 'animate-pulse' : ''}
+          `}
         >
           {isLoading ? 'Generating...' : 'Generate Summaries'}
         </button>
@@ -93,7 +115,9 @@ const TagSummaries: React.FC = () => {
         <div className="text-red-500 mb-4">{error}</div>
       )}
       
-      {summaries.length === 0 ? (
+      {isLoading ? (
+        renderLoadingState()
+      ) : summaries.length === 0 ? (
         <div className="text-secondary/70">
           No tag summaries available. Click "Generate Summaries" to create them.
         </div>

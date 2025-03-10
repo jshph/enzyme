@@ -47,8 +47,8 @@ let instanceCounter = 0;
 
 
 export function getServerUrl() {
-  return "http://localhost:3129";
-  // return "https://enzyme-server-production.up.railway.app";
+  // return "http://localhost:3129";
+  return "https://enzyme-server-production.up.railway.app";
 }
 
 const SERVER_URL = getServerUrl();
