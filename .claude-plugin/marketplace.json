@@ -1,0 +1,20 @@
+{
+  "name": "enzyme",
+  "owner": {
+    "name": "jshph"
+  },
+  "plugins": [
+    {
+      "name": "enzyme",
+      "source": "./",
+      "description": "Local-first knowledge indexing — explore your Obsidian vault by concept, not keyword",
+      "version": "0.1.0",
+      "author": {
+        "name": "Joshua Pham"
+      },
+      "homepage": "https://enzyme.garden",
+      "repository": "https://github.com/jshph/enzyme",
+      "keywords": ["obsidian", "knowledge-management", "semantic-search", "pkm"]
+    }
+  ]
+}
