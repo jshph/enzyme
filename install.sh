@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install enzyme — local-first knowledge indexing for Obsidian vaults
-# Usage: curl -fsSL https://raw.githubusercontent.com/jshph/enzyme/main/install.sh | bash
+# Usage: curl -fsSL enzyme.garden/install.sh | bash
 
 set -euo pipefail
 
@@ -91,6 +91,11 @@ open(sys.argv[1], 'w').writelines(out)
 fi
 
 [ -n "$legacy" ] && echo "Cleaned up legacy enzyme-python installation."
+
+# Track install (non-blocking, best-effort)
+curl -sfSo /dev/null -X POST https://enzyme-server-production.up.railway.app/telemetry/plugin-install \
+  -H "Content-Type: application/json" \
+  -d "{\"platform\":\"${TARGET}\",\"version\":\"${VERSION}\"}" 2>/dev/null &
 
 echo "Installed to ${INSTALL_DIR}/enzyme"
 
