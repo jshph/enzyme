@@ -45,4 +45,10 @@ case ":$PATH:" in
 esac
 
 echo ""
-echo "Next: enzyme setup && cd /path/to/vault && enzyme init"
+echo "Next steps:"
+echo "  enzyme setup                        # download embedding model (~52 MB)"
+echo "  cd /path/to/vault && enzyme init    # initialize your vault"
+echo ""
+echo "Add the Claude Code plugin:"
+echo "  claude marketplace add jshph/enzyme"
+echo "  claude plugin install enzyme"
