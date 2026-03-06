@@ -24,10 +24,6 @@ Content retrieval works by **resonance with catalyst questions**, not keyword ma
 
 ## Prerequisites
 
-The `enzyme` binary must be in PATH. If `enzyme` is not found, tell the user:
-
-> Install enzyme: `curl -fsSL https://raw.githubusercontent.com/jshph/enzyme/main/install.sh | bash`
-
 ### Check vault initialization
 
 ```bash
@@ -84,15 +80,6 @@ enzyme apply ./research-papers           # Apply current vault's catalysts
 enzyme apply ./papers --source ~/vault   # Explicit source vault
 ```
 
-### `enzyme setup` — Download the embedding model
-
-Downloads the embedding model to `~/.enzyme/models/`. Required before first use.
-
-```bash
-enzyme setup                  # Download model if missing
-enzyme setup --check          # Exit 0 if present, exit 1 if missing
-```
-
 ### When to use `catalyze` vs `Grep`
 
 **Use Grep when you have a concrete anchor** — something that exists verbatim in the vault:
@@ -109,18 +96,38 @@ enzyme setup --check          # Exit 0 if present, exit 1 if missing
 
 The test: would these exact words appear in their notes? Names and tags always do. Abstract/academic language rarely does — vaults use personal, concrete phrasing.
 
+### Reading JSON output
+
+Enzyme commands return JSON. Read the output directly — do not pipe through Python or jq.
+
+**`enzyme petri`** — each entity object has:
+- `name`, `type`, `frequency`, `activity_trend`, `days_since_last_seen`
+- `catalysts`: array of `{ text, context }`
+
+**`enzyme catalyze`** — response has:
+- `results`: array of `{ file_path, content, similarity }`
+- `top_contributing_catalysts`: array of `{ text, entity, contribution_count }`
+
 ## Workflow
 
-1. **Start with petri.** Run `enzyme petri` to see the landscape — what's active, what's dormant, what catalysts have formed.
+1. **Discover vault context.** At session start, scan for structural files that reveal the vault's shape:
+   - Glob for `**/MOC.md`, `**/Index.md`, `**/agents.md`, `**/CLAUDE.md`, `**/guide.md`, `**/ENZYME_GUIDE.md`, and `**/_index.md`
+   - Read any discovered files to understand vault structure, conventions, and user preferences
+   - If the vault is **not initialized** (no `.enzyme/enzyme.db`), build a guide by stacking the files with context headers describing what each one is, then pipe to `enzyme init --guide`. Example:
+     ```bash
+     enzyme init --guide "$(printf '=== guide.md (entity weights — tags and folders the user considers important) ===\n'; cat guide.md; printf '\n\n=== CLAUDE.md (vault workflow instructions and conventions) ===\n'; cat CLAUDE.md)"
+     ```
+     Each file type carries different signal: `guide.md` is a tag/folder weight map, `ENZYME_GUIDE.md` is a thematic description of the vault's shape, `CLAUDE.md` has workflow conventions and preferences, `MOC.md`/`Index.md` are structural maps. Label them so the LLM generating catalysts knows what it's reading.
+   - If the vault **is initialized**, use this context to orient your petri reading — know the vault's shape before interpreting what's growing
 
-2. **Ground in evidence.** Before making observations, use catalysts from the petri to run `enzyme catalyze` searches. Look across entities for patterns — what the user keeps returning to, avoiding, or circling.
+2. **Start with petri.** Run `enzyme petri` to see the landscape — what's active, what's dormant, what catalysts have formed.
 
-3. **Open with a question.** Synthesize a single 10-20 word question that names something the user is *doing* across their vault — then ground it with their words. This is the invitation in. Follow [petri-guide.md](petri-guide.md).
+3. **Ground in evidence.** Before making observations, use catalysts from the petri to run `enzyme catalyze` searches. Look across entities for patterns — what the user keeps returning to, avoiding, or circling.
 
-4. **Follow threads.** Use catalysts from petri results to drive searches based on what the user responds to. A catalyst for one entity often surfaces content connecting to another.
+4. **Open with a question.** Synthesize a single 10-20 word question that names something the user is *doing* across their vault — then ground it with their words. This is the invitation in. Follow [petri-guide.md](petri-guide.md).
 
-5. **Present search results** following [search-guide.md](search-guide.md). Lead with their words from matched excerpts, notice tensions across results, suggest specific next searches using catalyst language.
+5. **Follow threads.** Use catalysts from petri results to drive searches based on what the user responds to. A catalyst for one entity often surfaces content connecting to another.
 
-6. **Check staleness.** If output includes `"stale": true`, suggest running `enzyme refresh` to pick up recent changes.
+6. **Present search results** following [search-guide.md](search-guide.md). Lead with their words from matched excerpts, notice tensions across results, suggest specific next searches using catalyst language.
 
-7. **If the vault isn't initialized** (no `.enzyme/enzyme.db`), tell the user and offer to run `enzyme init`. If the model is missing, run `enzyme setup`.
+7. **Check staleness.** If output includes `"stale": true`, suggest running `enzyme refresh` to pick up recent changes.
