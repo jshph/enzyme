@@ -37,7 +37,7 @@ ls .enzyme/enzyme.db
 
 ### `enzyme petri` — See what's growing
 
-Returns JSON with trending entities and their catalysts. Output includes a `stale` field — if `true`, suggest running `enzyme refresh`.
+Returns JSON with trending entities and their catalysts.
 
 ```bash
 enzyme petri                  # Default: top 10 entities
@@ -46,7 +46,7 @@ enzyme petri -n 5             # Top 5 entities
 
 ### `enzyme catalyze "query"` — Search by concept
 
-Activates the vault's catalysts to surface resonant content. Returns JSON with matched excerpts, file paths, and contributing catalysts. Output includes a `stale` field.
+Activates the vault's catalysts to surface resonant content. Returns JSON with matched excerpts, file paths, and contributing catalysts.
 
 ```bash
 enzyme catalyze "feeling stuck"
@@ -63,12 +63,17 @@ enzyme init --guide "vault guide content"
 
 ### `enzyme refresh` — Update the index
 
-Re-scans vault content. Use when vault content has changed significantly or when commands report `stale: true`.
+Runs automatically before each prompt via hook — manual use is rarely needed. Use `--full` to force a complete re-index if results seem off.
 
 ```bash
-enzyme refresh
 enzyme refresh --full                 # Force full re-index
 ```
+
+### `--quiet` mode (agent/headless use)
+
+Both `enzyme init --quiet` and `enzyme refresh --quiet` output compact JSON to stdout that includes full petri data. **Do not follow up with a separate `enzyme petri` call** — it's already in the response under the `petri` key.
+
+When `refresh --quiet` detects the vault is fresh (nothing to do), the output is `{ "fresh": true, "petri": ... }`. When stale, the full output includes indexing stats, capabilities, warnings, entity changes, and petri.
 
 ### `enzyme apply <target>` — Project catalysts onto external content
 
@@ -120,7 +125,7 @@ Enzyme commands return JSON. Read the output directly — do not pipe through Py
      Each file type carries different signal: `guide.md` is a tag/folder weight map, `ENZYME_GUIDE.md` is a thematic description of the vault's shape, `CLAUDE.md` has workflow conventions and preferences, `MOC.md`/`Index.md` are structural maps. Label them so the LLM generating catalysts knows what it's reading.
    - If the vault **is initialized**, use this context to orient your petri reading — know the vault's shape before interpreting what's growing
 
-2. **Start with petri.** Run `enzyme petri` to see the landscape — what's active, what's dormant, what catalysts have formed.
+2. **Start with petri.** Run `enzyme petri` to see the landscape — what's active, what's dormant, what catalysts have formed. (If you just ran `init --quiet` or `refresh --quiet`, petri is already in the JSON output — skip this step.)
 
 3. **Ground in evidence.** Before making observations, use catalysts from the petri to run `enzyme catalyze` searches. Look across entities for patterns — what the user keeps returning to, avoiding, or circling.
 
@@ -130,4 +135,3 @@ Enzyme commands return JSON. Read the output directly — do not pipe through Py
 
 6. **Present search results** following [search-guide.md](search-guide.md). Lead with their words from matched excerpts, notice tensions across results, suggest specific next searches using catalyst language.
 
-7. **Check staleness.** If output includes `"stale": true`, suggest running `enzyme refresh` to pick up recent changes.
