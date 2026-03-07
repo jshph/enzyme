@@ -55,4 +55,3 @@ A search for "feeling stuck on the project" finds notes about creative blocks, m
 ## Links
 
 - [enzyme.garden](https://enzyme.garden)
-- [enzyme-rust](https://github.com/jshph/enzyme-rust) — source code
