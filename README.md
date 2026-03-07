@@ -1,5 +1,7 @@
 # Enzyme
 
+<a href="https://discord.gg/nhvsqtKjQd"><img src="https://img.shields.io/discord/1191288276536008745?label=Discord&logo=discord" alt="Discord"></a>
+
 Local-first knowledge indexing — explore your Obsidian vault by concept, not keyword.
 
 ## Install
