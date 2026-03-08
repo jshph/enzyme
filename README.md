@@ -1,7 +1,5 @@
 # Enzyme
 
-<a href="https://discord.gg/nhvsqtKjQd"><img src="https://img.shields.io/discord/1191288276536008745?label=Discord&logo=discord" alt="Discord"></a>
-
 Local-first knowledge indexing — explore your Obsidian vault by concept, not keyword.
 
 ## Install
@@ -55,3 +53,4 @@ A search for "feeling stuck on the project" finds notes about creative blocks, m
 ## Links
 
 - [enzyme.garden](https://enzyme.garden)
+- [enzyme-rust](https://github.com/jshph/enzyme-rust) — source code
