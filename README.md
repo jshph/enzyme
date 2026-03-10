@@ -2,7 +2,9 @@
 
 # 🧬 Enzyme
 
-**Local-first knowledge indexing — explore your Obsidian vault by concept, not keyword.**
+**An LSP for your ideas.**
+
+Gives Claude structural understanding of your Obsidian vault so it thinks with you instead of guessing.
 
 [![Discord](https://img.shields.io/discord/1191288276536008745?label=Discord&logo=discord&style=flat-square)](https://discord.gg/nhvsqtKjQd)
 [![License](https://img.shields.io/github/license/jshph/enzyme?style=flat-square)](LICENSE)
