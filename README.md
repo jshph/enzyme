@@ -6,6 +6,8 @@
 
 Gives Claude structural understanding of your Obsidian vault so it thinks with you instead of guessing.
 
+<img src="demo.gif" alt="Enzyme demo" width="800" />
+
 [![Discord](https://img.shields.io/discord/1191288276536008745?label=Discord&logo=discord&style=flat-square)](https://discord.gg/nhvsqtKjQd)
 [![Binary Size](https://img.shields.io/badge/binary-13MB-blue?style=flat-square)](https://github.com/jshph/enzyme/releases/latest)
 [![Release](https://img.shields.io/github/v/release/jshph/enzyme?style=flat-square)](https://github.com/jshph/enzyme/releases/latest)
