@@ -7,7 +7,7 @@
 Gives Claude structural understanding of your Obsidian vault so it thinks with you instead of guessing.
 
 [![Discord](https://img.shields.io/discord/1191288276536008745?label=Discord&logo=discord&style=flat-square)](https://discord.gg/nhvsqtKjQd)
-[![License](https://img.shields.io/github/license/jshph/enzyme?style=flat-square)](LICENSE)
+[![Binary Size](https://img.shields.io/badge/binary-13MB-blue?style=flat-square)](https://github.com/jshph/enzyme/releases/latest)
 [![Release](https://img.shields.io/github/v/release/jshph/enzyme?style=flat-square)](https://github.com/jshph/enzyme/releases/latest)
 
 [Website](https://enzyme.garden) · [Discord](https://discord.gg/nhvsqtKjQd) · [Getting Started](#install)
