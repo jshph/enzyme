@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.jshph/enzyme",
   "title": "Enzyme",
-  "description": "Semantic search and pattern discovery for Obsidian vaults. Surface connections by concept, not keyword.",
-  "version": "0.3.4",
+  "description": "Semantic search and pattern discovery for Obsidian and markdown vaults.",
+  "version": "0.3.5",
   "websiteUrl": "https://enzyme.garden",
   "repository": {
     "url": "https://github.com/jshph/enzyme",
@@ -12,8 +12,8 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/jshph/enzyme/releases/download/v0.3.4/enzyme-mcp-0.3.4-macos-arm64.mcpb",
-      "fileSha256": "bc0787bfe84300646633058e066bced11320628fc6840ccaca6bd98b10da4b0e",
+      "identifier": "https://github.com/jshph/enzyme/releases/download/v0.3.5/enzyme-mcp-0.3.5-macos-arm64.mcpb",
+      "fileSha256": "e37ee9df6c7280335dfcf1f02aff3e2ff075672b9540db13a8ffa7a316d051a1",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {
@@ -26,8 +26,8 @@
       ]
     },{
       "registryType": "mcpb",
-      "identifier": "https://github.com/jshph/enzyme/releases/download/v0.3.4/enzyme-mcp-0.3.4-linux-x86_64.mcpb",
-      "fileSha256": "12300257c4f11be3f377d9bb1457aca6bb85746a662b0722e45c87e280ffbfad",
+      "identifier": "https://github.com/jshph/enzyme/releases/download/v0.3.5/enzyme-mcp-0.3.5-linux-x86_64.mcpb",
+      "fileSha256": "a0f48cc826d30bf46926cca3f1679846634c0abc49de8381227738bd055440c0",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {
@@ -40,8 +40,8 @@
       ]
     },{
       "registryType": "mcpb",
-      "identifier": "https://github.com/jshph/enzyme/releases/download/v0.3.4/enzyme-mcp-0.3.4-linux-arm64.mcpb",
-      "fileSha256": "ea96b840cc9c91a6e4bc4115df7febb12b9f1d2abcf3bb75431fd712b53bcd90",
+      "identifier": "https://github.com/jshph/enzyme/releases/download/v0.3.5/enzyme-mcp-0.3.5-linux-arm64.mcpb",
+      "fileSha256": "c054b3b3373f289d8142c0323338c3ac8c0d46a3acdcccf23c208e3ea55051e2",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {
