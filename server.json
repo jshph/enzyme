@@ -3,7 +3,7 @@
   "name": "io.github.byenzyme/enzyme",
   "title": "Enzyme",
   "description": "Semantic search and pattern discovery for Obsidian and markdown vaults.",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "websiteUrl": "https://memory.enzyme.garden",
   "repository": {
     "url": "https://github.com/byenzyme/enzyme",
@@ -12,8 +12,8 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/byenzyme/enzyme/releases/download/v0.9.0/enzyme-mcp-0.9.0-macos-arm64.mcpb",
-      "fileSha256": "41bb138f7f0a8492ccf78284a791ad5d132329b3425061993a0067229fad5ee1",
+      "identifier": "https://github.com/byenzyme/enzyme/releases/download/v0.9.1/enzyme-mcp-0.9.1-macos-arm64.mcpb",
+      "fileSha256": "7f185d8e27eeb4c8b15896fc4f203647bfa5c366640ff989ad80b4bfb92db3e8",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {
@@ -26,8 +26,8 @@
       ]
     },{
       "registryType": "mcpb",
-      "identifier": "https://github.com/byenzyme/enzyme/releases/download/v0.9.0/enzyme-mcp-0.9.0-macos-x86_64.mcpb",
-      "fileSha256": "cfb03ffd80f4fe911005289db34f85b1a0d98db6dcbafd8438e467f281dd09d7",
+      "identifier": "https://github.com/byenzyme/enzyme/releases/download/v0.9.1/enzyme-mcp-0.9.1-macos-x86_64.mcpb",
+      "fileSha256": "71d82bff77d9c6b51f4dd4e74a8b6159cdcf14f8e5dfb04c036dce57b8ece533",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {
@@ -40,8 +40,8 @@
       ]
     },{
       "registryType": "mcpb",
-      "identifier": "https://github.com/byenzyme/enzyme/releases/download/v0.9.0/enzyme-mcp-0.9.0-linux-x86_64.mcpb",
-      "fileSha256": "69648731a9c293e11cb6a77333bf2bd23fe9e1531846cbe2eeddcf74aacab660",
+      "identifier": "https://github.com/byenzyme/enzyme/releases/download/v0.9.1/enzyme-mcp-0.9.1-linux-x86_64.mcpb",
+      "fileSha256": "d83f5b0e9a0137849d3d9c5e94e4b8245c45d9c7764f6219d0679a904b672cec",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {
@@ -54,8 +54,8 @@
       ]
     },{
       "registryType": "mcpb",
-      "identifier": "https://github.com/byenzyme/enzyme/releases/download/v0.9.0/enzyme-mcp-0.9.0-linux-arm64.mcpb",
-      "fileSha256": "8f4b5af3f3448c6998a30e8f910812dfb511fb094f0cbfd093d1096b07260875",
+      "identifier": "https://github.com/byenzyme/enzyme/releases/download/v0.9.1/enzyme-mcp-0.9.1-linux-arm64.mcpb",
+      "fileSha256": "3f39f072f5bc447e97094eedd6a19c02fdbede50265b9a788a0e127e3b1b0f89",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {
